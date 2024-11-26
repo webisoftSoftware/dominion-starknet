@@ -28,3 +28,17 @@
 // FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER
 // DEALINGS IN THE SOFTWARE.
 ////////////////////////////////////////////////////////////////////////////////////////////////////
+
+use dominion::models::enums::{EnumCardSuit, EnumCardValue};
+
+#[derive(Drop, Serde, Copy, Debug, Introspect)]
+pub struct Card {
+    pub value: EnumCardValue,
+    pub suit: EnumCardSuit,
+}
+
+#[derive(Drop, Serde, Copy, Debug, Introspect)]
+pub struct Blinds {
+    pub small_blind: u256,
+    pub big_blind: u256,
+}

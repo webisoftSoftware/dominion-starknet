@@ -28,3 +28,68 @@
 // FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER
 // DEALINGS IN THE SOFTWARE.
 ////////////////////////////////////////////////////////////////////////////////////////////////////
+
+
+#[derive(Drop, Serde, Copy, Debug, PartialEq, Introspect)]
+pub enum EnumGameState {
+    WaitingForPlayers,
+    PreFlop,
+    Flop,
+    Turn,
+    River,
+}
+
+#[derive(Drop, Serde, Copy, Debug, Introspect)]
+pub enum EnumPlayerState {
+    Waiting,
+    Active,
+    Folded,
+    AllIn,
+}
+
+#[derive(Drop, Serde, Copy, Debug, Introspect)]
+pub enum EnumPosition {
+    SmallBlind,
+    BigBlind,
+    Dealer,
+    None,
+}
+
+#[derive(Drop, Serde, Copy, Debug, Introspect)]
+pub enum EnumHandRank {
+    HighCard,
+    Pair,
+    TwoPair,
+    ThreeOfAKind,
+    Straight,
+    Flush,
+    FullHouse,
+    FourOfAKind,
+    StraightFlush,
+    RoyalFlush,
+}
+
+#[derive(Drop, Serde, Copy, Debug, PartialEq, Introspect)]
+pub enum EnumCardValue {
+    Two,
+    Three,
+    Four,
+    Five,
+    Six,
+    Seven,
+    Eight,
+    Nine,
+    Ten,
+    Jack,
+    Queen,
+    King,
+    Ace
+}
+
+#[derive(Drop, Serde, Copy, Debug, Introspect)]
+pub enum EnumCardSuit {
+    Spades,
+    Hearts,
+    Diamonds,
+    Clubs,
+}

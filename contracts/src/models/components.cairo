@@ -29,10 +29,42 @@
 // DEALINGS IN THE SOFTWARE.
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 
-#[derive(Drop, Serde, Clone, Debug)]
+use starknet::ContractAddress;
+use dominion::models::structs::{Blinds, Card};
+use dominion::models::enums::{EnumHandRank, EnumPosition, EnumGameState, EnumPlayerState};
+
+#[derive(Drop, Serde, Debug, Introspect)]
 #[dojo::model]
-pub struct MockComponent {
+pub struct ComponentTable {
     #[key]
-    pub value: u32,
-    pub name: ByteArray,
+    pub id: u32, // Table ID
+    pub deck: Array<Card>,
+    pub community_cards: Array<Card>, // Public cards in the middle of the Table
+    pub players: Array<ContractAddress>, // This array is used to keep track of the order of the players turns
+    pub current_turn: ContractAddress, // Address of the Player that needs to play
+    pub pot: u256,
+    // pub side_pots: Array<u256>, // Consider adding this later
+    pub blinds: Blinds,
+    pub state: EnumGameState,
+}
+
+#[derive(Drop, Serde, Debug, Introspect)]
+#[dojo::model]
+pub struct ComponentPlayer {
+    #[key]
+    pub address: ContractAddress,
+    pub hand: ComponentHand,
+    pub chips: u256,
+    pub position: EnumPosition,
+    pub state: EnumPlayerState, // Maybe add a new state for the player that is waiting to join the table and is not eligible for blinds
+    pub current_bet: u256,
+}
+
+#[derive(Drop, Serde, Debug, Introspect)]
+#[dojo::model]
+pub struct ComponentHand {
+    #[key]
+    pub address: ContractAddress, // Address of the Player
+    pub cards: Array<Card>,
+    pub hand_rank: EnumHandRank,
 }
