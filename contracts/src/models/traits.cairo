@@ -66,6 +66,10 @@ impl EnumGameStateDisplay of Display<EnumGameState> {
                 let str: ByteArray = format!("River");
                 f.buffer.append(@str);
             },
+            EnumGameState::Showdown => {
+                let str: ByteArray = format!("Showdown");
+                f.buffer.append(@str);
+            },
         };
         Result::Ok(())
     }
@@ -388,7 +392,6 @@ impl PlayerImpl of IPlayer {
     fn new(address: ContractAddress, initial_chips: u256) -> ComponentPlayer {
         ComponentPlayer {
             address,
-            hand: ComponentHand { address: address, cards: array![], hand_rank: EnumHandRank::HighCard },
             chips: initial_chips,
             position: EnumPosition::None,
             state: EnumPlayerState::Waiting,
@@ -430,17 +433,12 @@ impl HandImpl of IHand {
     fn new(address: ContractAddress) -> ComponentHand {
         ComponentHand {
             address,
-            cards: array![],
-            hand_rank: EnumHandRank::HighCard,
+            cards: array![]
         }
     }
 
     fn add_card(ref self: ComponentHand, card: Card) {
         self.cards.append(card);
-    }
-
-    fn get_rank(self: @ComponentHand) -> EnumHandRank {
-        *self.hand_rank
     }
 
     fn get_cards(self: @ComponentHand) -> Span<Card> {

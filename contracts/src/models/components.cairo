@@ -53,7 +53,6 @@ pub struct ComponentTable {
 pub struct ComponentPlayer {
     #[key]
     pub address: ContractAddress,
-    pub hand: ComponentHand,
     pub chips: u256,
     pub position: EnumPosition,
     pub state: EnumPlayerState, // Maybe add a new state for the player that is waiting to join the table and is not eligible for blinds
@@ -66,5 +65,5 @@ pub struct ComponentHand {
     #[key]
     pub address: ContractAddress, // Address of the Player
     pub cards: Array<Card>,
-    pub hand_rank: EnumHandRank,
+    //pub hand_rank: EnumHandRank,
 }

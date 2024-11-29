@@ -37,6 +37,7 @@ pub enum EnumGameState {
     Flop,
     Turn,
     River,
+    Showdown,
 }
 
 #[derive(Drop, Serde, Copy, Debug, Introspect)]
