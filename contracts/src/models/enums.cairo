@@ -29,7 +29,6 @@
 // DEALINGS IN THE SOFTWARE.
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 
-
 #[derive(Drop, Serde, Copy, Debug, PartialEq, Introspect)]
 pub enum EnumGameState {
     WaitingForPlayers,
@@ -40,7 +39,7 @@ pub enum EnumGameState {
     Showdown,
 }
 
-#[derive(Drop, Serde, Copy, Debug, Introspect)]
+#[derive(Drop, Serde, Copy, Debug, PartialEq, Introspect)]
 pub enum EnumPlayerState {
     Waiting,
     Active,
@@ -48,7 +47,7 @@ pub enum EnumPlayerState {
     AllIn,
 }
 
-#[derive(Drop, Serde, Copy, Debug, Introspect)]
+#[derive(Drop, Serde, Copy, Debug, PartialEq, Introspect)]
 pub enum EnumPosition {
     SmallBlind,
     BigBlind,
@@ -56,7 +55,7 @@ pub enum EnumPosition {
     None,
 }
 
-#[derive(Drop, Serde, Copy, Debug, Introspect)]
+#[derive(Drop, Serde, Copy, Debug, PartialEq, Introspect)]
 pub enum EnumHandRank {
     HighCard,
     Pair,
@@ -87,7 +86,7 @@ pub enum EnumCardValue {
     Ace
 }
 
-#[derive(Drop, Serde, Copy, Debug, Introspect)]
+#[derive(Drop, Serde, Copy, Debug, PartialEq, Introspect)]
 pub enum EnumCardSuit {
     Spades,
     Hearts,

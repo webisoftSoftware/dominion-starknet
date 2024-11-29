@@ -3,8 +3,8 @@
 // ░░███░░░░███                           ░░░              ░░░                      
 //  ░███   ░░███  ██████  █████████████   ████  ████████   ████   ██████  ████████  
 //  ░███    ░███ ███░░███░░███░░███░░███ ░░███ ░░███░░███ ░░███  ███░░███░░███░░███ 
-//  ░███    ░███░███ ░███ ░███ ░███ ░███  ░███  ░███ ░███  ░███ ░███ ░███ ░███ ░███ ░███ 
-//  ░███    ███ ░███ ░███ ░███ ░███ ░███  ░███  ░███ ░███  ░███ ░███ ░███ ░███ ░███ ░███ 
+//  ░███    ░███░███ ░███ ░███ ░███ ░███  ░███  ░███ ░███  ░███ ░███ ░███ ░███ ░███ 
+//  ░███    ███ ░███ ░███ ░███ ░███ ░███  ░███  ░███ ░███  ░███ ░███ ░███ ░███ ░███ 
 //  ██████████  ░░██████  █████░███ █████ █████ ████ █████ █████░░██████  ████ █████
 // ░░░░░░░░░░    ░░░░░░  ░░░░░ ░░░ ░░░░░ ░░░░░ ░░░░ ░░░░░ ░░░░░  ░░░░░░  ░░░░ ░░░░░ 
 //
@@ -31,7 +31,7 @@
 
 use starknet::ContractAddress;
 use core::fmt::{Display, Formatter, Error};
-use dominion::models::structs::{Card, Blinds};
+use dominion::models::structs::StructCard;
 use dominion::models::enums::{
     EnumCardSuit, EnumCardValue, EnumGameState, EnumPlayerState, EnumPosition, EnumHandRank
 };
@@ -42,6 +42,85 @@ use dominion::models::components::{ComponentTable, ComponentPlayer, ComponentHan
 /////////////////////////////// DISPLAY /////////////////////////////////
 /////////////////////////////////////////////////////////////////////////
 /////////////////////////////////////////////////////////////////////////
+
+impl ComponentHandDisplay of Display<ComponentHand> {
+    fn fmt(self: @ComponentHand, ref f: Formatter) -> Result<(), Error> {
+        let str: ByteArray = format!(
+            "Hand {}:\n\tCards:", starknet::contract_address_to_felt252(*self.m_address)
+        );
+        f.buffer.append(@str);
+
+        for card in self
+            .m_cards
+            .span() {
+                let str: ByteArray = format!("\n\t\t{}", *card);
+                f.buffer.append(@str);
+            };
+
+        Result::Ok(())
+    }
+}
+
+impl ComponentPlayerDisplay of Display<ComponentPlayer> {
+    fn fmt(self: @ComponentPlayer, ref f: Formatter) -> Result<(), Error> {
+        let str: ByteArray = format!(
+            "Player: {0}", starknet::contract_address_to_felt252(*self.m_address)
+        );
+        f.buffer.append(@str);
+
+        let str: ByteArray = format!("\n\tChips: {0}", *self.m_chips);
+        f.buffer.append(@str);
+
+        let str: ByteArray = format!("\n\tPosition: {0}", *self.m_position);
+        f.buffer.append(@str);
+
+        let str: ByteArray = format!("\n\tState: {0}", *self.m_state);
+        f.buffer.append(@str);
+
+        let str: ByteArray = format!("\n\tCurrent Bet: {0}", *self.m_current_bet);
+        f.buffer.append(@str);
+
+        Result::Ok(())
+    }
+}
+
+impl ComponentTableDisplay of Display<ComponentTable> {
+    fn fmt(self: @ComponentTable, ref f: Formatter) -> Result<(), Error> {
+        let str: ByteArray = format!("Table {0}:\n\tPlayers:", *self.m_id);
+        f.buffer.append(@str);
+
+        for player in self
+            .m_players
+            .span() {
+                let str: ByteArray = format!(
+                    "\n\t\t{}", starknet::contract_address_to_felt252(*player)
+                );
+                f.buffer.append(@str);
+            };
+
+        let str: ByteArray = format!(
+            "\n\tCurrent Turn: {}", starknet::contract_address_to_felt252(*self.m_current_turn)
+        );
+        f.buffer.append(@str);
+
+        let str: ByteArray = format!("\n\tSmall Blind: {}", *self.m_small_blind);
+        f.buffer.append(@str);
+
+        let str: ByteArray = format!("\n\tBig Blind: {}", *self.m_big_blind);
+        f.buffer.append(@str);
+
+        let str: ByteArray = format!("\n\tPot: {}", *self.m_pot);
+        f.buffer.append(@str);
+
+        let str: ByteArray = format!("\n\tState: {}", *self.m_state);
+        f.buffer.append(@str);
+
+        let str: ByteArray = format!("\n\tLast Played: {}", *self.m_last_played_ts);
+        f.buffer.append(@str);
+
+        Result::Ok(())
+    }
+}
 
 impl EnumGameStateDisplay of Display<EnumGameState> {
     fn fmt(self: @EnumGameState, ref f: Formatter) -> Result<(), Error> {
@@ -255,41 +334,9 @@ impl EnumCardSuitDisplay of Display<EnumCardSuit> {
     }
 }
 
-impl CardDisplay of Display<Card> {
-    fn fmt(self: @Card, ref f: Formatter) -> Result<(), Error> {
-        let str: ByteArray = format!("{}{}", *self.value, *self.suit);
-        f.buffer.append(@str);
-        Result::Ok(())
-    }
-}
-
-impl ComponentTableDisplay of Display<ComponentTable> {
-    fn fmt(self: @ComponentTable, ref f: Formatter) -> Result<(), Error> {
-        let str: ByteArray = format!("Table {}: {} players", *self.id, self.players.len());
-        f.buffer.append(@str);
-        Result::Ok(())
-    }
-}
-
-impl ComponentPlayerDisplay of Display<ComponentPlayer> {
-    fn fmt(self: @ComponentPlayer, ref f: Formatter) -> Result<(), Error> {
-        let str: ByteArray = format!("Player: {}, Chips: {}", starknet::contract_address_to_felt252(*self.address), *self.chips);
-        f.buffer.append(@str);
-        Result::Ok(())
-    }
-}
-
-impl ComponentHandDisplay of Display<ComponentHand> {
-    fn fmt(self: @ComponentHand, ref f: Formatter) -> Result<(), Error> {
-        let str: ByteArray = format!("Hand {}: {} cards", starknet::contract_address_to_felt252(*self.address), self.cards.len());
-        f.buffer.append(@str);
-        Result::Ok(())
-    }
-}
-
-impl BlindsDisplay of Display<Blinds> {
-    fn fmt(self: @Blinds, ref f: Formatter) -> Result<(), Error> {
-        let str: ByteArray = format!("SB: {}, BB: {}", *self.small_blind, *self.big_blind);
+impl StructCardDisplay of Display<StructCard> {
+    fn fmt(self: @StructCard, ref f: Formatter) -> Result<(), Error> {
+        let str: ByteArray = format!("Card: {}\n\tSuit: {}", *self.m_value, *self.m_suit);
         f.buffer.append(@str);
         Result::Ok(())
     }
@@ -297,151 +344,180 @@ impl BlindsDisplay of Display<Blinds> {
 
 /////////////////////////////////////////////////////////////////////////
 /////////////////////////////////////////////////////////////////////////
-/////////////////////////////// TRAITS /////////////////////////////////
+/////////////////////////////// INTO ////////////////////////////////////
+/////////////////////////////////////////////////////////////////////////
+/////////////////////////////////////////////////////////////////////////
+
+impl EnumCardValueInto of Into<EnumCardValue, u32> {
+    fn into(self: EnumCardValue) -> u32 {
+        match self {
+            EnumCardValue::Two => 2,
+            EnumCardValue::Three => 3,
+            EnumCardValue::Four => 4,
+            EnumCardValue::Five => 5,
+            EnumCardValue::Six => 6,
+            EnumCardValue::Seven => 7,
+            EnumCardValue::Eight => 8,
+            EnumCardValue::Nine => 9,
+            EnumCardValue::Ten => 10,
+            EnumCardValue::Jack => 11,
+            EnumCardValue::Queen => 12,
+            EnumCardValue::King => 13,
+            EnumCardValue::Ace => 14,
+        }
+    }
+}
+
+impl EnumHandRankInto of Into<EnumHandRank, u32> {
+    fn into(self: EnumHandRank) -> u32 {
+        match self {
+            EnumHandRank::HighCard => 1,
+            EnumHandRank::Pair => 2,
+            EnumHandRank::TwoPair => 3,
+            EnumHandRank::ThreeOfAKind => 4,
+            EnumHandRank::Straight => 5,
+            EnumHandRank::Flush => 6,
+            EnumHandRank::FullHouse => 7,
+            EnumHandRank::FourOfAKind => 8,
+            EnumHandRank::StraightFlush => 9,
+            EnumHandRank::RoyalFlush => 10,
+        }
+    }
+}
+
+/////////////////////////////////////////////////////////////////////////
+/////////////////////////////////////////////////////////////////////////
+/////////////////////////////// PARTIALEQ ///////////////////////////////
+/////////////////////////////////////////////////////////////////////////
+/////////////////////////////////////////////////////////////////////////
+
+impl ComponentPlayerEq of PartialEq<ComponentPlayer> {
+    fn eq(lhs: @ComponentPlayer, rhs: @ComponentPlayer) -> bool {
+        *lhs.m_address == *rhs.m_address
+    }
+}
+
+impl ComponentTableEq of PartialEq<ComponentTable> {
+    fn eq(lhs: @ComponentTable, rhs: @ComponentTable) -> bool {
+        *lhs.m_id == *rhs.m_id
+    }
+}
+
+impl StructCardEq of PartialEq<StructCard> {
+    fn eq(lhs: @StructCard, rhs: @StructCard) -> bool {
+        *lhs.m_value == *rhs.m_value && *lhs.m_suit == *rhs.m_suit
+    }
+}
+
+impl ComponentHandEq of PartialEq<ComponentHand> {
+    fn eq(lhs: @ComponentHand, rhs: @ComponentHand) -> bool {
+        let mut equal: bool = lhs.m_id == rhs.m_id;
+
+        if !equal {
+            return false;
+        }
+
+        for i in 0..lhs.m_cards.len() {
+            if lhs.m_cards[i] != rhs.m_cards[i] {
+                equal = false;
+                break;
+            }
+        };
+        equal
+    }
+}
+
+/////////////////////////////////////////////////////////////////////////
+/////////////////////////////////////////////////////////////////////////
+/////////////////////////////// TRAITS //////////////////////////////////
 /////////////////////////////////////////////////////////////////////////
 /////////////////////////////////////////////////////////////////////////
 
 #[generate_trait]
 impl CardImpl of ICard {
-    fn new(value: EnumCardValue, suit: EnumCardSuit) -> Card {
-        Card { value, suit }
-    }
-
-    fn compare(self: @Card, other: @Card) -> bool {
-        *self.value == *other.value
-    }
-
-    fn get_value(self: @Card) -> EnumCardValue {
-        *self.value
-    }
-
-    fn get_suit(self: @Card) -> EnumCardSuit {
-        *self.suit
-    }
-}
-
-#[generate_trait]
-impl BlindsImpl of IBlinds {
-    fn new(small_blind: u256, big_blind: u256) -> Blinds {
-        assert(big_blind > small_blind, 'Invalid blind values');
-        Blinds { small_blind, big_blind }
-    }
-
-    fn increase_blinds(ref self: Blinds, multiplier: u256) {
-        self.small_blind *= multiplier;
-        self.big_blind *= multiplier;
-    }
-
-    fn get_blind_amount(self: @Blinds, position: @EnumPosition) -> u256 {
-        match position {
-            EnumPosition::SmallBlind => *self.small_blind,
-            EnumPosition::BigBlind => *self.big_blind,
-            _ => 0,
-        }
-    }
-
-    fn get_small_blind(self: @Blinds) -> u256 {
-        *self.small_blind
-    }
-
-    fn get_big_blind(self: @Blinds) -> u256 {
-        *self.big_blind
-    }
-}
-
-#[generate_trait]
-impl TableImpl of ITable {
-    fn new(id: u32, blinds: Blinds) -> ComponentTable {
-        ComponentTable {
-            id,
-            deck: array![],
-            community_cards: array![],
-            players: array![],
-            current_turn: starknet::contract_address_const::<0>(),
-            pot: 0,
-            blinds,
-            state: EnumGameState::WaitingForPlayers,
-        }
-    }
-
-    fn add_player(ref self: ComponentTable, player: ContractAddress) {
-        if self.state == EnumGameState::WaitingForPlayers {
-            self.players.append(player);
-        }
-    }
-
-    fn add_to_pot(ref self: ComponentTable, amount: u256) {
-        self.pot += amount;
-    }
-
-    fn get_state(self: @ComponentTable) -> EnumGameState {
-        *self.state
-    }
-
-    fn get_pot(self: @ComponentTable) -> u256 {
-        *self.pot
-    }
-
-    fn get_players(self: @ComponentTable) -> Span<ContractAddress> {
-        self.players.span()
-    }
-}
-
-#[generate_trait]
-impl PlayerImpl of IPlayer {
-    fn new(address: ContractAddress, initial_chips: u256) -> ComponentPlayer {
-        ComponentPlayer {
-            address,
-            chips: initial_chips,
-            position: EnumPosition::None,
-            state: EnumPlayerState::Waiting,
-            current_bet: 0,
-        }
-    }
-
-    fn place_bet(ref self: ComponentPlayer, amount: u256) {
-        assert(self.chips >= amount, 'Insufficient chips');
-        self.chips -= amount;
-        self.current_bet += amount;
-    }
-
-    fn fold(ref self: ComponentPlayer) {
-        self.state = EnumPlayerState::Folded;
-    }
-
-    fn all_in(ref self: ComponentPlayer) {
-        self.current_bet += self.chips;
-        self.chips = 0;
-        self.state = EnumPlayerState::AllIn;
-    }
-
-    fn get_state(self: @ComponentPlayer) -> EnumPlayerState {
-        *self.state
-    }
-
-    fn get_chips(self: @ComponentPlayer) -> u256 {
-        *self.chips
-    }
-
-    fn get_current_bet(self: @ComponentPlayer) -> u256 {
-        *self.current_bet
+    fn new(value: EnumCardValue, suit: EnumCardSuit) -> StructCard {
+        StructCard { m_value: value, m_suit: suit }
     }
 }
 
 #[generate_trait]
 impl HandImpl of IHand {
-    fn new(address: ContractAddress) -> ComponentHand {
-        ComponentHand {
-            address,
-            cards: array![]
+    fn new(table_id: u32, address: ContractAddress) -> ComponentHand {
+        ComponentHand { m_id: table_id, m_address: address, m_cards: array![] }
+    }
+
+    fn add_card(ref self: ComponentHand, card: StructCard) {
+        self.m_cards.append(card);
+    }
+}
+
+#[generate_trait]
+impl PlayerImpl of IPlayer {
+    fn new(table_id: u32, address: ContractAddress, initial_chips: u32) -> ComponentPlayer {
+        ComponentPlayer {
+            m_id: table_id,
+            m_address: address,
+            m_chips: initial_chips,
+            m_position: EnumPosition::None,
+            m_state: EnumPlayerState::Waiting,
+            m_current_bet: 0,
         }
     }
 
-    fn add_card(ref self: ComponentHand, card: Card) {
-        self.cards.append(card);
+    fn place_bet(ref self: ComponentPlayer, amount: u32) {
+        assert(self.m_chips >= amount, 'Insufficient chips');
+        self.m_chips -= amount;
+        self.m_current_bet += amount;
     }
 
-    fn get_cards(self: @ComponentHand) -> Span<Card> {
-        self.cards.span()
+    fn fold(ref self: ComponentPlayer) {
+        self.m_state = EnumPlayerState::Folded;
+    }
+
+    fn all_in(ref self: ComponentPlayer) {
+        self.m_current_bet += self.m_chips;
+        self.m_chips = 0;
+        self.m_state = EnumPlayerState::AllIn;
+    }
+}
+
+#[generate_trait]
+impl TableImpl of ITable {
+    fn new(id: u32, small_blind: u32, big_blind: u32) -> ComponentTable {
+        ComponentTable {
+            m_id: id,
+            m_deck: array![],
+            m_community_cards: array![],
+            m_players: array![],
+            m_current_turn: starknet::contract_address_const::<0>(),
+            m_pot: 0,
+            m_small_blind: small_blind,
+            m_big_blind: big_blind,
+            m_state: EnumGameState::WaitingForPlayers,
+            m_last_played_ts: 0,
+        }
+    }
+
+    fn add_player(ref self: ComponentTable, player: ContractAddress) {
+        if self.m_state == EnumGameState::WaitingForPlayers {
+            self.m_players.append(player);
+        }
+    }
+
+    fn add_to_pot(ref self: ComponentTable, amount: u32) {
+        self.m_pot += amount;
+    }
+
+    fn increase_blinds(ref self: ComponentTable, multiplier: u32) {
+        self.m_small_blind *= multiplier;
+        self.m_big_blind *= multiplier;
+    }
+
+    fn get_blind_amount(self: @ComponentTable, position: @EnumPosition) -> u32 {
+        match position {
+            EnumPosition::SmallBlind => *self.m_small_blind,
+            EnumPosition::BigBlind => *self.m_big_blind,
+            _ => 0,
+        }
     }
 }
