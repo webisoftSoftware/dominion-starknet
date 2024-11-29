@@ -45,6 +45,7 @@ mod systems {
 #[cfg(test)]
 mod tests {
     mod utils;
+    mod test_traits;
     mod integration {
         mod test_actions;
         mod test_game;
