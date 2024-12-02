@@ -43,16 +43,16 @@ fn test_eq() {
     assert_eq!(card1, card2);
 
     let player1: ComponentPlayer = ComponentPlayer {
-        m_id: 0,
-        m_address: starknet::contract_address_const::<0x0>(),
+        m_table_id: 0,
+        m_owner: starknet::contract_address_const::<0x0>(),
         m_chips: 100,
         m_position: EnumPosition::None,
         m_state: EnumPlayerState::Active,
         m_current_bet: 0
     };
     let player2: ComponentPlayer = ComponentPlayer {
-        m_id: 0,
-        m_address: starknet::contract_address_const::<0x0>(),
+        m_table_id: 0,
+        m_owner: starknet::contract_address_const::<0x0>(),
         m_chips: 100,
         m_position: EnumPosition::None,
         m_state: EnumPlayerState::Active,
@@ -61,7 +61,7 @@ fn test_eq() {
     assert_eq!(player1, player2);
 
     let table1: ComponentTable = ComponentTable {
-        m_id: 0,
+        m_table_id: 0,
         m_players: array![],
         m_pot: 0,
         m_small_blind: 0,
@@ -73,7 +73,7 @@ fn test_eq() {
         m_last_played_ts: 0
     };
     let table2: ComponentTable = ComponentTable {
-        m_id: 0,
+        m_table_id: 0,
         m_players: array![],
         m_pot: 0,
         m_small_blind: 0,
@@ -86,8 +86,8 @@ fn test_eq() {
     };
     assert_eq!(table1, table2);
 
-    let hand1: ComponentHand = ComponentHand { m_id: 0, m_address: starknet::contract_address_const::<0x0>(), m_cards: array![] };
-    let hand2: ComponentHand = ComponentHand { m_id: 0, m_address: starknet::contract_address_const::<0x0>(), m_cards: array![] };
+    let hand1: ComponentHand = ComponentHand { m_table_id: 0, m_owner: starknet::contract_address_const::<0x0>(), m_cards: array![] };
+    let hand2: ComponentHand = ComponentHand { m_table_id: 0, m_owner: starknet::contract_address_const::<0x0>(), m_cards: array![] };
     assert_eq!(hand1, hand2);
 }
 
@@ -97,8 +97,8 @@ fn test_display() {
         format!(
             "{}",
             ComponentPlayer {
-                m_id: 0,
-                m_address: starknet::contract_address_const::<0x0>(),
+                m_table_id: 0,
+                m_owner: starknet::contract_address_const::<0x0>(),
                 m_chips: 100,
                 m_position: EnumPosition::None,
                 m_state: EnumPlayerState::Active,
@@ -111,7 +111,7 @@ fn test_display() {
         format!(
             "{}",
             ComponentTable {
-                m_id: 0,
+                m_table_id: 0,
                 m_players: array![],
                 m_deck: array![],
                 m_community_cards: array![],
@@ -126,7 +126,7 @@ fn test_display() {
         "Table 0:\n\tPlayers:\n\tCurrent Turn: 0\n\tSmall Blind: 0\n\tBig Blind: 0\n\tPot: 0\n\tState: WaitingForPlayers\n\tLast Played: 0"
     );
     assert_eq!(
-        format!("{}", ComponentHand { m_id: 0, m_address: starknet::contract_address_const::<0x0>(), m_cards: array![] }),
+        format!("{}", ComponentHand { m_table_id: 0, m_owner: starknet::contract_address_const::<0x0>(), m_cards: array![] }),
         "Hand 0:\n\tCards:"
     );
     assert_eq!(
