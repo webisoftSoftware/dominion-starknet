@@ -35,33 +35,14 @@ use dominion::models::enums::{EnumPosition, EnumGameState, EnumPlayerState};
 
 #[derive(Drop, Serde, Debug, Introspect)]
 #[dojo::model]
-struct ComponentTable {
-    #[key]
-    m_id: u32, // Table ID
-    m_deck: Array<StructCard>,
-    m_community_cards: Array<StructCard>, // Public cards in the middle of the Table
-    m_players: Array<
-        ContractAddress
-    >, // This array is used to keep track of the order of the players turns
-    m_current_turn: ContractAddress, // Address of the Player that needs to play
-    m_pot: u32,
-    // pub side_pots: Array<u256>, // Consider adding this later
-    m_small_blind: u32,
-    m_big_blind: u32,
-    m_state: EnumGameState,
-    m_last_played_ts: u64
-}
-
-#[derive(Drop, Serde, Debug, Introspect)]
-#[dojo::model]
 struct ComponentPlayer {
     #[key]
-    m_id: u32, // Table ID
+    m_table_id: u32, // Table ID
     #[key]
-    m_address: ContractAddress,
+    m_owner: ContractAddress,
     m_chips: u32,
     m_position: EnumPosition,
-    m_state: EnumPlayerState, // Maybe add a new state for the player that is waiting to join the table and is not eligible for blinds
+    m_state: EnumPlayerState,
     m_current_bet: u32,
 }
 
@@ -69,8 +50,25 @@ struct ComponentPlayer {
 #[dojo::model]
 struct ComponentHand {
     #[key]
-    m_id: u32, // Table ID
+    m_table_id: u32, // Table ID
     #[key]
-    m_address: ContractAddress, // Address of the Player
+    m_owner: ContractAddress,
     m_cards: Array<StructCard>,
+}
+
+#[derive(Drop, Serde, Debug, Introspect)]
+#[dojo::model]
+struct ComponentTable {
+    #[key]
+    m_table_id: u32, // Table ID
+    m_deck: Array<StructCard>,
+    m_community_cards: Array<StructCard>, // Public cards in the middle of the Table
+    m_players: Array<ContractAddress>, // This array is used to keep track of the order of the players turns
+    m_current_turn: ContractAddress, // Address of the Player that needs to play
+    m_pot: u32,
+    // pub side_pots: Array<u256>, // Consider adding this later
+    m_small_blind: u32,
+    m_big_blind: u32,
+    m_state: EnumGameState,
+    m_last_played_ts: u64
 }

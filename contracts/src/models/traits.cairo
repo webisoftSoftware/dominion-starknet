@@ -46,7 +46,7 @@ use dominion::models::components::{ComponentTable, ComponentPlayer, ComponentHan
 impl ComponentHandDisplay of Display<ComponentHand> {
     fn fmt(self: @ComponentHand, ref f: Formatter) -> Result<(), Error> {
         let str: ByteArray = format!(
-            "Hand {}:\n\tCards:", starknet::contract_address_to_felt252(*self.m_address)
+            "Hand {}:\n\tCards:", starknet::contract_address_to_felt252(*self.m_owner)
         );
         f.buffer.append(@str);
 
@@ -64,7 +64,7 @@ impl ComponentHandDisplay of Display<ComponentHand> {
 impl ComponentPlayerDisplay of Display<ComponentPlayer> {
     fn fmt(self: @ComponentPlayer, ref f: Formatter) -> Result<(), Error> {
         let str: ByteArray = format!(
-            "Player: {0}", starknet::contract_address_to_felt252(*self.m_address)
+            "Player: {0}", starknet::contract_address_to_felt252(*self.m_owner)
         );
         f.buffer.append(@str);
 
@@ -86,7 +86,7 @@ impl ComponentPlayerDisplay of Display<ComponentPlayer> {
 
 impl ComponentTableDisplay of Display<ComponentTable> {
     fn fmt(self: @ComponentTable, ref f: Formatter) -> Result<(), Error> {
-        let str: ByteArray = format!("Table {0}:\n\tPlayers:", *self.m_id);
+        let str: ByteArray = format!("Table {0}:\n\tPlayers:", *self.m_table_id);
         f.buffer.append(@str);
 
         for player in self
@@ -393,13 +393,13 @@ impl EnumHandRankInto of Into<EnumHandRank, u32> {
 
 impl ComponentPlayerEq of PartialEq<ComponentPlayer> {
     fn eq(lhs: @ComponentPlayer, rhs: @ComponentPlayer) -> bool {
-        *lhs.m_address == *rhs.m_address
+        *lhs.m_owner == *rhs.m_owner
     }
 }
 
 impl ComponentTableEq of PartialEq<ComponentTable> {
     fn eq(lhs: @ComponentTable, rhs: @ComponentTable) -> bool {
-        *lhs.m_id == *rhs.m_id
+        *lhs.m_table_id == *rhs.m_table_id
     }
 }
 
@@ -411,7 +411,7 @@ impl StructCardEq of PartialEq<StructCard> {
 
 impl ComponentHandEq of PartialEq<ComponentHand> {
     fn eq(lhs: @ComponentHand, rhs: @ComponentHand) -> bool {
-        let mut equal: bool = lhs.m_id == rhs.m_id;
+        let mut equal: bool = lhs.m_table_id == rhs.m_table_id;
 
         if !equal {
             return false;
@@ -443,25 +443,41 @@ impl CardImpl of ICard {
 #[generate_trait]
 impl HandImpl of IHand {
     fn new(table_id: u32, address: ContractAddress) -> ComponentHand {
-        ComponentHand { m_id: table_id, m_address: address, m_cards: array![] }
+        ComponentHand { m_table_id: table_id, m_owner: address, m_cards: array![] }
     }
 
     fn add_card(ref self: ComponentHand, card: StructCard) {
         self.m_cards.append(card);
     }
+
+    fn clear(ref self: ComponentHand) {
+        self.m_cards = array![];
+    }
+
+    // fn get_current_rank(self: @ComponentHand) -> u8 {
+    //     let mut result: u8 = 0;
+    //     for card in self.m_cards.span() {
+    //         result += *card.get_rank();
+    //     };
+    //     result
+    // }
 }
 
 #[generate_trait]
 impl PlayerImpl of IPlayer {
     fn new(table_id: u32, address: ContractAddress, initial_chips: u32) -> ComponentPlayer {
         ComponentPlayer {
-            m_id: table_id,
-            m_address: address,
+            m_table_id: table_id,
+            m_owner: address,
             m_chips: initial_chips,
             m_position: EnumPosition::None,
             m_state: EnumPlayerState::Waiting,
             m_current_bet: 0,
         }
+    }
+
+    fn set_position(ref self: ComponentPlayer, position: EnumPosition) {
+        self.m_position = position;
     }
 
     fn place_bet(ref self: ComponentPlayer, amount: u32) {
@@ -485,7 +501,7 @@ impl PlayerImpl of IPlayer {
 impl TableImpl of ITable {
     fn new(id: u32, small_blind: u32, big_blind: u32) -> ComponentTable {
         ComponentTable {
-            m_id: id,
+            m_table_id: id,
             m_deck: array![],
             m_community_cards: array![],
             m_players: array![],
@@ -498,10 +514,45 @@ impl TableImpl of ITable {
         }
     }
 
+    fn find_card(self: @ComponentTable, card: @StructCard) -> Option<u32> {
+        let mut found = Option::None;
+
+        for i in 0..self.m_deck.len() {
+            if self.m_deck[i] == card {
+                found = Option::Some(i);
+                break;
+            }
+        };
+        return found;
+    }
+
+    fn find_player(self: @ComponentTable, player: @ContractAddress) -> Option<u32> {
+        let mut found = Option::None;
+
+        for i in 0..self.m_players.len() {
+            if self.m_players[i] == player {
+                found = Option::Some(i);
+                break;
+            }
+        };
+        return found;
+    }
+
     fn add_player(ref self: ComponentTable, player: ContractAddress) {
         if self.m_state == EnumGameState::WaitingForPlayers {
             self.m_players.append(player);
         }
+    }
+
+    fn remove_player(ref self: ComponentTable, player: @ContractAddress) {
+        let mut new_players: Array<ContractAddress> = array![];
+
+        for p in self.m_players.span() {
+            if *p != *player {
+                new_players.append(p.clone());
+            }
+        };
+        self.m_players = new_players;
     }
 
     fn add_to_pot(ref self: ComponentTable, amount: u32) {
