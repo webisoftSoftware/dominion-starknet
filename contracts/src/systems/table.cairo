@@ -61,25 +61,27 @@ mod table_system {
     impl TableSystem of super::ITableSystem<ContractState> {
         fn create_table(
             ref self: ContractState, table_id: u32, small_blind: u256, big_blind: u256
-        ) {// Implement create table logic
+        ) { // Implement create table logic
         }
 
-        fn join_table(ref self: ContractState, table_id: u32) {// Implement join table logic
+        fn join_table(ref self: ContractState, table_id: u32) { // Implement join table logic
         }
 
-        fn leave_table(ref self: ContractState, table_id: u32) {// Implement leave table logic
+        fn leave_table(ref self: ContractState, table_id: u32) { // Implement leave table logic
         }
 
-        fn initialize_deck(ref self: ContractState, table_id: u32) {// Implement initialize deck logic
+        fn initialize_deck(
+            ref self: ContractState, table_id: u32
+        ) { // Implement initialize deck logic
         }
 
-        fn deal_cards(ref self: ContractState, table_id: u32) {// Implement deal cards logic
+        fn deal_cards(ref self: ContractState, table_id: u32) { // Implement deal cards logic
         }
 
-        fn encode_cards(ref self: ContractState, table_id: u32) {// Implement encode cards logic
+        fn encode_cards(ref self: ContractState, table_id: u32) { // Implement encode cards logic
         }
 
-        fn shuffle_deck(ref self: ContractState, table_id: u32) {// Implement shuffle deck logic
+        fn shuffle_deck(ref self: ContractState, table_id: u32) { // Implement shuffle deck logic
         }
     }
 }

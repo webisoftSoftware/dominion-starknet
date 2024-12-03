@@ -62,28 +62,28 @@ mod game_master_system {
 
     #[abi(embed_v0)]
     impl GameMasterImpl of super::IGameMaster<ContractState> {
-        fn change_turn(ref self: ContractState) {// Implement change turn logic
+        fn change_turn(ref self: ContractState) { // Implement change turn logic
         }
 
-        fn skip_turn(ref self: ContractState) {// Implement skip turn logic
+        fn skip_turn(ref self: ContractState) { // Implement skip turn logic
         }
 
-        fn set_admin(ref self: ContractState, admin: ContractAddress) {// Implement set admin logic
+        fn set_admin(ref self: ContractState, admin: ContractAddress) { // Implement set admin logic
         }
 
-        fn start_round(ref self: ContractState) {// Implement start round logic
+        fn start_round(ref self: ContractState) { // Implement start round logic
         }
 
-        fn end_round(ref self: ContractState) {// Implement end round logic
+        fn end_round(ref self: ContractState) { // Implement end round logic
         }
 
-        fn distribute_pot(ref self: ContractState) {// Implement distribute pot logic
+        fn distribute_pot(ref self: ContractState) { // Implement distribute pot logic
         }
 
-        fn evaluate_hands(ref self: ContractState) {// Implement evaluate hands logic
+        fn evaluate_hands(ref self: ContractState) { // Implement evaluate hands logic
         }
 
-        fn determine_winner(ref self: ContractState) {// Implement determine winner logic
+        fn determine_winner(ref self: ContractState) { // Implement determine winner logic
         }
     }
 }
