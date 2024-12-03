@@ -42,16 +42,44 @@
 // DEALINGS IN THE SOFTWARE.
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 
-use dominion::models::enums::{EnumCardSuit, EnumCardValue};
-
-#[derive(Drop, Serde, Copy, Debug, Introspect)]
-pub struct Card {
-    pub value: EnumCardValue,
-    pub suit: EnumCardSuit,
+#[starknet::interface]
+trait ITableSystem<TContractState> {
+    fn create_table(ref self: TContractState, table_id: u32, small_blind: u256, big_blind: u256);
+    fn join_table(ref self: TContractState, table_id: u32);
+    fn leave_table(ref self: TContractState, table_id: u32);
+    fn initialize_deck(ref self: TContractState, table_id: u32);
+    fn deal_cards(ref self: TContractState, table_id: u32);
+    fn encode_cards(ref self: TContractState, table_id: u32);
+    fn shuffle_deck(ref self: TContractState, table_id: u32);
 }
 
-#[derive(Drop, Serde, Copy, Debug, Introspect)]
-pub struct Blinds {
-    pub small_blind: u256,
-    pub big_blind: u256,
+#[dojo::contract]
+mod table_system {
+    use starknet::{ContractAddress, get_caller_address};
+
+    #[abi(embed_v0)]
+    impl TableSystem of super::ITableSystem<ContractState> {
+        fn create_table(
+            ref self: ContractState, table_id: u32, small_blind: u256, big_blind: u256
+        ) {// Implement create table logic
+        }
+
+        fn join_table(ref self: ContractState, table_id: u32) {// Implement join table logic
+        }
+
+        fn leave_table(ref self: ContractState, table_id: u32) {// Implement leave table logic
+        }
+
+        fn initialize_deck(ref self: ContractState, table_id: u32) {// Implement initialize deck logic
+        }
+
+        fn deal_cards(ref self: ContractState, table_id: u32) {// Implement deal cards logic
+        }
+
+        fn encode_cards(ref self: ContractState, table_id: u32) {// Implement encode cards logic
+        }
+
+        fn shuffle_deck(ref self: ContractState, table_id: u32) {// Implement shuffle deck logic
+        }
+    }
 }

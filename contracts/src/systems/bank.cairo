@@ -42,16 +42,32 @@
 // DEALINGS IN THE SOFTWARE.
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 
-use dominion::models::enums::{EnumCardSuit, EnumCardValue};
+use starknet::ContractAddress;
 
-#[derive(Drop, Serde, Copy, Debug, Introspect)]
-pub struct Card {
-    pub value: EnumCardValue,
-    pub suit: EnumCardSuit,
+#[starknet::interface]
+trait IBank<TContractState> {
+    fn deposit_erc20(ref self: TContractState, amount: u256);
+    fn withdraw_erc20(ref self: TContractState, amount: u256);
+    fn fund_paymaster(ref self: TContractState, amount: u256);
+    fn transfer_chips(ref self: TContractState, to: ContractAddress, amount: u256);
 }
 
-#[derive(Drop, Serde, Copy, Debug, Introspect)]
-pub struct Blinds {
-    pub small_blind: u256,
-    pub big_blind: u256,
+#[dojo::contract]
+mod bank_system {
+    use starknet::{ContractAddress, get_caller_address};
+
+    #[abi(embed_v0)]
+    impl BankImpl of super::IBank<ContractState> {
+        fn deposit_erc20(ref self: ContractState, amount: u256) {// Implement deposit ERC20 logic
+        }
+
+        fn withdraw_erc20(ref self: ContractState, amount: u256) {// Implement withdraw ERC20 logic
+        }
+
+        fn fund_paymaster(ref self: ContractState, amount: u256) {// Implement fund paymaster logic
+        }
+
+        fn transfer_chips(ref self: ContractState, to: ContractAddress, amount: u256) {// Implement transfer chips logic
+        }
+    }
 }

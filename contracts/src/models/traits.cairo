@@ -1,12 +1,25 @@
 ////////////////////////////////////////////////////////////////////////////////////////////////////
-// ██████████                             ███              ███                     
-// ░░███░░░░███                           ░░░              ░░░                      
-//  ░███   ░░███  ██████  █████████████   ████  ████████   ████   ██████  ████████  
-//  ░███    ░███ ███░░███░░███░░███░░███ ░░███ ░░███░░███ ░░███  ███░░███░░███░░███ 
-//  ░███    ░███░███ ░███ ░███ ░███ ░███  ░███  ░███ ░███  ░███ ░███ ░███ ░███ ░███ ░███ 
-//  ░███    ███ ░███ ░███ ░███ ░███ ░███  ░███  ░███ ░███  ░███ ░███ ░███ ░███ ░███ ░███ 
-//  ██████████  ░░██████  █████░███ █████ █████ ████ █████ █████░░██████  ████ █████
-// ░░░░░░░░░░    ░░░░░░  ░░░░░ ░░░ ░░░░░ ░░░░░ ░░░░ ░░░░░ ░░░░░  ░░░░░░  ░░░░ ░░░░░ 
+// ██████████                             ███              ███
+// ░░███░░░░███                           ░░░              ░░░
+//  ░███   ░░███  ██████  █████████████
+//  ████  ████████   ████   ██████
+//  ████████
+//  ░███    ░███
+//  ███░░███░░███░░███░░███ ░░███
+//  ░░███░░███ ░░███
+//  ███░░███░░███░░███
+//  ░███    ░███░███ ░███ ░███ ░███ ░███
+//  ░███  ░███ ░███  ░███ ░███ ░███ ░███
+//  ░███ ░███
+//  ░███    ███ ░███ ░███ ░███ ░███ ░███
+//  ░███  ░███ ░███  ░███ ░███ ░███ ░███
+//  ░███ ░███
+//  ██████████  ░░██████  █████░███
+//  █████ █████ ████ █████
+//  █████░░██████  ████ █████
+// ░░░░░░░░░░    ░░░░░░  ░░░░░ ░░░ ░░░░░
+// ░░░░░ ░░░░ ░░░░░ ░░░░░  ░░░░░░  ░░░░
+// ░░░░░
 //
 // Copyright (c) 2024 Dominion
 //
@@ -273,7 +286,11 @@ impl ComponentTableDisplay of Display<ComponentTable> {
 
 impl ComponentPlayerDisplay of Display<ComponentPlayer> {
     fn fmt(self: @ComponentPlayer, ref f: Formatter) -> Result<(), Error> {
-        let str: ByteArray = format!("Player: {}, Chips: {}", starknet::contract_address_to_felt252(*self.address), *self.chips);
+        let str: ByteArray = format!(
+            "Player: {}, Chips: {}",
+            starknet::contract_address_to_felt252(*self.address),
+            *self.chips
+        );
         f.buffer.append(@str);
         Result::Ok(())
     }
@@ -281,7 +298,11 @@ impl ComponentPlayerDisplay of Display<ComponentPlayer> {
 
 impl ComponentHandDisplay of Display<ComponentHand> {
     fn fmt(self: @ComponentHand, ref f: Formatter) -> Result<(), Error> {
-        let str: ByteArray = format!("Hand {}: {} cards", starknet::contract_address_to_felt252(*self.address), self.cards.len());
+        let str: ByteArray = format!(
+            "Hand {}: {} cards",
+            starknet::contract_address_to_felt252(*self.address),
+            self.cards.len()
+        );
         f.buffer.append(@str);
         Result::Ok(())
     }
@@ -389,11 +410,13 @@ impl TableImpl of ITable {
 
 #[generate_trait]
 impl PlayerImpl of IPlayer {
-    fn new(address: ContractAddress, initial_chips: u256) -> ComponentPlayer {
+    fn new(
+        address: ContractAddress, initial_chips: u256, position: EnumPosition
+    ) -> ComponentPlayer {
         ComponentPlayer {
             address,
             chips: initial_chips,
-            position: EnumPosition::None,
+            position,
             state: EnumPlayerState::Waiting,
             current_bet: 0,
         }
@@ -431,10 +454,7 @@ impl PlayerImpl of IPlayer {
 #[generate_trait]
 impl HandImpl of IHand {
     fn new(address: ContractAddress) -> ComponentHand {
-        ComponentHand {
-            address,
-            cards: array![]
-        }
+        ComponentHand { address, cards: array![] }
     }
 
     fn add_card(ref self: ComponentHand, card: Card) {
