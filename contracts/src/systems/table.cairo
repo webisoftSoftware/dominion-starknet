@@ -54,7 +54,7 @@ trait ITableSystem<TContractState> {
 
 #[dojo::contract]
 mod table_system {
-    use starknet::{ContractAddress, get_caller_address};
+    use starknet::{ContractAddress, get_caller_address, TxInfo, get_tx_info};
 
     #[storage]
     struct Storage {
@@ -69,7 +69,7 @@ mod table_system {
         let sender: ContractAddress = tx_info.account_contract_address;
 
         // Set the game master to the sender
-        self.game_master = sender;
+        self.game_master.write(sender);
     }
 
     #[abi(embed_v0)]
@@ -77,7 +77,7 @@ mod table_system {
         fn create_table(
             ref self: ContractState, table_id: u32, small_blind: u256, big_blind: u256
         ) { // Implement create table logic
-            assert!(self.game_master == get_caller_address(), "Only the game master can create a table");
+            assert!(self.game_master.read() == get_caller_address(), "Only the game master can create a table");
         }
 
         fn join_table(ref self: ContractState, table_id: u32) { // Implement join table logic
@@ -94,12 +94,12 @@ mod table_system {
 
         fn shuffle_deck(ref self: ContractState, table_id: u32) { // Implement shuffle deck logic
         }
+    }
 
-        #[generate_trait]
-        impl InternalImpl of InternalTrait {
-            fn _initialize_deck(ref self: ContractState, table_id: u32) {
-                // Implement initialize deck logic
-            }
+    #[generate_trait]
+    impl InternalImpl of InternalTrait {
+        fn _initialize_deck(ref self: ContractState, table_id: u32) {
+            // Implement initialize deck logic
         }
     }
 }
