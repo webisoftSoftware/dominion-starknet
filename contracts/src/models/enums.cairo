@@ -42,6 +42,8 @@
 // DEALINGS IN THE SOFTWARE.
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 
+use crate::models::structs::StructCard;
+
 #[derive(Drop, Serde, Copy, Debug, PartialEq, Introspect)]
 pub enum EnumGameState {
     WaitingForPlayers,
@@ -107,16 +109,23 @@ pub enum EnumCardSuit {
     Clubs,
 }
 
-#[derive(Drop, Serde, Copy, Debug, PartialEq)]
+#[derive(Drop, Serde, Copy, Debug, PartialEq, Introspect)]
+pub enum EnumError {
+    InvalidCard,
+    InvalidHand,
+    InvalidBoard,
+}
+
+#[derive(Drop, Serde, Debug, Introspect)]
 pub enum EnumHandResult {
-    RoyalFlush(Array<StructCard>),
-    StraightFlush(Array<StructCard>),
-    FourOfAKind(Array<StructCard>),
-    FullHouse(Array<StructCard>),
-    Flush(Array<StructCard>),
-    Straight(Array<StructCard>),
-    ThreeOfAKind(Array<StructCard>),
-    TwoPair(Array<StructCard>),
-    Pair(Array<StructCard>),
-    HighCard(Array<StructCard>)
+    RoyalFlush: Array<StructCard>,
+    StraightFlush: Array<StructCard>,
+    FourOfAKind: Array<StructCard>,
+    FullHouse: Array<StructCard>,
+    Flush: Array<StructCard>,
+    Straight: Array<StructCard>,
+    ThreeOfAKind: Array<StructCard>,
+    TwoPair: Array<StructCard>,
+    Pair: Array<StructCard>,
+    HighCard: Array<StructCard>
 }
