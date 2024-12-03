@@ -47,8 +47,8 @@ use starknet::ContractAddress;
 #[starknet::interface]
 trait IBank<TContractState> {
     fn deposit_erc20(ref self: TContractState, amount: u256);
-    fn cashout_erc20(ref self: TContractState, chips_amount: u256);
-    fn transfer_chips(ref self: TContractState, to: ContractAddress, amount: u256);
+    fn cashout_erc20(ref self: TContractState, chips_amount: u32);
+    fn transfer_chips(ref self: TContractState, to: ContractAddress, amount: u32);
 }
 
 #[starknet::interface]
@@ -69,8 +69,8 @@ mod bank_system {
 
     // Constants
     const ETH_TO_CHIPS_RATIO: u256 = 10000000000000; // 100,000 chips per ETH
-    const PAYMASTER_FEE_PERCENTAGE: u256 = 5; // 5% goes to paymaster
-    const WITHDRAWAL_FEE_PERCENTAGE: u256 = 2; // 2% withdrawal fee
+    const PAYMASTER_FEE_PERCENTAGE: u32 = 5; // 5% goes to paymaster
+    const WITHDRAWAL_FEE_PERCENTAGE: u32 = 2; // 2% withdrawal fee
 
     const ETH_CONTRACT_ADDRESS: felt252 =
         0x049d36570d4e46f48e99674bd3fcc84644ddd6b96f7c741b1562b82f9e004dc7; // Sepolia ETH on StarkNet
@@ -88,13 +88,13 @@ mod bank_system {
             let caller = get_caller_address();
 
             // Calculate paymaster fee (5%)
-            let paymaster_amount = (amount * PAYMASTER_FEE_PERCENTAGE) / 100;
+            let paymaster_amount: u256 = (amount * PAYMASTER_FEE_PERCENTAGE.into()) / 100;
 
             // Calculate net amount after paymaster fee
-            let net_amount = amount - paymaster_amount;
+            let net_amount: u256 = amount - paymaster_amount;
 
             // Calculate chips to mint based on net amount
-            let chips_amount = net_amount / ETH_TO_CHIPS_RATIO;
+            let chips_amount: u32 = (net_amount / ETH_TO_CHIPS_RATIO).try_into().unwrap();
 
             // Transfer ETH to paymaster
             InternalImpl::_transfer_eth_to(
@@ -108,24 +108,24 @@ mod bank_system {
 
             // Update player's chips
             let mut player: ComponentPlayer = world.read_model(caller);
-            player.chips += chips_amount;
+            player.m_chips += chips_amount;
             world.write_model(@player);
         }
 
-        fn cashout_erc20(ref self: ContractState, chips_amount: u256) {
+        fn cashout_erc20(ref self: ContractState, chips_amount: u32) {
             let mut world = self.world(@"dominion");
             let caller = get_caller_address();
 
             // Get player component
             let mut player: ComponentPlayer = world.read_model(caller);
-            assert!(player.chips >= chips_amount, "Insufficient chips");
+            assert!(player.m_chips >= chips_amount, "Insufficient chips");
 
             // Calculate ETH amount based on chips
-            let eth_amount = chips_amount * ETH_TO_CHIPS_RATIO;
+            let eth_amount: u256 = chips_amount.into() * ETH_TO_CHIPS_RATIO;
 
             // Calculate withdrawal fee (2%)
-            let fee_amount = (eth_amount * WITHDRAWAL_FEE_PERCENTAGE) / 100;
-            let net_eth_amount = eth_amount - fee_amount;
+            let fee_amount: u256 = (eth_amount * WITHDRAWAL_FEE_PERCENTAGE.into()) / 100;
+            let net_eth_amount: u256 = eth_amount - fee_amount;
 
             // Transfer fee to treasury
             InternalImpl::_transfer_eth_to(
@@ -136,11 +136,11 @@ mod bank_system {
             InternalImpl::_transfer_eth_to(net_eth_amount, caller);
 
             // Update player's chips
-            player.chips -= chips_amount;
+            player.m_chips -= chips_amount;
             world.write_model(@player);
         }
 
-        fn transfer_chips(ref self: ContractState, to: ContractAddress, amount: u256) {
+        fn transfer_chips(ref self: ContractState, to: ContractAddress, amount: u32) {
             let mut world = self.world(@"dominion");
             let caller = get_caller_address();
 
@@ -148,11 +148,11 @@ mod bank_system {
             let mut sender: ComponentPlayer = world.read_model(caller);
             let mut recipient: ComponentPlayer = world.read_model(to);
 
-            assert!(sender.chips >= amount, "Insufficient chips");
+            assert!(sender.m_chips >= amount, "Insufficient chips");
 
             // Update balances
-            sender.chips -= amount;
-            recipient.chips += amount;
+            sender.m_chips -= amount;
+            recipient.m_chips += amount;
 
             world.write_model(@sender);
             world.write_model(@recipient);
