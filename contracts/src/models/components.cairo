@@ -76,10 +76,8 @@ struct ComponentTable {
     m_table_id: u32, // Table ID
     m_deck: Array<StructCard>,
     m_community_cards: Array<StructCard>, // Public cards in the middle of the Table
-    m_players: Array<
-        ContractAddress
-    >, // This array is used to keep track of the order of the players turns
-    m_current_turn: ContractAddress, // Address of the Player that needs to play
+    m_players: Array<ContractAddress>, // This array is used to keep track of the order of the players turns
+    m_current_turn: u8, // Index of the current player turn
     m_pot: u32,
     // pub side_pots: Array<u256>, // Consider adding this later
     m_small_blind: u32,

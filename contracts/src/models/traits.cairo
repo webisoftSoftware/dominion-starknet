@@ -47,7 +47,7 @@ use core::fmt::{Display, Formatter, Error};
 use dominion::models::structs::StructCard;
 use dominion::models::enums::{
     EnumCardSuit, EnumCardValue, EnumGameState, EnumPlayerState, EnumPosition, EnumHandRank,
-    EnumHandResult, EnumError
+    EnumError
 };
 use dominion::models::components::{ComponentTable, ComponentPlayer, ComponentHand};
 
@@ -112,9 +112,7 @@ impl ComponentTableDisplay of Display<ComponentTable> {
                 f.buffer.append(@str);
             };
 
-        let str: ByteArray = format!(
-            "\n\tCurrent Turn: {}", starknet::contract_address_to_felt252(*self.m_current_turn)
-        );
+        let str: ByteArray = format!("\n\tCurrent Turn Index: {}", *self.m_current_turn);
         f.buffer.append(@str);
 
         let str: ByteArray = format!("\n\tSmall Blind: {}", *self.m_small_blind);
@@ -469,106 +467,137 @@ impl HandImpl of IHand {
         self.m_cards = array![];
     }
 
-    fn _is_flush(self: @ComponentHand, cards: @Array<StructCard>) -> bool {
+    fn _is_flush(self: @ComponentHand, cards: @Array<StructCard>, board: @Array<StructCard>) -> bool {
+        // TODO: Implement the non-naive approach.
+        
+        // NAIVE APPROACH:
+        // Check if there's 5 cards with the same suit.
+        let mut is_flush: bool = false;
+        for i in 0..cards.len() {
+            let current_suit: @EnumCardSuit = cards[i].m_suit;
+            let mut matches: u8 = 0;
+
+            for i in 0..board.len() {
+                if board[i].m_suit == current_suit {
+                    matches += 1;
+                }
+            };
+
+            if matches >= 5 {
+                is_flush = true;
+                break;
+            }
+        };
+        is_flush
+    }
+
+    fn _is_royal_straight(self: @ComponentHand, cards: @Array<StructCard>, board: @Array<StructCard>) -> bool {
         // TODO: Implement this
         false
     }
 
-    fn _is_straight(self: @ComponentHand, cards: @Array<StructCard>) -> bool {
+    fn _is_straight(self: @ComponentHand, cards: @Array<StructCard>, board: @Array<StructCard>) -> bool {
         // TODO: Implement this
         false
     }
 
-    fn _analyze_cards(
-        self: @ComponentHand, hand: @Array<StructCard>, board: @Array<StructCard>
-    ) -> Result<EnumHandResult, EnumError> {
+    fn is_four_of_a_kind(self: @ComponentHand, cards: @Array<StructCard>, board: @Array<StructCard>) -> bool {
         // TODO: Implement this
-        Result::Ok(EnumHandResult::HighCard(array![]))
+        false
     }
 
-    fn _get_high_card(self: @ComponentHand, cards: @Array<StructCard>) -> EnumCardValue {
+    fn is_three_of_a_kind(self: @ComponentHand, cards: @Array<StructCard>, board: @Array<StructCard>) -> bool {
         // TODO: Implement this
-        EnumCardValue::Ace
+        false
     }
 
-    fn _get_quad_value(self: @ComponentHand, cards: @Array<StructCard>) -> EnumCardValue {
+    fn is_two_pair(self: @ComponentHand, cards: @Array<StructCard>, board: @Array<StructCard>) -> bool {
         // TODO: Implement this
-        EnumCardValue::Ace
+        false
     }
 
-    fn _get_trips_value(self: @ComponentHand, cards: @Array<StructCard>) -> EnumCardValue {
+    fn is_pair(self: @ComponentHand, cards: @Array<StructCard>, board: @Array<StructCard>) -> bool {
         // TODO: Implement this
-        EnumCardValue::Ace
+        false
     }
 
-    fn _get_high_pair(self: @ComponentHand, cards: @Array<StructCard>) -> EnumCardValue {
+    fn _get_highest_card_value(self: @ComponentHand) -> u32 {
         // TODO: Implement this
-        EnumCardValue::Ace
+        0
     }
 
-    fn _get_pair_value(self: @ComponentHand, cards: @Array<StructCard>) -> EnumCardValue {
+    fn _get_value_from_cards(self: @ComponentHand, cards: @Array<StructCard>) -> u32 {
         // TODO: Implement this
-        EnumCardValue::Ace
+        0
+    }
+
+    fn _analyze_cards(self: @ComponentHand, hand: @Array<StructCard>, board: @Array<StructCard>) -> Result<(EnumHandRank, u32), EnumError> {
+        if hand.len() != 2 {
+            return Result::Err(EnumError::InvalidHand);
+        }
+
+        if board.len() > 5 {
+            return Result::Err(EnumError::InvalidBoard);
+        }
+
+        let value: u32 = self._get_value_from_cards(hand);
+
+        if self._is_flush(hand, board) && self._is_straight(hand, board) {
+            return Result::Ok((EnumHandRank::StraightFlush, value));
+        }
+
+        if self._is_royal_straight(hand, board) && self._is_flush(hand, board) {
+            return Result::Ok((EnumHandRank::RoyalFlush, value));
+        }
+
+        if self._is_flush(hand, board) {
+            return Result::Ok((EnumHandRank::Flush, value));
+        }
+
+        if self._is_straight(hand, board) {
+            return Result::Ok((EnumHandRank::Straight, value));
+        }
+
+        if self.is_four_of_a_kind(hand, board) {
+            return Result::Ok((EnumHandRank::FourOfAKind, value));
+        }
+
+        if self.is_three_of_a_kind(hand, board) {
+            return Result::Ok((EnumHandRank::ThreeOfAKind, value));
+        }
+
+        if self.is_two_pair(hand, board) {
+            return Result::Ok((EnumHandRank::TwoPair, value));
+        }
+
+        if self.is_pair(hand, board) {
+            return Result::Ok((EnumHandRank::Pair, value));
+        }
+
+        Result::Ok((EnumHandRank::HighCard, value))
     }
 
     fn evaluate_hand(
         self: @ComponentHand, hand: @Array<StructCard>, board: @Array<StructCard>
     ) -> (EnumHandRank, u32) {
         // First analyze the hand
-        let result: Result<EnumHandResult, EnumError> = self._analyze_cards(hand, board);
+        let result: Result<(EnumHandRank, u32), EnumError> = self._analyze_cards(hand, board);
         assert!(result.is_ok(), "Invalid hand");
 
+        let (rank, value): (EnumHandRank, u32) = result.unwrap();
+
         // Then match on the result to return the appropriate rank and score
-        match result.unwrap() {
-            EnumHandResult::RoyalFlush(cards) => {
-                assert!(cards.len() == 5, "Invalid number of cards for RoyalFlush");
-                assert!(self._is_flush(@cards), "RoyalFlush must be a flush");
-                assert!(self._is_straight(@cards), "RoyalFlush must be a straight");
-                (EnumHandRank::RoyalFlush, 1000)
-            },
-            EnumHandResult::StraightFlush(cards) => {
-                assert!(cards.len() == 5, "Invalid number of cards for StraightFlush");
-                assert!(self._is_flush(@cards), "StraightFlush must be a flush");
-                assert!(self._is_straight(@cards), "StraightFlush must be a straight");
-                let high_card = self._get_high_card(@cards);
-                (EnumHandRank::StraightFlush, 900 + high_card.into())
-            },
-            EnumHandResult::FourOfAKind(cards) => {
-                assert!(cards.len() == 5, "Invalid number of cards for FourOfAKind");
-                let quad_value = self._get_quad_value(@cards);
-                (EnumHandRank::FourOfAKind, 800 + quad_value.into())
-            },
-            EnumHandResult::FullHouse(cards) => {
-                assert!(cards.len() == 5, "Invalid number of cards for FullHouse");
-                let trips_value = self._get_trips_value(@cards);
-                (EnumHandRank::FullHouse, 700 + trips_value.into())
-            },
-            EnumHandResult::Flush(cards) => {
-                assert!(cards.len() == 5, "Invalid number of cards for Flush");
-                let high_card = self._get_high_card(@cards);
-                (EnumHandRank::Flush, 600 + high_card.into())
-            },
-            EnumHandResult::Straight(cards) => {
-                assert!(cards.len() == 5, "Invalid number of cards for Straight");
-                let high_card = self._get_high_card(@cards);
-                (EnumHandRank::Straight, 500 + high_card.into())
-            },
-            EnumHandResult::ThreeOfAKind(cards) => {
-                let trips_value = self._get_trips_value(@cards);
-                (EnumHandRank::ThreeOfAKind, 400 + trips_value.into())
-            },
-            EnumHandResult::TwoPair(cards) => {
-                let high_pair = self._get_high_pair(@cards);
-                (EnumHandRank::TwoPair, 300 + high_pair.into())
-            },
-            EnumHandResult::Pair(cards) => {
-                let pair_value = self._get_pair_value(@cards);
-                (EnumHandRank::Pair, 200 + pair_value.into())
-            },
-            EnumHandResult::HighCard(cards) => {
-                let high_card = self._get_high_card(@cards);
-                (EnumHandRank::HighCard, 100 + high_card.into())
-            },
+        match rank {
+            EnumHandRank::RoyalFlush => (EnumHandRank::RoyalFlush, EnumHandRank::RoyalFlush.into() + value),
+            EnumHandRank::StraightFlush => (EnumHandRank::StraightFlush, EnumHandRank::StraightFlush.into() + value),
+            EnumHandRank::FourOfAKind => (EnumHandRank::FourOfAKind, EnumHandRank::FourOfAKind.into() + value),
+            EnumHandRank::FullHouse => (EnumHandRank::FullHouse, EnumHandRank::FullHouse.into() + value),
+            EnumHandRank::Flush => (EnumHandRank::Flush, EnumHandRank::Flush.into() + value),
+            EnumHandRank::Straight => (EnumHandRank::Straight, EnumHandRank::Straight.into() + value),
+            EnumHandRank::ThreeOfAKind => (EnumHandRank::ThreeOfAKind, EnumHandRank::ThreeOfAKind.into() + value),
+            EnumHandRank::TwoPair => (EnumHandRank::TwoPair, EnumHandRank::TwoPair.into() + value),
+            EnumHandRank::Pair => (EnumHandRank::Pair, EnumHandRank::Pair.into() + value),
+            EnumHandRank::HighCard => (EnumHandRank::HighCard, EnumHandRank::HighCard.into() + value),
         }
     }
 }
@@ -615,7 +644,7 @@ impl TableImpl of ITable {
             m_deck: array![],
             m_community_cards: array![],
             m_players: array![],
-            m_current_turn: starknet::contract_address_const::<0>(),
+            m_current_turn: 0,
             m_pot: 0,
             m_small_blind: small_blind,
             m_big_blind: big_blind,
