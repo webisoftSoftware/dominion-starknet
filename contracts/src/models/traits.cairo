@@ -33,7 +33,8 @@ use starknet::ContractAddress;
 use core::fmt::{Display, Formatter, Error};
 use dominion::models::structs::StructCard;
 use dominion::models::enums::{
-    EnumCardSuit, EnumCardValue, EnumGameState, EnumPlayerState, EnumPosition, EnumHandRank, EnumHandResult
+    EnumCardSuit, EnumCardValue, EnumGameState, EnumPlayerState, EnumPosition, EnumHandRank, EnumHandResult,
+    EnumError
 };
 use dominion::models::components::{ComponentTable, ComponentPlayer, ComponentHand};
 
@@ -438,10 +439,6 @@ impl CardImpl of ICard {
     fn new(value: EnumCardValue, suit: EnumCardSuit) -> StructCard {
         StructCard { m_value: value, m_suit: suit }
     }
-
-    fn get_value(self: @StructCard) -> u8 {
-        return self.m_suit.into() * self.m_value;
-    }
 }
 
 #[generate_trait]
@@ -458,38 +455,83 @@ impl HandImpl of IHand {
         self.m_cards = array![];
     }
 
-    fn analyze_cards(hand: Array<StructCard>, board: Array<StructCard>) -> Result<EnumHandResult, EnumError> {
+    fn _is_flush(self: @ComponentHand, cards: @Array<StructCard>) -> bool {
+        // TODO: Implement this
+        false
+    }
+
+    fn _is_straight(self: @ComponentHand, cards: @Array<StructCard>) -> bool {
+        // TODO: Implement this
+        false
+    }
+
+    fn _analyze_cards(self: @ComponentHand, hand: @Array<StructCard>, board: @Array<StructCard>) -> Result<EnumHandResult, EnumError> {
         // TODO: Implement this
         Result::Ok(EnumHandResult::HighCard(array![]))
     }
 
-    fn evaluate_hand(hand: Array<StructCard>, board: Array<StructCard>) -> (EnumHandRank, u32) {
+    fn _get_high_card(self: @ComponentHand, cards: @Array<StructCard>) -> EnumCardValue {
+        // TODO: Implement this
+        EnumCardValue::Ace
+    }
+
+    fn _get_quad_value(self: @ComponentHand, cards: @Array<StructCard>) -> EnumCardValue {
+        // TODO: Implement this
+        EnumCardValue::Ace
+    }
+
+    fn _get_trips_value(self: @ComponentHand, cards: @Array<StructCard>) -> EnumCardValue {
+        // TODO: Implement this
+        EnumCardValue::Ace
+    }
+
+    fn _get_high_pair(self: @ComponentHand, cards: @Array<StructCard>) -> EnumCardValue {
+        // TODO: Implement this
+        EnumCardValue::Ace
+    }
+
+    fn _get_pair_value(self: @ComponentHand, cards: @Array<StructCard>) -> EnumCardValue {
+        // TODO: Implement this
+        EnumCardValue::Ace
+    }
+
+    fn evaluate_hand(self: @ComponentHand, hand: @Array<StructCard>, board: @Array<StructCard>) -> (EnumHandRank, u32) {
         // First analyze the hand
-        let result: Result<EnumHandResult, EnumError> = analyze_cards(hand, board);
+        let result: Result<EnumHandResult, EnumError> = self._analyze_cards(hand, board);
         assert!(result.is_ok(), "Invalid hand");
         
         // Then match on the result to return the appropriate rank and score
-        match result {
+        match result.unwrap() {
             EnumHandResult::RoyalFlush(cards) => {
+                assert!(cards.len() == 5, "Invalid number of cards for RoyalFlush");
+                assert!(self._is_flush(@cards), "RoyalFlush must be a flush");
+                assert!(self._is_straight(@cards), "RoyalFlush must be a straight");
                 (EnumHandRank::RoyalFlush, 1000)
             },
             EnumHandResult::StraightFlush(cards) => {
+                assert!(cards.len() == 5, "Invalid number of cards for StraightFlush");
+                assert!(self._is_flush(@cards), "StraightFlush must be a flush");
+                assert!(self._is_straight(@cards), "StraightFlush must be a straight");
                 let high_card = self._get_high_card(@cards);
                 (EnumHandRank::StraightFlush, 900 + high_card.into())
             },
             EnumHandResult::FourOfAKind(cards) => {
+                assert!(cards.len() == 5, "Invalid number of cards for FourOfAKind");
                 let quad_value = self._get_quad_value(@cards);
                 (EnumHandRank::FourOfAKind, 800 + quad_value.into())
             },
             EnumHandResult::FullHouse(cards) => {
+                assert!(cards.len() == 5, "Invalid number of cards for FullHouse");
                 let trips_value = self._get_trips_value(@cards);
                 (EnumHandRank::FullHouse, 700 + trips_value.into())
             },
             EnumHandResult::Flush(cards) => {
+                assert!(cards.len() == 5, "Invalid number of cards for Flush");
                 let high_card = self._get_high_card(@cards);
                 (EnumHandRank::Flush, 600 + high_card.into())
             },
             EnumHandResult::Straight(cards) => {
+                assert!(cards.len() == 5, "Invalid number of cards for Straight");
                 let high_card = self._get_high_card(@cards);
                 (EnumHandRank::Straight, 500 + high_card.into())
             },
@@ -511,6 +553,7 @@ impl HandImpl of IHand {
             },
         }
     }
+}
 
 #[generate_trait]
 impl PlayerImpl of IPlayer {
