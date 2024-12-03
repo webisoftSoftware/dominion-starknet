@@ -46,6 +46,7 @@ mod utils;
 mod test_traits;
 mod integration {
     mod test_actions;
-    mod test_game;
-    mod test_player;
+    mod test_table;
+    mod test_bank;
+    mod test_game_master;
 }
