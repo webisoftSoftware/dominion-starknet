@@ -33,7 +33,7 @@ use starknet::ContractAddress;
 use core::fmt::{Display, Formatter, Error};
 use dominion::models::structs::StructCard;
 use dominion::models::enums::{
-    EnumCardSuit, EnumCardValue, EnumGameState, EnumPlayerState, EnumPosition, EnumHandRank
+    EnumCardSuit, EnumCardValue, EnumGameState, EnumPlayerState, EnumPosition, EnumHandRank, EnumHandResult
 };
 use dominion::models::components::{ComponentTable, ComponentPlayer, ComponentHand};
 
@@ -438,6 +438,10 @@ impl CardImpl of ICard {
     fn new(value: EnumCardValue, suit: EnumCardSuit) -> StructCard {
         StructCard { m_value: value, m_suit: suit }
     }
+
+    fn get_value(self: @StructCard) -> u8 {
+        return self.m_suit.into() * self.m_value;
+    }
 }
 
 #[generate_trait]
@@ -454,14 +458,59 @@ impl HandImpl of IHand {
         self.m_cards = array![];
     }
 
-    // fn get_current_rank(self: @ComponentHand) -> u8 {
-    //     let mut result: u8 = 0;
-    //     for card in self.m_cards.span() {
-    //         result += *card.get_rank();
-    //     };
-    //     result
-    // }
-}
+    fn analyze_cards(hand: Array<StructCard>, board: Array<StructCard>) -> Result<EnumHandResult, EnumError> {
+        // TODO: Implement this
+        Result::Ok(EnumHandResult::HighCard(array![]))
+    }
+
+    fn evaluate_hand(hand: Array<StructCard>, board: Array<StructCard>) -> (EnumHandRank, u32) {
+        // First analyze the hand
+        let result: Result<EnumHandResult, EnumError> = analyze_cards(hand, board);
+        assert!(result.is_ok(), "Invalid hand");
+        
+        // Then match on the result to return the appropriate rank and score
+        match result {
+            EnumHandResult::RoyalFlush(cards) => {
+                (EnumHandRank::RoyalFlush, 1000)
+            },
+            EnumHandResult::StraightFlush(cards) => {
+                let high_card = self._get_high_card(@cards);
+                (EnumHandRank::StraightFlush, 900 + high_card.into())
+            },
+            EnumHandResult::FourOfAKind(cards) => {
+                let quad_value = self._get_quad_value(@cards);
+                (EnumHandRank::FourOfAKind, 800 + quad_value.into())
+            },
+            EnumHandResult::FullHouse(cards) => {
+                let trips_value = self._get_trips_value(@cards);
+                (EnumHandRank::FullHouse, 700 + trips_value.into())
+            },
+            EnumHandResult::Flush(cards) => {
+                let high_card = self._get_high_card(@cards);
+                (EnumHandRank::Flush, 600 + high_card.into())
+            },
+            EnumHandResult::Straight(cards) => {
+                let high_card = self._get_high_card(@cards);
+                (EnumHandRank::Straight, 500 + high_card.into())
+            },
+            EnumHandResult::ThreeOfAKind(cards) => {
+                let trips_value = self._get_trips_value(@cards);
+                (EnumHandRank::ThreeOfAKind, 400 + trips_value.into())
+            },
+            EnumHandResult::TwoPair(cards) => {
+                let high_pair = self._get_high_pair(@cards);
+                (EnumHandRank::TwoPair, 300 + high_pair.into())
+            },
+            EnumHandResult::Pair(cards) => {
+                let pair_value = self._get_pair_value(@cards);
+                (EnumHandRank::Pair, 200 + pair_value.into())
+            },
+            EnumHandResult::HighCard(cards) => {
+                let high_card = self._get_high_card(@cards);
+                (EnumHandRank::HighCard, 100 + high_card.into())
+            },
+        }
+    }
 
 #[generate_trait]
 impl PlayerImpl of IPlayer {
