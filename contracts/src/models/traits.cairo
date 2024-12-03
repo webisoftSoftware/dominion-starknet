@@ -1,12 +1,25 @@
 ////////////////////////////////////////////////////////////////////////////////////////////////////
-// ██████████                             ███              ███                     
-// ░░███░░░░███                           ░░░              ░░░                      
-//  ░███   ░░███  ██████  █████████████   ████  ████████   ████   ██████  ████████  
-//  ░███    ░███ ███░░███░░███░░███░░███ ░░███ ░░███░░███ ░░███  ███░░███░░███░░███ 
-//  ░███    ░███░███ ░███ ░███ ░███ ░███  ░███  ░███ ░███  ░███ ░███ ░███ ░███ ░███ 
-//  ░███    ███ ░███ ░███ ░███ ░███ ░███  ░███  ░███ ░███  ░███ ░███ ░███ ░███ ░███ 
-//  ██████████  ░░██████  █████░███ █████ █████ ████ █████ █████░░██████  ████ █████
-// ░░░░░░░░░░    ░░░░░░  ░░░░░ ░░░ ░░░░░ ░░░░░ ░░░░ ░░░░░ ░░░░░  ░░░░░░  ░░░░ ░░░░░ 
+// ██████████                             ███              ███
+// ░░███░░░░███                           ░░░              ░░░
+//  ░███   ░░███  ██████  █████████████
+//  ████  ████████   ████   ██████
+//  ████████
+//  ░███    ░███
+//  ███░░███░░███░░███░░███ ░░███
+//  ░░███░░███ ░░███
+//  ███░░███░░███░░███
+//  ░███    ░███░███ ░███ ░███ ░███ ░███
+//  ░███  ░███ ░███  ░███ ░███ ░███ ░███
+//  ░███
+//  ░███    ███ ░███ ░███ ░███ ░███ ░███
+//  ░███  ░███ ░███  ░███ ░███ ░███ ░███
+//  ░███
+//  ██████████  ░░██████  █████░███
+//  █████ █████ ████ █████
+//  █████░░██████  ████ █████
+// ░░░░░░░░░░    ░░░░░░  ░░░░░ ░░░ ░░░░░
+// ░░░░░ ░░░░ ░░░░░ ░░░░░  ░░░░░░  ░░░░
+// ░░░░░
 //
 // Copyright (c) 2024 Dominion
 //
@@ -33,8 +46,8 @@ use starknet::ContractAddress;
 use core::fmt::{Display, Formatter, Error};
 use dominion::models::structs::StructCard;
 use dominion::models::enums::{
-    EnumCardSuit, EnumCardValue, EnumGameState, EnumPlayerState, EnumPosition, EnumHandRank, EnumHandResult,
-    EnumError
+    EnumCardSuit, EnumCardValue, EnumGameState, EnumPlayerState, EnumPosition, EnumHandRank,
+    EnumHandResult, EnumError
 };
 use dominion::models::components::{ComponentTable, ComponentPlayer, ComponentHand};
 
@@ -418,12 +431,13 @@ impl ComponentHandEq of PartialEq<ComponentHand> {
             return false;
         }
 
-        for i in 0..lhs.m_cards.len() {
-            if lhs.m_cards[i] != rhs.m_cards[i] {
-                equal = false;
-                break;
-            }
-        };
+        for i in 0
+            ..lhs.m_cards.len() {
+                if lhs.m_cards[i] != rhs.m_cards[i] {
+                    equal = false;
+                    break;
+                }
+            };
         equal
     }
 }
@@ -465,7 +479,9 @@ impl HandImpl of IHand {
         false
     }
 
-    fn _analyze_cards(self: @ComponentHand, hand: @Array<StructCard>, board: @Array<StructCard>) -> Result<EnumHandResult, EnumError> {
+    fn _analyze_cards(
+        self: @ComponentHand, hand: @Array<StructCard>, board: @Array<StructCard>
+    ) -> Result<EnumHandResult, EnumError> {
         // TODO: Implement this
         Result::Ok(EnumHandResult::HighCard(array![]))
     }
@@ -495,11 +511,13 @@ impl HandImpl of IHand {
         EnumCardValue::Ace
     }
 
-    fn evaluate_hand(self: @ComponentHand, hand: @Array<StructCard>, board: @Array<StructCard>) -> (EnumHandRank, u32) {
+    fn evaluate_hand(
+        self: @ComponentHand, hand: @Array<StructCard>, board: @Array<StructCard>
+    ) -> (EnumHandRank, u32) {
         // First analyze the hand
         let result: Result<EnumHandResult, EnumError> = self._analyze_cards(hand, board);
         assert!(result.is_ok(), "Invalid hand");
-        
+
         // Then match on the result to return the appropriate rank and score
         match result.unwrap() {
             EnumHandResult::RoyalFlush(cards) => {
@@ -609,24 +627,28 @@ impl TableImpl of ITable {
     fn find_card(self: @ComponentTable, card: @StructCard) -> Option<u32> {
         let mut found = Option::None;
 
-        for i in 0..self.m_deck.len() {
-            if self.m_deck[i] == card {
-                found = Option::Some(i);
-                break;
-            }
-        };
+        for i in 0
+            ..self.m_deck.len() {
+                if self.m_deck[i] == card {
+                    found = Option::Some(i);
+                    break;
+                }
+            };
         return found;
     }
 
     fn find_player(self: @ComponentTable, player: @ContractAddress) -> Option<u32> {
         let mut found = Option::None;
 
-        for i in 0..self.m_players.len() {
-            if self.m_players[i] == player {
-                found = Option::Some(i);
-                break;
-            }
-        };
+        for i in 0
+            ..self
+                .m_players
+                .len() {
+                    if self.m_players[i] == player {
+                        found = Option::Some(i);
+                        break;
+                    }
+                };
         return found;
     }
 

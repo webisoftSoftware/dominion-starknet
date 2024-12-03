@@ -1,12 +1,25 @@
 ////////////////////////////////////////////////////////////////////////////////////////////////////
-// ██████████                             ███              ███                     
-// ░░███░░░░███                           ░░░              ░░░                      
-//  ░███   ░░███  ██████  █████████████   ████  ████████   ████   ██████  ████████  
-//  ░███    ░███ ███░░███░░███░░███░░███ ░░███ ░░███░░███ ░░███  ███░░███░░███░░███ 
-//  ░███    ░███░███ ░███ ░███ ░███ ░███  ░███  ░███ ░███  ░███ ░███ ░███ ░███ ░███ 
-//  ░███    ███ ░███ ░███ ░███ ░███ ░███  ░███  ░███ ░███  ░███ ░███ ░███ ░███ ░███ 
-//  ██████████  ░░██████  █████░███ █████ █████ ████ █████ █████░░██████  ████ █████
-// ░░░░░░░░░░    ░░░░░░  ░░░░░ ░░░ ░░░░░ ░░░░░ ░░░░ ░░░░░ ░░░░░  ░░░░░░  ░░░░ ░░░░░ 
+// ██████████                             ███              ███
+// ░░███░░░░███                           ░░░              ░░░
+//  ░███   ░░███  ██████  █████████████
+//  ████  ████████   ████   ██████
+//  ████████
+//  ░███    ░███
+//  ███░░███░░███░░███░░███ ░░███
+//  ░░███░░███ ░░███
+//  ███░░███░░███░░███
+//  ░███    ░███░███ ░███ ░███ ░███ ░███
+//  ░███  ░███ ░███  ░███ ░███ ░███ ░███
+//  ░███
+//  ░███    ███ ░███ ░███ ░███ ░███ ░███
+//  ░███  ░███ ░███  ░███ ░███ ░███ ░███
+//  ░███
+//  ██████████  ░░██████  █████░███
+//  █████ █████ ████ █████
+//  █████░░██████  ████ █████
+// ░░░░░░░░░░    ░░░░░░  ░░░░░ ░░░ ░░░░░
+// ░░░░░ ░░░░ ░░░░░ ░░░░░  ░░░░░░  ░░░░
+// ░░░░░
 //
 // Copyright (c) 2024 Dominion
 //
@@ -29,10 +42,15 @@
 // DEALINGS IN THE SOFTWARE.
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 
-use crate::models::enums::{EnumCardSuit, EnumCardValue, EnumHandRank, EnumPlayerState, EnumGameState, EnumPosition};
-use crate::models::traits::{EnumCardValueDisplay, EnumCardSuitDisplay, EnumHandRankDisplay, EnumPlayerStateDisplay, EnumGameStateDisplay,
-EnumHandRankInto, ComponentPlayerEq, ComponentTableEq, ComponentPlayerDisplay, EnumCardValueInto, ComponentTableDisplay, ComponentHandDisplay,
-StructCardDisplay, ComponentHandEq, StructCardEq};
+use crate::models::enums::{
+    EnumCardSuit, EnumCardValue, EnumHandRank, EnumPlayerState, EnumGameState, EnumPosition
+};
+use crate::models::traits::{
+    EnumCardValueDisplay, EnumCardSuitDisplay, EnumHandRankDisplay, EnumPlayerStateDisplay,
+    EnumGameStateDisplay, EnumHandRankInto, ComponentPlayerEq, ComponentTableEq,
+    ComponentPlayerDisplay, EnumCardValueInto, ComponentTableDisplay, ComponentHandDisplay,
+    StructCardDisplay, ComponentHandEq, StructCardEq
+};
 use crate::models::structs::{StructCard};
 use crate::models::components::{ComponentHand, ComponentTable, ComponentPlayer};
 
@@ -86,8 +104,12 @@ fn test_eq() {
     };
     assert_eq!(table1, table2);
 
-    let hand1: ComponentHand = ComponentHand { m_table_id: 0, m_owner: starknet::contract_address_const::<0x0>(), m_cards: array![] };
-    let hand2: ComponentHand = ComponentHand { m_table_id: 0, m_owner: starknet::contract_address_const::<0x0>(), m_cards: array![] };
+    let hand1: ComponentHand = ComponentHand {
+        m_table_id: 0, m_owner: starknet::contract_address_const::<0x0>(), m_cards: array![]
+    };
+    let hand2: ComponentHand = ComponentHand {
+        m_table_id: 0, m_owner: starknet::contract_address_const::<0x0>(), m_cards: array![]
+    };
     assert_eq!(hand1, hand2);
 }
 
@@ -126,17 +148,16 @@ fn test_display() {
         "Table 0:\n\tPlayers:\n\tCurrent Turn: 0\n\tSmall Blind: 0\n\tBig Blind: 0\n\tPot: 0\n\tState: WaitingForPlayers\n\tLast Played: 0"
     );
     assert_eq!(
-        format!("{}", ComponentHand { m_table_id: 0, m_owner: starknet::contract_address_const::<0x0>(), m_cards: array![] }),
+        format!(
+            "{}",
+            ComponentHand {
+                m_table_id: 0, m_owner: starknet::contract_address_const::<0x0>(), m_cards: array![]
+            }
+        ),
         "Hand 0:\n\tCards:"
     );
     assert_eq!(
-        format!(
-            "{}",
-            StructCard {
-                m_value: EnumCardValue::Two,
-                m_suit: EnumCardSuit::Clubs
-            }
-        ),
+        format!("{}", StructCard { m_value: EnumCardValue::Two, m_suit: EnumCardSuit::Clubs }),
         "Card: 2\n\tSuit: C"
     );
     assert_eq!(format!("{}", EnumHandRank::HighCard), "HighCard");
