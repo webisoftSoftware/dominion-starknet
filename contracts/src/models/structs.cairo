@@ -45,13 +45,7 @@
 use dominion::models::enums::{EnumCardSuit, EnumCardValue};
 
 #[derive(Drop, Serde, Copy, Debug, Introspect)]
-pub struct Card {
-    pub value: EnumCardValue,
-    pub suit: EnumCardSuit,
-}
-
-#[derive(Drop, Serde, Copy, Debug, Introspect)]
-pub struct Blinds {
-    pub small_blind: u256,
-    pub big_blind: u256,
+struct StructCard {
+    m_value: EnumCardValue,
+    m_suit: EnumCardSuit,
 }
