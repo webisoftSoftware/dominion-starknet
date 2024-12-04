@@ -49,7 +49,8 @@ use crate::models::traits::{
     EnumCardValueDisplay, EnumCardSuitDisplay, EnumHandRankDisplay, EnumPlayerStateDisplay,
     EnumGameStateDisplay, EnumHandRankInto, ComponentPlayerEq, ComponentTableEq,
     ComponentPlayerDisplay, EnumCardValueInto, ComponentTableDisplay, ComponentHandDisplay,
-    StructCardDisplay, ComponentHandEq, StructCardEq
+    StructCardDisplay, ComponentHandEq, StructCardEq, HandDefaultImpl, TableDefaultImpl,
+    PlayerDefaultImpl
 };
 use crate::models::structs::{StructCard};
 use crate::models::components::{ComponentHand, ComponentTable, ComponentPlayer};
@@ -60,56 +61,18 @@ fn test_eq() {
     let card2: StructCard = StructCard { m_value: EnumCardValue::Two, m_suit: EnumCardSuit::Clubs };
     assert_eq!(card1, card2);
 
-    let player1: ComponentPlayer = ComponentPlayer {
-        m_table_id: 0,
-        m_owner: starknet::contract_address_const::<0x0>(),
-        m_chips: 100,
-        m_position: EnumPosition::None,
-        m_state: EnumPlayerState::Active,
-        m_current_bet: 0
-    };
-    let player2: ComponentPlayer = ComponentPlayer {
-        m_table_id: 0,
-        m_owner: starknet::contract_address_const::<0x0>(),
-        m_chips: 100,
-        m_position: EnumPosition::None,
-        m_state: EnumPlayerState::Active,
-        m_current_bet: 0
-    };
+    let mut player1: ComponentPlayer = Default::default();
+    let mut player2: ComponentPlayer = Default::default();
+    player1.m_chips = 100;
+    player2.m_chips = 100;
     assert_eq!(player1, player2);
 
-    let table1: ComponentTable = ComponentTable {
-        m_table_id: 0,
-        m_players: array![],
-        m_pot: 0,
-        m_small_blind: 0,
-        m_big_blind: 0,
-        m_deck: array![],
-        m_current_turn: 0,
-        m_community_cards: array![],
-        m_state: EnumGameState::WaitingForPlayers,
-        m_last_played_ts: 0
-    };
-    let table2: ComponentTable = ComponentTable {
-        m_table_id: 0,
-        m_players: array![],
-        m_pot: 0,
-        m_small_blind: 0,
-        m_big_blind: 0,
-        m_current_turn: 0,
-        m_deck: array![],
-        m_community_cards: array![],
-        m_state: EnumGameState::WaitingForPlayers,
-        m_last_played_ts: 0
-    };
+    let table1: ComponentTable = Default::default();
+    let table2: ComponentTable = Default::default();
     assert_eq!(table1, table2);
 
-    let hand1: ComponentHand = ComponentHand {
-        m_table_id: 0, m_owner: starknet::contract_address_const::<0x0>(), m_cards: array![]
-    };
-    let hand2: ComponentHand = ComponentHand {
-        m_table_id: 0, m_owner: starknet::contract_address_const::<0x0>(), m_cards: array![]
-    };
+    let hand1: ComponentHand = Default::default();
+    let hand2: ComponentHand = Default::default();
     assert_eq!(hand1, hand2);
 }
 
@@ -132,27 +95,14 @@ fn test_display() {
     assert_eq!(
         format!(
             "{}",
-            ComponentTable {
-                m_table_id: 0,
-                m_players: array![],
-                m_deck: array![],
-                m_community_cards: array![],
-                m_pot: 0,
-                m_current_turn: 0,
-                m_small_blind: 0,
-                m_big_blind: 0,
-                m_state: EnumGameState::WaitingForPlayers,
-                m_last_played_ts: 0
-            }
+            TableDefaultImpl::default()
         ),
         "Table 0:\n\tPlayers:\n\tCurrent Turn Index: 0\n\tSmall Blind: 0\n\tBig Blind: 0\n\tPot: 0\n\tState: WaitingForPlayers\n\tLast Played: 0"
     );
     assert_eq!(
         format!(
             "{}",
-            ComponentHand {
-                m_table_id: 0, m_owner: starknet::contract_address_const::<0x0>(), m_cards: array![]
-            }
+            HandDefaultImpl::default()
         ),
         "Hand 0:\n\tCards:"
     );
