@@ -85,8 +85,8 @@ struct ComponentTable {
     // pub side_pots: Array<u256>, // Consider adding this later
     m_small_blind: u32,
     m_big_blind: u32,
-    m_max_buy_in: u32,
     m_min_buy_in: u32,
+    m_max_buy_in: u32,
     m_state: EnumGameState,
     m_last_played_ts: u64
 }

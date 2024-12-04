@@ -1127,8 +1127,8 @@ impl TableImpl of ITable {
         id: u32,
         small_blind: u32,
         big_blind: u32,
-        max_buy_in: u32,
         min_buy_in: u32,
+        max_buy_in: u32,
         m_players: Array<ContractAddress>
     ) -> ComponentTable {
         assert!(min_buy_in > max_buy_in, "Minimum buy-in cannot be greater than maximum buy-in");
@@ -1143,8 +1143,8 @@ impl TableImpl of ITable {
             m_pot: 0,
             m_small_blind: small_blind,
             m_big_blind: big_blind,
-            m_max_buy_in: max_buy_in,
             m_min_buy_in: min_buy_in,
+            m_max_buy_in: max_buy_in,
             m_state: EnumGameState::WaitingForPlayers,
             m_last_played_ts: 0,
         };
@@ -1259,9 +1259,7 @@ impl TableImpl of ITable {
 impl HandDefaultImpl of Default<ComponentHand> {
     fn default() -> ComponentHand {
         return ComponentHand {
-            m_table_id: 0,
-            m_owner: starknet::contract_address_const::<0x0>(),
-            m_cards: array![],
+            m_table_id: 0, m_owner: starknet::contract_address_const::<0x0>(), m_cards: array![],
         };
     }
 }
