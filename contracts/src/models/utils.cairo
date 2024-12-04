@@ -51,7 +51,7 @@ fn sort(arr: @Array<StructCard>) -> Array<StructCard> {
     if arr.len() <= 1 {
         return arr.clone();
     }
-    
+
     // Perform merge sort
     return merge_sort(arr, 0, arr.len() - 1);
 }
@@ -118,11 +118,11 @@ fn merge_sort(arr: @Array<StructCard>, left: usize, right: usize) -> Array<Struc
     }
 
     let mid = left + (right - left) / 2;
-    
+
     // Sort first and second halves
     let sorted_left = merge_sort(arr, left, mid);
     let sorted_right = merge_sort(arr, mid + 1, right);
-    
+
     // Create new array with sorted elements
     let mut result = array![];
     let mut i = 0;
@@ -135,6 +135,6 @@ fn merge_sort(arr: @Array<StructCard>, left: usize, right: usize) -> Array<Struc
         result.append(sorted_right[i].clone());
         i += 1;
     };
-    
+
     merge(@result, 0, mid, right)
 }
