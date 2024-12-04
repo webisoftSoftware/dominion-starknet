@@ -46,7 +46,7 @@ use starknet::ContractAddress;
 
 #[starknet::interface]
 trait ITableSystem<TContractState> {
-    fn create_table(ref self: TContractState, small_blind: u32, big_blind: u32);
+    fn create_table(ref self: TContractState, small_blind: u32, big_blind: u32, max_buy_in: u32, min_buy_in: u32, players: Array<ContractAddress>);
     fn join_table(ref self: TContractState, table_id: u32);
     fn leave_table(ref self: TContractState, table_id: u32);
 }
@@ -83,7 +83,7 @@ mod table_system {
     #[abi(embed_v0)]
     impl TableSystemImpl of super::ITableSystem<ContractState> {
         fn create_table(
-            ref self: ContractState, small_blind: u32, big_blind: u32
+            ref self: ContractState, small_blind: u32, big_blind: u32, max_buy_in: u32, min_buy_in: u32
         ) {
             let mut world = self.world(@"dominion");
             let caller = get_caller_address();
@@ -92,7 +92,7 @@ mod table_system {
 
             let table_id = self.counter.read();
             // Create new table
-            let table: ComponentTable = ITable::new(table_id, small_blind, big_blind);
+            let table: ComponentTable = ITable::new(table_id, small_blind, big_blind, max_buy_in, min_buy_in, array![]);
 
             // Write table to world
             world.write_model(@table);
