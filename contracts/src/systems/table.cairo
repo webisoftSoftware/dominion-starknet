@@ -63,8 +63,7 @@ mod table_system {
     use starknet::{ContractAddress, get_caller_address, TxInfo, get_tx_info};
     use dojo::{model::ModelStorage, world::IWorldDispatcher};
 
-    // Constants for table player limits
-    const MIN_PLAYERS: u32 = 2;
+    // Constant for table player limits
     const MAX_PLAYERS: u32 = 6;
 
     // Contract storage variables

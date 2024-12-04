@@ -187,6 +187,10 @@ impl EnumPlayerStateDisplay of Display<EnumPlayerState> {
                 let str: ByteArray = format!("Waiting");
                 f.buffer.append(@str);
             },
+            EnumPlayerState::Ready => {
+                let str: ByteArray = format!("Ready");
+                f.buffer.append(@str);
+            },
             EnumPlayerState::Active => {
                 let str: ByteArray = format!("Active");
                 f.buffer.append(@str);
