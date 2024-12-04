@@ -469,12 +469,47 @@ impl HandImpl of IHand {
         self.m_cards = array![];
     }
 
+    fn evaluate_hand(self: @ComponentHand, board: @Array<StructCard>) -> (EnumHandRank, u32) {
+        // First analyze the hand
+        let rank_result: Result<EnumHandRank, EnumError> = self._evaluate_rank(board);
+        assert!(rank_result.is_ok(), "Invalid hand");
+
+        let value: u32 = self._evaluate_value();
+
+        // Return the appropriate score and rank in case of a tie.
+        match rank_result.unwrap() {
+            EnumHandRank::RoyalFlush => (
+                EnumHandRank::RoyalFlush, EnumHandRank::RoyalFlush.into() + value
+            ),
+            EnumHandRank::StraightFlush => (
+                EnumHandRank::StraightFlush, EnumHandRank::StraightFlush.into() + value
+            ),
+            EnumHandRank::FourOfAKind => (
+                EnumHandRank::FourOfAKind, EnumHandRank::FourOfAKind.into() + value
+            ),
+            EnumHandRank::FullHouse => (
+                EnumHandRank::FullHouse, EnumHandRank::FullHouse.into() + value
+            ),
+            EnumHandRank::Flush => (EnumHandRank::Flush, EnumHandRank::Flush.into() + value),
+            EnumHandRank::Straight => (
+                EnumHandRank::Straight, EnumHandRank::Straight.into() + value
+            ),
+            EnumHandRank::ThreeOfAKind => (
+                EnumHandRank::ThreeOfAKind, EnumHandRank::ThreeOfAKind.into() + value
+            ),
+            EnumHandRank::TwoPair => (EnumHandRank::TwoPair, EnumHandRank::TwoPair.into() + value),
+            EnumHandRank::Pair => (EnumHandRank::Pair, EnumHandRank::Pair.into() + value),
+            EnumHandRank::HighCard => (
+                EnumHandRank::HighCard, EnumHandRank::HighCard.into() + value
+            ),
+        }
+    }
+
     fn _has_royal_flush(self: @ComponentHand, board: @Array<StructCard>) -> bool {
         // TODO: Implement the non-naive approach.
 
         // NAIVE APPROACH (ASSUMING THAT THE CARDS IN HAND ARE SORTED):
 
-        // Early return if not enough cards
         if self.m_cards.len() + board.len() < 5 {
             return false;
         }
@@ -526,9 +561,11 @@ impl HandImpl of IHand {
 
         return royal_flush;
     }
-
+                
     fn _has_straight_flush(self: @ComponentHand, board: @Array<StructCard>) -> bool {
-        // Early return if not enough cards
+        // TODO: Implement the non-naive approach.
+
+        // NAIVE APPROACH (ASSUMING THAT THE CARDS IN HAND ARE SORTED):
         if self.m_cards.len() + board.len() < 5 {
             return false;
         }
@@ -616,7 +653,7 @@ impl HandImpl of IHand {
 
         return straight_flush;
     }
-
+                
     fn _has_four_of_a_kind(self: @ComponentHand, board: @Array<StructCard>) -> bool {
         // TODO: Implement the non-naive approach.
 
@@ -668,7 +705,7 @@ impl HandImpl of IHand {
 
         return same_kind_count >= 4;
     }
-
+                
     fn _has_full_house(self: @ComponentHand, board: @Array<StructCard>) -> bool {
         // TODO: Implement the non-naive approach.
 
@@ -982,7 +1019,7 @@ impl HandImpl of IHand {
         return highest_value;
     }
 
-    fn _get_value_from_cards(self: @ComponentHand) -> u32 {
+    fn _evaluate_value(self: @ComponentHand) -> u32 {
         let mut total_value: u32 = 0;
 
         for i in 0
@@ -995,9 +1032,9 @@ impl HandImpl of IHand {
         return total_value;
     }
 
-    fn _analyze_cards(
+    fn _evaluate_rank(
         self: @ComponentHand, board: @Array<StructCard>
-    ) -> Result<(EnumHandRank, u32), EnumError> {
+    ) -> Result<EnumHandRank, EnumError> {
         if self.m_cards.len() != 2 {
             return Result::Err(EnumError::InvalidHand);
         }
@@ -1006,77 +1043,39 @@ impl HandImpl of IHand {
             return Result::Err(EnumError::InvalidBoard);
         }
 
-        let value: u32 = self._get_value_from_cards();
-
         if self._has_flush(board) && self._has_straight(board) {
-            return Result::Ok((EnumHandRank::StraightFlush, value));
+            return Result::Ok(EnumHandRank::StraightFlush);
         }
 
         if self._has_straight_flush(board) && self._has_flush(board) {
-            return Result::Ok((EnumHandRank::RoyalFlush, value));
+            return Result::Ok(EnumHandRank::RoyalFlush);
         }
 
         if self._has_flush(board) {
-            return Result::Ok((EnumHandRank::Flush, value));
+            return Result::Ok(EnumHandRank::Flush);
         }
 
         if self._has_straight(board) {
-            return Result::Ok((EnumHandRank::Straight, value));
+            return Result::Ok(EnumHandRank::Straight);
         }
 
         if self._has_four_of_a_kind(board) {
-            return Result::Ok((EnumHandRank::FourOfAKind, value));
+            return Result::Ok(EnumHandRank::FourOfAKind);
         }
 
         if self._has_three_of_a_kind(board) {
-            return Result::Ok((EnumHandRank::ThreeOfAKind, value));
+            return Result::Ok(EnumHandRank::ThreeOfAKind);
         }
 
         if self._has_two_pair(board) {
-            return Result::Ok((EnumHandRank::TwoPair, value));
+            return Result::Ok(EnumHandRank::TwoPair);
         }
 
         if self._has_pair(board) {
-            return Result::Ok((EnumHandRank::Pair, value));
+            return Result::Ok(EnumHandRank::Pair);
         }
 
-        Result::Ok((EnumHandRank::HighCard, value))
-    }
-
-    fn evaluate_hand(self: @ComponentHand, board: @Array<StructCard>) -> (EnumHandRank, u32) {
-        // First analyze the hand
-        let result: Result<(EnumHandRank, u32), EnumError> = self._analyze_cards(board);
-        assert!(result.is_ok(), "Invalid hand");
-
-        let (rank, value): (EnumHandRank, u32) = result.unwrap();
-
-        // Then match on the result to return the appropriate rank and score
-        match rank {
-            EnumHandRank::RoyalFlush => (
-                EnumHandRank::RoyalFlush, EnumHandRank::RoyalFlush.into() + value
-            ),
-            EnumHandRank::StraightFlush => (
-                EnumHandRank::StraightFlush, EnumHandRank::StraightFlush.into() + value
-            ),
-            EnumHandRank::FourOfAKind => (
-                EnumHandRank::FourOfAKind, EnumHandRank::FourOfAKind.into() + value
-            ),
-            EnumHandRank::FullHouse => (
-                EnumHandRank::FullHouse, EnumHandRank::FullHouse.into() + value
-            ),
-            EnumHandRank::Flush => (EnumHandRank::Flush, EnumHandRank::Flush.into() + value),
-            EnumHandRank::Straight => (
-                EnumHandRank::Straight, EnumHandRank::Straight.into() + value
-            ),
-            EnumHandRank::ThreeOfAKind => (
-                EnumHandRank::ThreeOfAKind, EnumHandRank::ThreeOfAKind.into() + value
-            ),
-            EnumHandRank::TwoPair => (EnumHandRank::TwoPair, EnumHandRank::TwoPair.into() + value),
-            EnumHandRank::Pair => (EnumHandRank::Pair, EnumHandRank::Pair.into() + value),
-            EnumHandRank::HighCard => (
-                EnumHandRank::HighCard, EnumHandRank::HighCard.into() + value
-            ),
-        }
+        Result::Ok(EnumHandRank::HighCard)
     }
 }
 
@@ -1116,19 +1115,26 @@ impl PlayerImpl of IPlayer {
 
 #[generate_trait]
 impl TableImpl of ITable {
-    fn new(id: u32, small_blind: u32, big_blind: u32) -> ComponentTable {
-        ComponentTable {
+    fn new(id: u32, small_blind: u32, big_blind: u32, max_buy_in: u32, min_buy_in: u32, m_players: Array<ContractAddress>) -> ComponentTable {
+        assert!(min_buy_in > max_buy_in, "Minimum buy-in cannot be greater than maximum buy-in");
+        assert!(m_players.len() <= 6, "There must be at most 6 players");
+
+        let mut table: ComponentTable = ComponentTable {
             m_table_id: id,
             m_deck: array![],
             m_community_cards: array![],
-            m_players: array![],
+            m_players: m_players,
             m_current_turn: 0,
             m_pot: 0,
             m_small_blind: small_blind,
             m_big_blind: big_blind,
+            m_max_buy_in: max_buy_in,
+            m_min_buy_in: min_buy_in,
             m_state: EnumGameState::WaitingForPlayers,
             m_last_played_ts: 0,
-        }
+        };
+        table._initialize_deck();
+        return table;
     }
 
     fn find_card(self: @ComponentTable, card: @StructCard) -> Option<u32> {
@@ -1191,5 +1197,88 @@ impl TableImpl of ITable {
             EnumPosition::BigBlind => *self.m_big_blind,
             _ => 0,
         }
+    }
+
+    fn _initialize_deck(ref self: ComponentTable) {
+        // Initialize a standard 52-card deck
+        self.m_deck = array![];
+        
+        // Add cards for each suit and value
+        let suits = array![
+            EnumCardSuit::Spades,
+            EnumCardSuit::Hearts,
+            EnumCardSuit::Diamonds,
+            EnumCardSuit::Clubs
+        ];
+        
+        let values = array![
+            EnumCardValue::Two,
+            EnumCardValue::Three,
+            EnumCardValue::Four,
+            EnumCardValue::Five,
+            EnumCardValue::Six,
+            EnumCardValue::Seven,
+            EnumCardValue::Eight,
+            EnumCardValue::Nine,
+            EnumCardValue::Ten,
+            EnumCardValue::Jack,
+            EnumCardValue::Queen,
+            EnumCardValue::King,
+            EnumCardValue::Ace
+        ];
+
+        for i in 0..suits.len() {
+            for j in 0..values.len() {
+                self.m_deck.append(ICard::new(*values[j], *suits[i]));
+            }
+        }
+    }
+}
+
+/////////////////////////////////////////////////////////////////////////
+/////////////////////////////////////////////////////////////////////////
+/////////////////////////////// DEFAULT /////////////////////////////////
+/////////////////////////////////////////////////////////////////////////
+/////////////////////////////////////////////////////////////////////////
+
+impl HandDefaultImpl of Default<ComponentHand> {
+    fn default() -> ComponentHand {
+        return ComponentHand {
+            m_table_id: 0,
+            m_owner: starknet::contract_address_const::<0x0>(),
+            m_cards: array![],
+        };
+    }
+}
+
+impl PlayerDefaultImpl of Default<ComponentPlayer> {
+    fn default() -> ComponentPlayer {
+        return ComponentPlayer {
+            m_table_id: 0,
+            m_owner: starknet::contract_address_const::<0x0>(),
+            m_chips: 0,
+            m_position: EnumPosition::None,
+            m_state: EnumPlayerState::Waiting,
+            m_current_bet: 0,
+        };
+    }
+}
+
+impl TableDefaultImpl of Default<ComponentTable> {
+    fn default() -> ComponentTable {
+        return ComponentTable {
+            m_table_id: 0,
+            m_deck: array![],
+            m_community_cards: array![],
+            m_players: array![],
+            m_current_turn: 0,
+            m_pot: 0,
+            m_small_blind: 0,
+            m_big_blind: 0,
+            m_max_buy_in: 0,
+            m_min_buy_in: 0,
+            m_state: EnumGameState::WaitingForPlayers,
+            m_last_played_ts: 0,
+        };
     }
 }
