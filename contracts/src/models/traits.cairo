@@ -561,7 +561,7 @@ impl HandImpl of IHand {
 
         return royal_flush;
     }
-                
+
     fn _has_straight_flush(self: @ComponentHand, board: @Array<StructCard>) -> bool {
         // TODO: Implement the non-naive approach.
 
@@ -653,7 +653,7 @@ impl HandImpl of IHand {
 
         return straight_flush;
     }
-                
+
     fn _has_four_of_a_kind(self: @ComponentHand, board: @Array<StructCard>) -> bool {
         // TODO: Implement the non-naive approach.
 
@@ -705,7 +705,7 @@ impl HandImpl of IHand {
 
         return same_kind_count >= 4;
     }
-                
+
     fn _has_full_house(self: @ComponentHand, board: @Array<StructCard>) -> bool {
         // TODO: Implement the non-naive approach.
 
@@ -1115,7 +1115,14 @@ impl PlayerImpl of IPlayer {
 
 #[generate_trait]
 impl TableImpl of ITable {
-    fn new(id: u32, small_blind: u32, big_blind: u32, max_buy_in: u32, min_buy_in: u32, m_players: Array<ContractAddress>) -> ComponentTable {
+    fn new(
+        id: u32,
+        small_blind: u32,
+        big_blind: u32,
+        max_buy_in: u32,
+        min_buy_in: u32,
+        m_players: Array<ContractAddress>
+    ) -> ComponentTable {
         assert!(min_buy_in > max_buy_in, "Minimum buy-in cannot be greater than maximum buy-in");
         assert!(m_players.len() <= 6, "There must be at most 6 players");
 
@@ -1202,15 +1209,12 @@ impl TableImpl of ITable {
     fn _initialize_deck(ref self: ComponentTable) {
         // Initialize a standard 52-card deck
         self.m_deck = array![];
-        
+
         // Add cards for each suit and value
         let suits = array![
-            EnumCardSuit::Spades,
-            EnumCardSuit::Hearts,
-            EnumCardSuit::Diamonds,
-            EnumCardSuit::Clubs
+            EnumCardSuit::Spades, EnumCardSuit::Hearts, EnumCardSuit::Diamonds, EnumCardSuit::Clubs
         ];
-        
+
         let values = array![
             EnumCardValue::Two,
             EnumCardValue::Three,
@@ -1227,11 +1231,14 @@ impl TableImpl of ITable {
             EnumCardValue::Ace
         ];
 
-        for i in 0..suits.len() {
-            for j in 0..values.len() {
-                self.m_deck.append(ICard::new(*values[j], *suits[i]));
-            }
-        }
+        for i in 0
+            ..suits
+                .len() {
+                    for j in 0
+                        ..values.len() {
+                            self.m_deck.append(ICard::new(*values[j], *suits[i]));
+                        }
+                }
     }
 }
 
@@ -1244,9 +1251,7 @@ impl TableImpl of ITable {
 impl HandDefaultImpl of Default<ComponentHand> {
     fn default() -> ComponentHand {
         return ComponentHand {
-            m_table_id: 0,
-            m_owner: starknet::contract_address_const::<0x0>(),
-            m_cards: array![],
+            m_table_id: 0, m_owner: starknet::contract_address_const::<0x0>(), m_cards: array![],
         };
     }
 }

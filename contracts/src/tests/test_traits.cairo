@@ -93,19 +93,10 @@ fn test_display() {
         "Player: 0\n\tChips: 100\n\tPosition: None\n\tState: Active\n\tCurrent Bet: 0"
     );
     assert_eq!(
-        format!(
-            "{}",
-            TableDefaultImpl::default()
-        ),
+        format!("{}", TableDefaultImpl::default()),
         "Table 0:\n\tPlayers:\n\tCurrent Turn Index: 0\n\tSmall Blind: 0\n\tBig Blind: 0\n\tPot: 0\n\tState: WaitingForPlayers\n\tLast Played: 0"
     );
-    assert_eq!(
-        format!(
-            "{}",
-            HandDefaultImpl::default()
-        ),
-        "Hand 0:\n\tCards:"
-    );
+    assert_eq!(format!("{}", HandDefaultImpl::default()), "Hand 0:\n\tCards:");
     assert_eq!(
         format!("{}", StructCard { m_value: EnumCardValue::Two, m_suit: EnumCardSuit::Clubs }),
         "Card: 2\n\tSuit: C"
