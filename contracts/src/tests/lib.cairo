@@ -42,8 +42,12 @@
 // DEALINGS IN THE SOFTWARE.
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 
-mod utils;
-mod test_traits;
+mod unit {
+    mod test_utils;
+    mod test_hand;
+    mod test_traits;
+}
+
 mod integration {
     mod test_actions;
     mod test_table;
