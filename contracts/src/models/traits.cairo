@@ -199,6 +199,10 @@ impl EnumPlayerStateDisplay of Display<EnumPlayerState> {
                 let str: ByteArray = format!("AllIn");
                 f.buffer.append(@str);
             },
+            EnumPlayerState::Left => {
+                let str: ByteArray = format!("Left");
+                f.buffer.append(@str);
+            },
         };
         Result::Ok(())
     }

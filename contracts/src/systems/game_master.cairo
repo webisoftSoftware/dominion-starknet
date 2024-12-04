@@ -46,13 +46,16 @@ use starknet::ContractAddress;
 
 #[starknet::interface]
 trait IGameMaster<TContractState> {
-    fn change_turn(ref self: TContractState);
-    fn skip_turn(ref self: TContractState);
+    // Game Master Functions
     fn start_round(ref self: TContractState);
     fn end_round(ref self: TContractState);
-    fn distribute_pot(ref self: TContractState);
-    fn evaluate_hands(ref self: TContractState);
+    fn skip_turn(ref self: TContractState);
     fn determine_winner(ref self: TContractState);
+
+    // Timeout Functions
+    fn kick_player(ref self: TContractState, player: ContractAddress);
+
+    // Admin Functions
     fn change_game_master(ref self: TContractState, new_game_master: ContractAddress);
     fn get_game_master(self: @TContractState) -> ContractAddress;
 }
@@ -78,20 +81,6 @@ mod game_master_system {
 
     #[abi(embed_v0)]
     impl GameMasterImpl of super::IGameMaster<ContractState> {
-        fn change_turn(ref self: ContractState) { // Implement change turn logic
-            assert!(
-                self.game_master.read() == get_caller_address(),
-                "Only the game master can change the turn"
-            );
-        }
-
-        fn skip_turn(ref self: ContractState) { // Implement skip turn logic
-            assert!(
-                self.game_master.read() == get_caller_address(),
-                "Only the game master can skip the turn"
-            );
-        }
-
         fn start_round(ref self: ContractState) { // Implement start round logic
             assert!(
                 self.game_master.read() == get_caller_address(),
@@ -106,17 +95,10 @@ mod game_master_system {
             );
         }
 
-        fn distribute_pot(ref self: ContractState) { // Implement distribute pot logic
+        fn skip_turn(ref self: ContractState) { // Implement skip turn logic
             assert!(
                 self.game_master.read() == get_caller_address(),
-                "Only the game master can distribute the pot"
-            );
-        }
-
-        fn evaluate_hands(ref self: ContractState) { // Implement evaluate hands logic
-            assert!(
-                self.game_master.read() == get_caller_address(),
-                "Only the game master can evaluate the hands"
+                "Only the game master can skip the turn"
             );
         }
 
@@ -124,6 +106,13 @@ mod game_master_system {
             assert!(
                 self.game_master.read() == get_caller_address(),
                 "Only the game master can determine the winner"
+            );
+        }
+
+        fn kick_player(ref self: ContractState, player: ContractAddress) {
+            assert!(
+                self.game_master.read() == get_caller_address(),
+                "Only the game master can kick players"
             );
         }
 

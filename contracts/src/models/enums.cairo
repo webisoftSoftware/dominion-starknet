@@ -60,6 +60,7 @@ pub enum EnumPlayerState {
     Active,
     Folded,
     AllIn,
+    Left,
 }
 
 #[derive(Drop, Serde, Copy, Debug, PartialEq, Introspect)]
