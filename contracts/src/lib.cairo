@@ -59,8 +59,11 @@ mod systems {
 
 #[cfg(test)]
 mod tests {
-    mod utils;
-    mod test_traits;
+    mod unit {
+        mod test_utils;
+        mod test_hand;
+        mod test_traits;
+    }
     mod integration {
         mod test_actions;
         mod test_game_master;

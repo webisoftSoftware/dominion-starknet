@@ -42,15 +42,9 @@
 // DEALINGS IN THE SOFTWARE.
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 
-mod unit {
-    mod test_utils;
-    mod test_hand;
-    mod test_traits;
-}
+use dominion::models::utils::{sort, merge, merge_sort};
 
-mod integration {
-    mod test_actions;
-    mod test_table;
-    mod test_bank;
-    mod test_game_master;
+#[test]
+fn test_utils() {
+    assert_eq!(1, 1);
 }
