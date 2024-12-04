@@ -133,6 +133,12 @@ impl ComponentTableDisplay of Display<ComponentTable> {
         let str: ByteArray = format!("\n\tBig Blind: {}", *self.m_big_blind);
         f.buffer.append(@str);
 
+        let str: ByteArray = format!("\n\tMin Buy In: {}", *self.m_min_buy_in);
+        f.buffer.append(@str);
+
+        let str: ByteArray = format!("\n\tMax Buy In: {}", *self.m_max_buy_in);
+        f.buffer.append(@str);
+
         let str: ByteArray = format!("\n\tPot: {}", *self.m_pot);
         f.buffer.append(@str);
 
