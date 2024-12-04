@@ -82,6 +82,7 @@ struct ComponentTable {
         ContractAddress
     >, // This array is used to keep track of the order of the players turns
     m_current_turn: u8, // Index of the current player turn
+    m_current_dealer: u8, // Index of the current dealer
     m_pot: u32,
     // pub side_pots: Array<u256>, // Consider adding this later
     m_small_blind: u32,
