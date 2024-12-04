@@ -1084,11 +1084,11 @@ impl HandImpl of IHand {
 
 #[generate_trait]
 impl PlayerImpl of IPlayer {
-    fn new(table_id: u32, address: ContractAddress, initial_chips: u32) -> ComponentPlayer {
+    fn new(table_id: u32, address: ContractAddress) -> ComponentPlayer {
         ComponentPlayer {
             m_table_id: table_id,
             m_owner: address,
-            m_chips: initial_chips,
+            m_chips: 0,
             m_position: EnumPosition::None,
             m_state: EnumPlayerState::Waiting,
             m_current_bet: 0,
