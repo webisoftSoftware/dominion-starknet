@@ -48,12 +48,13 @@ use starknet::ContractAddress;
 trait IGameMaster<TContractState> {
     fn change_turn(ref self: TContractState);
     fn skip_turn(ref self: TContractState);
-    fn set_admin(ref self: TContractState, admin: ContractAddress);
     fn start_round(ref self: TContractState);
     fn end_round(ref self: TContractState);
     fn distribute_pot(ref self: TContractState);
     fn evaluate_hands(ref self: TContractState);
     fn determine_winner(ref self: TContractState);
+    fn change_game_master(ref self: TContractState, new_game_master: ContractAddress);
+    fn get_game_master(self: @TContractState) -> ContractAddress;
 }
 
 #[dojo::contract]
@@ -65,8 +66,7 @@ mod game_master_system {
         game_master: ContractAddress,
     }
 
-    #[constructor]
-    fn constructor(ref self: ContractState) {
+    fn dojo_init(ref self: ContractState) {
         let tx_info: TxInfo = get_tx_info().unbox();
 
         // Access the account_contract_address field
@@ -84,10 +84,6 @@ mod game_master_system {
 
         fn skip_turn(ref self: ContractState) { // Implement skip turn logic
             assert!(self.game_master.read() == get_caller_address(), "Only the game master can skip the turn");
-        }
-
-        fn set_admin(ref self: ContractState, admin: ContractAddress) { // Implement set admin logic
-            assert!(self.game_master.read() == get_caller_address(), "Only the game master can set the admin");
         }
 
         fn start_round(ref self: ContractState) { // Implement start round logic
@@ -108,6 +104,15 @@ mod game_master_system {
 
         fn determine_winner(ref self: ContractState) { // Implement determine winner logic
             assert!(self.game_master.read() == get_caller_address(), "Only the game master can determine the winner");
+        }
+
+        fn change_game_master(ref self: ContractState, new_game_master: ContractAddress) {
+            assert!(self.game_master.read() == get_caller_address(), "Only the game master can change the game master");
+            self.game_master.write(new_game_master);
+        }
+
+        fn get_game_master(self: @ContractState) -> ContractAddress {
+            self.game_master.read()
         }
     }
 }

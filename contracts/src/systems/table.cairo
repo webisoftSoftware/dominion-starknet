@@ -42,27 +42,34 @@
 // DEALINGS IN THE SOFTWARE.
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 
+use starknet::ContractAddress;
+
 #[starknet::interface]
 trait ITableSystem<TContractState> {
-    fn create_table(ref self: TContractState, table_id: u32, small_blind: u256, big_blind: u256);
+    fn create_table(ref self: TContractState, small_blind: u32, big_blind: u32);
     fn join_table(ref self: TContractState, table_id: u32);
     fn leave_table(ref self: TContractState, table_id: u32);
-    fn deal_cards(ref self: TContractState, table_id: u32);
-    fn encode_cards(ref self: TContractState, table_id: u32);
-    fn shuffle_deck(ref self: TContractState, table_id: u32);
 }
 
 #[dojo::contract]
 mod table_system {
+    use dominion::models::components::{ComponentTable, ComponentPlayer, ComponentHand};
+    use dominion::models::enums::{EnumPosition, EnumGameState, EnumPlayerState};
+    use dominion::models::structs::StructCard;
+    use dominion::models::enums::{EnumCardSuit, EnumCardValue};
+    use dominion::models::traits::ITable;
     use starknet::{ContractAddress, get_caller_address, TxInfo, get_tx_info};
+    use dojo::{model::ModelStorage, world::IWorldDispatcher};
 
+
+    const MAX_PLAYERS: u32 = 6;
     #[storage]
     struct Storage {
         game_master: ContractAddress,
+        counter: u32,
     }
 
-    #[constructor]
-    fn constructor(ref self: ContractState) {
+    fn dojo_init(ref self: ContractState) {
         let tx_info: TxInfo = get_tx_info().unbox();
 
         // Access the account_contract_address field
@@ -70,36 +77,36 @@ mod table_system {
 
         // Set the game master to the sender
         self.game_master.write(sender);
+        self.counter.write(1); // Start at 1 because 0 is reserved for table that is not created yet
     }
 
     #[abi(embed_v0)]
-    impl TableSystem of super::ITableSystem<ContractState> {
+    impl TableSystemImpl of super::ITableSystem<ContractState> {
         fn create_table(
-            ref self: ContractState, table_id: u32, small_blind: u256, big_blind: u256
-        ) { // Implement create table logic
-            assert!(self.game_master.read() == get_caller_address(), "Only the game master can create a table");
+            ref self: ContractState, small_blind: u32, big_blind: u32
+        ) {
+            let mut world = self.world(@"dominion");
+            let caller = get_caller_address();
+            
+            assert!(self.game_master.read() == caller, "Only game master can create table");
+
+            let table_id = self.counter.read();
+            // Create new table
+            let table: ComponentTable = ITable::new(table_id, small_blind, big_blind);
+
+            // Write table to world
+            world.write_model(@table);
+
+            // Increment counter
+            self.counter.write(table_id + 1);
         }
 
-        fn join_table(ref self: ContractState, table_id: u32) { // Implement join table logic
+        fn join_table(ref self: ContractState, table_id: u32) {
+           
         }
 
-        fn leave_table(ref self: ContractState, table_id: u32) { // Implement leave table logic
-        }
-
-        fn deal_cards(ref self: ContractState, table_id: u32) { // Implement deal cards logic
-        }
-
-        fn encode_cards(ref self: ContractState, table_id: u32) { // Implement encode cards logic
-        }
-
-        fn shuffle_deck(ref self: ContractState, table_id: u32) { // Implement shuffle deck logic
-        }
-    }
-
-    #[generate_trait]
-    impl InternalImpl of InternalTrait {
-        fn _initialize_deck(ref self: ContractState, table_id: u32) {
-            // Implement initialize deck logic
+        fn leave_table(ref self: ContractState, table_id: u32) {
+          
         }
     }
 }

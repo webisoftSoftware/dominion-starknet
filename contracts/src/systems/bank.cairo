@@ -62,7 +62,6 @@ trait IERC20<TContractState> {
 #[dojo::contract]
 mod bank_system {
     use starknet::{ContractAddress, get_caller_address, get_contract_address};
-    use starknet::storage::Map;
     use dojo::{model::ModelStorage, world::IWorldDispatcher};
     use dominion::models::components::ComponentPlayer;
     use super::{IERC20Dispatcher, IERC20DispatcherTrait};
@@ -108,6 +107,7 @@ mod bank_system {
 
             // Update player's chips
             let mut player: ComponentPlayer = world.read_model(caller);
+            if 
             player.m_chips += chips_amount;
             world.write_model(@player);
         }

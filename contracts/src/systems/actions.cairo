@@ -59,6 +59,7 @@ mod actions_system {
     #[abi(embed_v0)]
     impl ActionsImpl of super::IActions<ContractState> {
         fn bet(ref self: ContractState, amount: u256) { // Implement bet logic
+            
         }
 
         fn fold(ref self: ContractState) { // Implement fold logic
