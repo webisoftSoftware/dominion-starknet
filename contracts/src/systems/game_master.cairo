@@ -46,13 +46,16 @@ use starknet::ContractAddress;
 
 #[starknet::interface]
 trait IGameMaster<TContractState> {
-    fn change_turn(ref self: TContractState);
-    fn skip_turn(ref self: TContractState);
-    fn start_round(ref self: TContractState);
-    fn end_round(ref self: TContractState);
-    fn distribute_pot(ref self: TContractState);
-    fn evaluate_hands(ref self: TContractState);
-    fn determine_winner(ref self: TContractState);
+    // Game Master Functions
+    fn start_round(ref self: TContractState, table_id: u32);
+    fn end_round(ref self: TContractState, table_id: u32);
+    fn skip_turn(ref self: TContractState, table_id: u32);
+    fn determine_winner(ref self: TContractState, table_id: u32);
+
+    // Timeout Functions
+    fn kick_player(ref self: TContractState, table_id: u32, player: ContractAddress);
+
+    // Admin Functions
     fn change_game_master(ref self: TContractState, new_game_master: ContractAddress);
     fn get_game_master(self: @TContractState) -> ContractAddress;
 }
@@ -60,6 +63,10 @@ trait IGameMaster<TContractState> {
 #[dojo::contract]
 mod game_master_system {
     use starknet::{ContractAddress, get_caller_address, TxInfo, get_tx_info};
+    use dojo::{model::ModelStorage, world::IWorldDispatcher};
+    use dominion::models::components::ComponentTable;
+    use dominion::models::enums::EnumGameState;
+    const MIN_PLAYERS: u32 = 2;
 
     #[storage]
     struct Storage {
@@ -78,52 +85,52 @@ mod game_master_system {
 
     #[abi(embed_v0)]
     impl GameMasterImpl of super::IGameMaster<ContractState> {
-        fn change_turn(ref self: ContractState) { // Implement change turn logic
-            assert!(
-                self.game_master.read() == get_caller_address(),
-                "Only the game master can change the turn"
-            );
+        fn start_round(ref self: ContractState, table_id: u32) {
+            // let mut world = self.world(@"dominion");
+
+            // // Implement start round logic
+            // assert!(
+            //     self.game_master.read() == get_caller_address(),
+            //     "Only the game master can start the round"
+            // );
+
+            // // Fetch the table
+            // let table: ComponentTable = world.read_model(table_id);
+
+            // // Validate minimum number of players
+            // assert!(table.m_players.len() >= MIN_PLAYERS, "Not enough players to start the round");
+
+            // assert!(table.m_game_state == EnumGameState::WaitingForPlayers, "Game is not in the waiting for players state");
+
+            
+
         }
 
-        fn skip_turn(ref self: ContractState) { // Implement skip turn logic
-            assert!(
-                self.game_master.read() == get_caller_address(),
-                "Only the game master can skip the turn"
-            );
-        }
-
-        fn start_round(ref self: ContractState) { // Implement start round logic
-            assert!(
-                self.game_master.read() == get_caller_address(),
-                "Only the game master can start the round"
-            );
-        }
-
-        fn end_round(ref self: ContractState) { // Implement end round logic
+        fn end_round(ref self: ContractState, table_id: u32) { // Implement end round logic
             assert!(
                 self.game_master.read() == get_caller_address(),
                 "Only the game master can end the round"
             );
         }
 
-        fn distribute_pot(ref self: ContractState) { // Implement distribute pot logic
+        fn skip_turn(ref self: ContractState, table_id: u32) { // Implement skip turn logic
             assert!(
                 self.game_master.read() == get_caller_address(),
-                "Only the game master can distribute the pot"
+                "Only the game master can skip the turn"
             );
         }
 
-        fn evaluate_hands(ref self: ContractState) { // Implement evaluate hands logic
-            assert!(
-                self.game_master.read() == get_caller_address(),
-                "Only the game master can evaluate the hands"
-            );
-        }
-
-        fn determine_winner(ref self: ContractState) { // Implement determine winner logic
+        fn determine_winner(ref self: ContractState, table_id: u32) { // Implement determine winner logic
             assert!(
                 self.game_master.read() == get_caller_address(),
                 "Only the game master can determine the winner"
+            );
+        }
+
+        fn kick_player(ref self: ContractState, table_id: u32, player: ContractAddress) {
+            assert!(
+                self.game_master.read() == get_caller_address(),
+                "Only the game master can kick players"
             );
         }
 

@@ -108,10 +108,10 @@ mod bank_system {
 
             // Update player's chips
             let mut player: ComponentPlayer = world.read_model(caller);
-            if !player.m_has_joined {
+            if !player.m_is_created {
                 player = IPlayer::new(0, caller);
             }
-            player.m_chips += chips_amount;
+            player.m_total_chips += chips_amount;
             world.write_model(@player);
         }
 
@@ -121,7 +121,7 @@ mod bank_system {
 
             // Get player component
             let mut player: ComponentPlayer = world.read_model(caller);
-            assert!(player.m_chips >= chips_amount, "Insufficient chips");
+            assert!(player.m_total_chips >= chips_amount, "Insufficient chips");
 
             // Calculate ETH amount based on chips
             let eth_amount: u256 = chips_amount.into() * ETH_TO_CHIPS_RATIO;
@@ -139,7 +139,7 @@ mod bank_system {
             InternalImpl::_transfer_eth_to(net_eth_amount, caller);
 
             // Update player's chips
-            player.m_chips -= chips_amount;
+            player.m_total_chips -= chips_amount;
             world.write_model(@player);
         }
 
@@ -151,11 +151,11 @@ mod bank_system {
             let mut sender: ComponentPlayer = world.read_model(caller);
             let mut recipient: ComponentPlayer = world.read_model(to);
 
-            assert!(sender.m_chips >= amount, "Insufficient chips");
+            assert!(sender.m_total_chips >= amount, "Insufficient chips");
 
             // Update balances
-            sender.m_chips -= amount;
-            recipient.m_chips += amount;
+            sender.m_total_chips -= amount;
+            recipient.m_total_chips += amount;
 
             world.write_model(@sender);
             world.write_model(@recipient);
