@@ -58,16 +58,6 @@ struct ComponentHand {
 
 #[derive(Drop, Serde, Debug, Introspect)]
 #[dojo::model]
-struct ComponentHand {
-    #[key]
-    m_table_id: u32, // Table ID
-    #[key]
-    m_owner: ContractAddress,
-    m_cards: Array<StructCard>,
-}
-
-#[derive(Drop, Serde, Debug, Introspect)]
-#[dojo::model]
 struct ComponentPlayer {
     #[key]
     m_table_id: u32, // Table ID
@@ -77,7 +67,6 @@ struct ComponentPlayer {
     m_position: EnumPosition,
     m_state: EnumPlayerState,
     m_current_bet: u32,
-    m_has_joined: bool,
     m_has_joined: bool,
 }
 
@@ -91,7 +80,6 @@ struct ComponentTable {
     m_players: Array<
         ContractAddress
     >, // This array is used to keep track of the order of the players turns
-    m_current_turn: u8, // Index of the current player turn
     m_current_turn: u8, // Index of the current player turn
     m_pot: u32,
     // pub side_pots: Array<u256>, // Consider adding this later
