@@ -63,11 +63,12 @@ struct ComponentPlayer {
     m_table_id: u32, // Table ID
     #[key]
     m_owner: ContractAddress,
-    m_chips: u32,
+    m_table_chips: u32,
+    m_total_chips: u32,
     m_position: EnumPosition,
     m_state: EnumPlayerState,
     m_current_bet: u32,
-    m_has_joined: bool,
+    m_is_created: bool,
 }
 
 #[derive(Drop, Serde, Debug, Introspect)]

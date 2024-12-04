@@ -84,7 +84,10 @@ impl ComponentPlayerDisplay of Display<ComponentPlayer> {
         );
         f.buffer.append(@str);
 
-        let str: ByteArray = format!("\n\tChips: {0}", *self.m_chips);
+        let str: ByteArray = format!("\n\tTable Chips: {0}", *self.m_table_chips);
+        f.buffer.append(@str);
+
+        let str: ByteArray = format!("\n\tTotal Chips: {0}", *self.m_total_chips);
         f.buffer.append(@str);
 
         let str: ByteArray = format!("\n\tPosition: {0}", *self.m_position);
@@ -96,7 +99,7 @@ impl ComponentPlayerDisplay of Display<ComponentPlayer> {
         let str: ByteArray = format!("\n\tCurrent Bet: {0}", *self.m_current_bet);
         f.buffer.append(@str);
 
-        let str: ByteArray = format!("\n\tHas Joined: {0}", *self.m_has_joined);
+        let str: ByteArray = format!("\n\tIs Created: {0}", *self.m_is_created);
         f.buffer.append(@str);
 
         Result::Ok(())
@@ -416,7 +419,7 @@ impl EnumHandRankInto of Into<EnumHandRank, u32> {
 
 impl ComponentPlayerEq of PartialEq<ComponentPlayer> {
     fn eq(lhs: @ComponentPlayer, rhs: @ComponentPlayer) -> bool {
-        *lhs.m_owner == *rhs.m_owner && *lhs.m_has_joined == *rhs.m_has_joined
+        *lhs.m_owner == *rhs.m_owner && *lhs.m_is_created == *rhs.m_is_created
     }
 }
 
@@ -1094,11 +1097,12 @@ impl PlayerImpl of IPlayer {
         ComponentPlayer {
             m_table_id: table_id,
             m_owner: address,
-            m_chips: 0,
+            m_table_chips: 0,
+            m_total_chips: 0,
             m_position: EnumPosition::None,
             m_state: EnumPlayerState::Waiting,
             m_current_bet: 0,
-            m_has_joined: true,
+            m_is_created: true,
         }
     }
 
@@ -1107,8 +1111,8 @@ impl PlayerImpl of IPlayer {
     }
 
     fn place_bet(ref self: ComponentPlayer, amount: u32) {
-        assert(self.m_chips >= amount, 'Insufficient chips');
-        self.m_chips -= amount;
+        assert(self.m_table_chips >= amount, 'Insufficient chips');
+        self.m_table_chips -= amount;
         self.m_current_bet += amount;
     }
 
@@ -1117,13 +1121,13 @@ impl PlayerImpl of IPlayer {
     }
 
     fn all_in(ref self: ComponentPlayer) {
-        self.m_current_bet += self.m_chips;
-        self.m_chips = 0;
+        self.m_current_bet += self.m_table_chips;
+        self.m_table_chips = 0;
         self.m_state = EnumPlayerState::AllIn;
     }
 
     fn _is_created(self: @ComponentPlayer) -> bool {
-        return *self.m_has_joined;
+        return *self.m_is_created;
     }
 }
 
@@ -1275,11 +1279,12 @@ impl PlayerDefaultImpl of Default<ComponentPlayer> {
         return ComponentPlayer {
             m_table_id: 0,
             m_owner: starknet::contract_address_const::<0x0>(),
-            m_chips: 0,
+            m_table_chips: 0,
+            m_total_chips: 0,
             m_position: EnumPosition::None,
             m_state: EnumPlayerState::Waiting,
             m_current_bet: 0,
-            m_has_joined: false,
+            m_is_created: false,
         };
     }
 }

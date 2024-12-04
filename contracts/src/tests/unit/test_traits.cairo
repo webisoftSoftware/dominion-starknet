@@ -63,8 +63,8 @@ fn test_eq() {
 
     let mut player1: ComponentPlayer = Default::default();
     let mut player2: ComponentPlayer = Default::default();
-    player1.m_chips = 100;
-    player2.m_chips = 100;
+    player1.m_total_chips = 100;
+    player2.m_total_chips = 100;
     assert_eq!(player1, player2);
 
     let table1: ComponentTable = Default::default();
@@ -84,14 +84,15 @@ fn test_display() {
             ComponentPlayer {
                 m_table_id: 0,
                 m_owner: starknet::contract_address_const::<0x0>(),
-                m_chips: 100,
+                m_total_chips: 100,
+                m_table_chips: 0,
                 m_position: EnumPosition::None,
                 m_state: EnumPlayerState::Active,
                 m_current_bet: 0,
-                m_has_joined: false
+                m_is_created: false
             }
         ),
-        "Player: 0\n\tChips: 100\n\tPosition: None\n\tState: Active\n\tCurrent Bet: 0\n\tHas Joined: false"
+        "Player: 0\n\tTotal Chips: 100\n\tTable Chips: 0\n\tPosition: None\n\tState: Active\n\tCurrent Bet: 0\n\tIs Created: false"
     );
     assert_eq!(
         format!("{}", TableDefaultImpl::default()),

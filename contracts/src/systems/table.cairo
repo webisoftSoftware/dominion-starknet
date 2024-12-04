@@ -49,7 +49,7 @@ trait ITableSystem<TContractState> {
     fn create_table(
         ref self: TContractState, small_blind: u32, big_blind: u32, min_buy_in: u32, max_buy_in: u32
     );
-    fn join_table(ref self: TContractState, table_id: u32);
+    fn join_table(ref self: TContractState, table_id: u32, chips_amount: u32);
     fn leave_table(ref self: TContractState, table_id: u32);
 }
 
@@ -59,12 +59,14 @@ mod table_system {
     use dominion::models::enums::{EnumPosition, EnumGameState, EnumPlayerState};
     use dominion::models::structs::StructCard;
     use dominion::models::enums::{EnumCardSuit, EnumCardValue};
-    use dominion::models::traits::ITable;
+    use dominion::models::traits::{ITable, IPlayer};
     use starknet::{ContractAddress, get_caller_address, TxInfo, get_tx_info};
     use dojo::{model::ModelStorage, world::IWorldDispatcher};
 
-
+    // Constants
+    const MIN_PLAYERS: u32 = 2;
     const MAX_PLAYERS: u32 = 6;
+
     #[storage]
     struct Storage {
         game_master: ContractAddress,
@@ -97,6 +99,7 @@ mod table_system {
             assert!(self.game_master.read() == caller, "Only game master can create table");
 
             let table_id = self.counter.read();
+
             // Create new table
             let table: ComponentTable = ITable::new(
                 table_id, small_blind, big_blind, min_buy_in, max_buy_in, array![]
@@ -109,7 +112,22 @@ mod table_system {
             self.counter.write(table_id + 1);
         }
 
-        fn join_table(ref self: ContractState, table_id: u32) {}
+        fn join_table(ref self: ContractState, table_id: u32, chips_amount: u32) {
+            let mut world = self.world(@"dominion");
+            let caller = get_caller_address();
+
+            let mut table: ComponentTable = world.read_model(table_id);
+            let mut player: ComponentPlayer = world.read_model(caller);
+
+            if !player.m_is_created {
+                player = IPlayer::new(table_id, caller);
+            }
+
+            assert!(table.m_players.len() < MAX_PLAYERS, "Table is full");
+            
+            
+
+        }
 
         fn leave_table(ref self: ContractState, table_id: u32) {}
     }
