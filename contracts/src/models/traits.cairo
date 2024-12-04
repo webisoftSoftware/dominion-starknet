@@ -96,6 +96,9 @@ impl ComponentPlayerDisplay of Display<ComponentPlayer> {
         let str: ByteArray = format!("\n\tCurrent Bet: {0}", *self.m_current_bet);
         f.buffer.append(@str);
 
+        let str: ByteArray = format!("\n\tHas Joined: {0}", *self.m_has_joined);
+        f.buffer.append(@str);
+
         Result::Ok(())
     }
 }
@@ -407,7 +410,7 @@ impl EnumHandRankInto of Into<EnumHandRank, u32> {
 
 impl ComponentPlayerEq of PartialEq<ComponentPlayer> {
     fn eq(lhs: @ComponentPlayer, rhs: @ComponentPlayer) -> bool {
-        *lhs.m_owner == *rhs.m_owner
+        *lhs.m_owner == *rhs.m_owner && *lhs.m_has_joined == *rhs.m_has_joined
     }
 }
 
@@ -1089,6 +1092,7 @@ impl PlayerImpl of IPlayer {
             m_position: EnumPosition::None,
             m_state: EnumPlayerState::Waiting,
             m_current_bet: 0,
+            m_has_joined: true,
         }
     }
 
@@ -1251,7 +1255,9 @@ impl TableImpl of ITable {
 impl HandDefaultImpl of Default<ComponentHand> {
     fn default() -> ComponentHand {
         return ComponentHand {
-            m_table_id: 0, m_owner: starknet::contract_address_const::<0x0>(), m_cards: array![],
+            m_table_id: 0,
+            m_owner: starknet::contract_address_const::<0x0>(),
+            m_cards: array![],
         };
     }
 }
@@ -1265,6 +1271,7 @@ impl PlayerDefaultImpl of Default<ComponentPlayer> {
             m_position: EnumPosition::None,
             m_state: EnumPlayerState::Waiting,
             m_current_bet: 0,
+            m_has_joined: false,
         };
     }
 }

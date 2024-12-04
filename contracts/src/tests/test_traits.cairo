@@ -87,10 +87,11 @@ fn test_display() {
                 m_chips: 100,
                 m_position: EnumPosition::None,
                 m_state: EnumPlayerState::Active,
-                m_current_bet: 0
+                m_current_bet: 0,
+                m_has_joined: false
             }
         ),
-        "Player: 0\n\tChips: 100\n\tPosition: None\n\tState: Active\n\tCurrent Bet: 0"
+        "Player: 0\n\tChips: 100\n\tPosition: None\n\tState: Active\n\tCurrent Bet: 0\n\tHas Joined: false"
     );
     assert_eq!(
         format!("{}", TableDefaultImpl::default()),

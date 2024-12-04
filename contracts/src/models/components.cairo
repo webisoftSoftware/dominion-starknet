@@ -67,6 +67,7 @@ struct ComponentPlayer {
     m_position: EnumPosition,
     m_state: EnumPlayerState,
     m_current_bet: u32,
+    m_has_joined: bool,
 }
 
 #[derive(Drop, Serde, Debug, Introspect)]
