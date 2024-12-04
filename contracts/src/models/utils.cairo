@@ -57,49 +57,35 @@ fn sort(arr: @Array<StructCard>) -> Array<StructCard> {
 }
 
 // Helper function to merge two sorted subarrays
-fn merge(arr: @Array<StructCard>, left: usize, mid: usize, right: usize) -> Array<StructCard> {
-    let mut i = left;
-    let mut j = mid + 1;
+fn merge(left_arr: @Array<StructCard>, right_arr: @Array<StructCard>) -> Array<StructCard> {
     let mut result: Array<StructCard> = array![];
+    let mut i = 0;
+    let mut j = 0;
 
-    // Copy elements before left index
-    let mut k = 0;
-    while k < left {
-        result.append((*arr[k]).clone());
-        k += 1;
-    };
-
-    // Merge the two subarrays
-    while i <= mid && j <= right {
-        let left_value: u32 = (*arr[i].m_value).into();
-        let right_value: u32 = (*arr[j].m_value).into();
+    // Merge the two arrays
+    while i < left_arr.len() && j < right_arr.len() {
+        let left_value: u32 = (*left_arr[i].m_value).into();
+        let right_value: u32 = (*right_arr[j].m_value).into();
 
         if left_value <= right_value {
-            result.append((*arr[i]).clone());
+            result.append((*left_arr[i]).clone());
             i += 1;
         } else {
-            result.append((*arr[j]).clone());
+            result.append((*right_arr[j]).clone());
             j += 1;
         }
     };
 
-    // Copy remaining elements from left subarray
-    while i <= mid {
-        result.append((*arr[i]).clone());
+    // Copy remaining elements from left array
+    while i < left_arr.len() {
+        result.append((*left_arr[i]).clone());
         i += 1;
     };
 
-    // Copy remaining elements from right subarray
-    while j <= right {
-        result.append((*arr[j]).clone());
+    // Copy remaining elements from right array
+    while j < right_arr.len() {
+        result.append((*right_arr[j]).clone());
         j += 1;
-    };
-
-    // Copy remaining elements after right index
-    let mut k = right + 1;
-    while k < arr.len() {
-        result.append((*arr[k]).clone());
-        k += 1;
     };
 
     result
@@ -109,32 +95,34 @@ fn merge(arr: @Array<StructCard>, left: usize, mid: usize, right: usize) -> Arra
 fn merge_sort(arr: @Array<StructCard>, left: usize, right: usize) -> Array<StructCard> {
     if left >= right {
         let mut result = array![];
-        let mut i = 0;
-        while i < arr.len() {
-            result.append((*arr[i]).clone());
-            i += 1;
-        };
+        result.append((*arr[left]).clone());
         return result;
     }
 
     let mid = left + (right - left) / 2;
 
-    // Sort first and second halves
-    let sorted_left = merge_sort(arr, left, mid);
-    let sorted_right = merge_sort(arr, mid + 1, right);
+    // Create subarrays for left and right portions
+    let mut left_arr = array![];
+    let mut right_arr = array![];
 
-    // Create new array with sorted elements
-    let mut result = array![];
-    let mut i = 0;
-    while i < sorted_left.len() {
-        result.append(sorted_left[i].clone());
-        i += 1;
-    };
-    let mut i = 0;
-    while i < sorted_right.len() {
-        result.append(sorted_right[i].clone());
+    // Fill left subarray
+    let mut i = left;
+    while i <= mid {
+        left_arr.append((*arr[i]).clone());
         i += 1;
     };
 
-    merge(@result, 0, mid, right)
+    // Fill right subarray
+    let mut i = mid + 1;
+    while i <= right {
+        right_arr.append((*arr[i]).clone());
+        i += 1;
+    };
+
+    // Sort both subarrays
+    let sorted_left = merge_sort(@left_arr, 0, left_arr.len() - 1);
+    let sorted_right = merge_sort(@right_arr, 0, right_arr.len() - 1);
+
+    // Merge the sorted subarrays
+    merge(@sorted_left, @sorted_right)
 }

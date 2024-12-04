@@ -1171,35 +1171,32 @@ impl TableImpl of ITable {
         return found;
     }
 
-    fn find_player(self: @ComponentTable, player: @ContractAddress) -> Option<u32> {
-        let mut found = Option::None;
-
-        for i in 0
-            ..self
-                .m_players
-                .len() {
-                    if self.m_players[i] == player {
-                        found = Option::Some(i);
-                        break;
-                    }
-                };
-        return found;
+    fn find_player(self: @ComponentTable, player: @ContractAddress) -> Option<usize> {
+        return self.m_players.position(player);
     }
 
     fn add_player(ref self: ComponentTable, player: ContractAddress) {
         if self.m_state == EnumGameState::WaitingForPlayers {
+            // Insert the new player right after the last player joined.
             self.m_players.append(player);
         }
     }
 
     fn remove_player(ref self: ComponentTable, player: @ContractAddress) {
-        let mut new_players: Array<ContractAddress> = array![];
+        let player_position: Option<usize> = self.find_player(player);
+        assert!(player_position.is_some(), "Cannot find player");
 
-        for p in self.m_players.span() {
-            if *p != *player {
-                new_players.append(p.clone());
-            }
-        };
+        let removed_player_position: usize = player_position.unwrap();
+        let mut new_players: Array<ContractAddress> = array![];
+        // Set the player to 0 to indicate empty seat.
+        for i in 0
+            ..self
+                .m_players
+                .len() {
+                    if i != removed_player_position {
+                        new_players.append(self.m_players[i].clone());
+                    }
+                };
         self.m_players = new_players;
     }
 

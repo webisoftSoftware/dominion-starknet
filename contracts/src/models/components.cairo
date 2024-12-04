@@ -46,6 +46,7 @@ use starknet::ContractAddress;
 use dominion::models::structs::StructCard;
 use dominion::models::enums::{EnumPosition, EnumGameState, EnumPlayerState};
 
+
 #[derive(Drop, Serde, Debug, Introspect)]
 #[dojo::model]
 struct ComponentHand {
