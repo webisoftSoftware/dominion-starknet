@@ -107,7 +107,6 @@ mod bank_system {
 
             // Update player's chips
             let mut player: ComponentPlayer = world.read_model(caller);
-            if 
             player.m_chips += chips_amount;
             world.write_model(@player);
         }
