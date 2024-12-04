@@ -1115,6 +1115,10 @@ impl PlayerImpl of IPlayer {
         self.m_chips = 0;
         self.m_state = EnumPlayerState::AllIn;
     }
+
+    fn _is_created(self: @ComponentPlayer) -> bool {
+        return *self.m_has_joined;
+    }
 }
 
 #[generate_trait]
