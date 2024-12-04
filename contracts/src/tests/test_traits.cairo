@@ -85,7 +85,7 @@ fn test_eq() {
         m_small_blind: 0,
         m_big_blind: 0,
         m_deck: array![],
-        m_current_turn: starknet::contract_address_const::<0x0>(),
+        m_current_turn: 0,
         m_community_cards: array![],
         m_state: EnumGameState::WaitingForPlayers,
         m_last_played_ts: 0
@@ -96,7 +96,7 @@ fn test_eq() {
         m_pot: 0,
         m_small_blind: 0,
         m_big_blind: 0,
-        m_current_turn: starknet::contract_address_const::<0x0>(),
+        m_current_turn: 0,
         m_deck: array![],
         m_community_cards: array![],
         m_state: EnumGameState::WaitingForPlayers,
@@ -138,14 +138,14 @@ fn test_display() {
                 m_deck: array![],
                 m_community_cards: array![],
                 m_pot: 0,
-                m_current_turn: starknet::contract_address_const::<0x0>(),
+                m_current_turn: 0,
                 m_small_blind: 0,
                 m_big_blind: 0,
                 m_state: EnumGameState::WaitingForPlayers,
                 m_last_played_ts: 0
             }
         ),
-        "Table 0:\n\tPlayers:\n\tCurrent Turn: 0\n\tSmall Blind: 0\n\tBig Blind: 0\n\tPot: 0\n\tState: WaitingForPlayers\n\tLast Played: 0"
+        "Table 0:\n\tPlayers:\n\tCurrent Turn Index: 0\n\tSmall Blind: 0\n\tBig Blind: 0\n\tPot: 0\n\tState: WaitingForPlayers\n\tLast Played: 0"
     );
     assert_eq!(
         format!(
