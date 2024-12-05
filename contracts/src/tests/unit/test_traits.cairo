@@ -50,15 +50,15 @@ use crate::models::traits::{
     EnumGameStateDisplay, EnumHandRankInto, ComponentPlayerEq, ComponentTableEq,
     ComponentPlayerDisplay, EnumCardValueInto, ComponentTableDisplay, ComponentHandDisplay,
     StructCardDisplay, ComponentHandEq, StructCardEq, HandDefaultImpl, TableDefaultImpl,
-    PlayerDefaultImpl
+    PlayerDefaultImpl, ICard
 };
 use crate::models::structs::{StructCard};
 use crate::models::components::{ComponentHand, ComponentTable, ComponentPlayer};
 
 #[test]
 fn test_eq() {
-    let card1: StructCard = StructCard { m_value: EnumCardValue::Two, m_suit: EnumCardSuit::Clubs };
-    let card2: StructCard = StructCard { m_value: EnumCardValue::Two, m_suit: EnumCardSuit::Clubs };
+    let card1: StructCard = ICard::new(EnumCardValue::Two, EnumCardSuit::Clubs);
+    let card2: StructCard = ICard::new(EnumCardValue::Two, EnumCardSuit::Clubs);
     assert_eq!(card1, card2);
 
     let mut player1: ComponentPlayer = Default::default();
@@ -100,8 +100,8 @@ fn test_display() {
     );
     assert_eq!(format!("{}", HandDefaultImpl::default()), "Hand 0:\n\tCards:");
     assert_eq!(
-        format!("{}", StructCard { m_value: EnumCardValue::Two, m_suit: EnumCardSuit::Clubs }),
-        "Card: 2\n\tSuit: C"
+        format!("{}", ICard::new(EnumCardValue::Two, EnumCardSuit::Clubs)),
+        "2C"
     );
     assert_eq!(format!("{}", EnumHandRank::HighCard), "HighCard");
     assert_eq!(format!("{}", EnumCardSuit::Clubs), "C");
