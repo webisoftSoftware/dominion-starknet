@@ -90,7 +90,6 @@ impl ComponentPlayerDisplay of Display<ComponentPlayer> {
         let str: ByteArray = format!("\n\tTable Chips: {0}", *self.m_table_chips);
         f.buffer.append(@str);
 
-
         let str: ByteArray = format!("\n\tPosition: {0}", *self.m_position);
         f.buffer.append(@str);
 
@@ -152,6 +151,10 @@ impl ComponentTableDisplay of Display<ComponentTable> {
 impl EnumGameStateDisplay of Display<EnumGameState> {
     fn fmt(self: @EnumGameState, ref f: Formatter) -> Result<(), Error> {
         match self {
+            EnumGameState::NotCreated => {
+                let str: ByteArray = format!("NotCreated");
+                f.buffer.append(@str);
+            },
             EnumGameState::WaitingForPlayers => {
                 let str: ByteArray = format!("WaitingForPlayers");
                 f.buffer.append(@str);
@@ -447,7 +450,7 @@ impl StructCardEq of PartialEq<StructCard> {
 
 impl ComponentHandEq of PartialEq<ComponentHand> {
     fn eq(lhs: @ComponentHand, rhs: @ComponentHand) -> bool {
-        let mut equal: bool = lhs.m_table_id == rhs.m_table_id;
+        let mut equal: bool = lhs.m_owner == rhs.m_owner;
 
         if !equal {
             return false;
@@ -479,7 +482,6 @@ impl CardImpl of ICard {
 
     fn get_value(self: @StructCard) -> Option<EnumCardValue> {
         assert!(self.m_string_representation.len() == 2, "Invalid card string representation");
-
 
         if self.m_string_representation[0] == '2' {
             return Option::Some(EnumCardValue::Two);
@@ -561,8 +563,8 @@ impl CardImpl of ICard {
 
 #[generate_trait]
 impl HandImpl of IHand {
-    fn new(table_id: u32, address: ContractAddress) -> ComponentHand {
-        ComponentHand { m_table_id: table_id, m_owner: address, m_cards: array![] }
+    fn new(address: ContractAddress) -> ComponentHand {
+        ComponentHand { m_owner: address, m_cards: array![] }
     }
 
     fn add_card(ref self: ComponentHand, card: StructCard) {
@@ -701,7 +703,7 @@ impl HandImpl of IHand {
                         }
 
                         suit_cards.append(card.clone());
-                };
+                    };
 
                 // Need at least 5 cards of the same suit for a straight flush
                 if suit_cards.len() < 5 {
@@ -720,50 +722,50 @@ impl HandImpl of IHand {
                             let mut has_four = false;
                             let mut has_five = false;
 
-                        for card in sorted_cards
-                            .span() {
-                                if let Option::Some(value) = card.get_value() {
-                                    match value {
-                                        EnumCardValue::Two => has_two = true,
-                                        EnumCardValue::Three => has_three = true,
-                                        EnumCardValue::Four => has_four = true,
-                                        EnumCardValue::Five => has_five = true,
-                                        _ => {},
-                                    };
-                                }
-                            };
+                            for card in sorted_cards
+                                .span() {
+                                    if let Option::Some(value) = card.get_value() {
+                                        match value {
+                                            EnumCardValue::Two => has_two = true,
+                                            EnumCardValue::Three => has_three = true,
+                                            EnumCardValue::Four => has_four = true,
+                                            EnumCardValue::Five => has_five = true,
+                                            _ => {},
+                                        };
+                                    }
+                                };
 
-                        if has_two && has_three && has_four && has_five {
-                            straight_flush = true;
-                            break;
+                            if has_two && has_three && has_four && has_five {
+                                straight_flush = true;
+                                break;
+                            }
                         }
                     }
-                }
 
-                // Check for regular straight flush
-                let mut consecutive_count: u32 = 1;
-                let mut prev_value: u32 = sorted_cards[0].get_value().unwrap().into();
+                    // Check for regular straight flush
+                    let mut consecutive_count: u32 = 1;
+                    let mut prev_value: u32 = sorted_cards[0].get_value().unwrap().into();
 
-                for i in 1
-                    ..sorted_cards
-                        .len() {
-                        if let Option::Some(current_value) = sorted_cards[i].get_value() {
-                            if current_value.into() == prev_value {
-                                continue; // Skip duplicate values
-                            }
+                    for i in 1
+                        ..sorted_cards
+                            .len() {
+                                if let Option::Some(current_value) = sorted_cards[i].get_value() {
+                                    if current_value.into() == prev_value {
+                                        continue; // Skip duplicate values
+                                    }
 
-                            if current_value.into() == prev_value + 1 {
-                                consecutive_count += 1;
-                                if consecutive_count >= 5 {
-                                    straight_flush = true;
-                                    break;
+                                    if current_value.into() == prev_value + 1 {
+                                        consecutive_count += 1;
+                                        if consecutive_count >= 5 {
+                                            straight_flush = true;
+                                            break;
+                                        }
+                                    } else {
+                                        consecutive_count = 1;
+                                    }
+                                    prev_value = current_value.into();
                                 }
-                            } else {
-                                consecutive_count = 1;
-                            }
-                            prev_value = current_value.into();
-                        }
-                    };
+                            };
                 }
             };
 
@@ -780,7 +782,7 @@ impl HandImpl of IHand {
 
         // Check if hand is a pair and board has matching value
         if let Option::Some(value) = self.m_cards[0].get_value() {
-            if let Option::Some(card_value) = self.m_cards[1].get_value() { 
+            if let Option::Some(card_value) = self.m_cards[1].get_value() {
                 if value == card_value {
                     let mut dup_count: u8 = 2;
                     for card in board
@@ -793,7 +795,7 @@ impl HandImpl of IHand {
                                     }
                                 }
                             }
-                    };
+                        };
 
                     if dup_count >= 4 {
                         return true;
@@ -817,12 +819,12 @@ impl HandImpl of IHand {
                         same_kind_count += 1;
 
                         if same_kind_count >= 4 {
-                        break;
+                            break;
                         }
                         continue;
                     }
 
-                same_kind_count = 1;
+                    same_kind_count = 1;
                     prev_value = card.get_value().unwrap();
                 }
             };
@@ -919,18 +921,18 @@ impl HandImpl of IHand {
                 for i in 0
                     ..all_cards
                         .len() {
-                        if let Option::Some(current_suit) = all_cards[i].get_suit() {
-                            if current_suit == *suit {
-                                matches += 1;
+                            if let Option::Some(current_suit) = all_cards[i].get_suit() {
+                                if current_suit == *suit {
+                                    matches += 1;
+                                }
                             }
-                        }
 
-                    if matches >= 5 {
-                        is_flush = true;
-                        break;
-                    }
-                };
-        };
+                            if matches >= 5 {
+                                is_flush = true;
+                                break;
+                            }
+                        };
+            };
 
         return is_flush;
     }
@@ -963,15 +965,15 @@ impl HandImpl of IHand {
                     for card in all_cards
                         .span() {
                             if let Option::Some(card_value) = card.get_value() {
-                            match card_value {
-                                EnumCardValue::Two => has_two = true,
-                                EnumCardValue::Three => has_three = true,
-                                EnumCardValue::Four => has_four = true,
-                                EnumCardValue::Five => has_five = true,
-                                _ => {},
-                            };
-                        }
-                    };
+                                match card_value {
+                                    EnumCardValue::Two => has_two = true,
+                                    EnumCardValue::Three => has_three = true,
+                                    EnumCardValue::Four => has_four = true,
+                                    EnumCardValue::Five => has_five = true,
+                                    _ => {},
+                                };
+                            }
+                        };
 
                     if has_two && has_three && has_four && has_five {
                         return true;
@@ -1087,23 +1089,23 @@ impl HandImpl of IHand {
                         if card_value == prev_value {
                             consecutive_count += 1;
                             if consecutive_count == 2 {
-                            if first_pair_value != Option::Some(prev_value) {
-                                num_pairs += 1;
-                                if num_pairs == 1 {
-                                    first_pair_value = Option::Some(prev_value);
+                                if first_pair_value != Option::Some(prev_value) {
+                                    num_pairs += 1;
+                                    if num_pairs == 1 {
+                                        first_pair_value = Option::Some(prev_value);
+                                    }
                                 }
+                            } else {
+                                consecutive_count = 1;
+                                prev_value = card_value;
                             }
-                        } else {
-                            consecutive_count = 1;
-                            prev_value = card_value;
+                        }
+
+                        if num_pairs >= 2 {
+                            break;
                         }
                     }
-
-                    if num_pairs >= 2 {
-                        break;
-                    }
-                }
-            };
+                };
 
         return num_pairs >= 2;
     }
@@ -1167,7 +1169,7 @@ impl HandImpl of IHand {
                         let current_value: u32 = card_value.into();
                         total_value += current_value;
                     }
-            };
+                };
         return total_value;
     }
 
@@ -1394,7 +1396,7 @@ impl TableImpl of ITable {
 impl HandDefaultImpl of Default<ComponentHand> {
     fn default() -> ComponentHand {
         return ComponentHand {
-            m_table_id: 0, m_owner: starknet::contract_address_const::<0x0>(), m_cards: array![],
+            m_owner: starknet::contract_address_const::<0x0>(), m_cards: array![],
         };
     }
 }
