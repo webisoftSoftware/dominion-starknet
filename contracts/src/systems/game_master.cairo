@@ -51,6 +51,8 @@ trait IGameMaster<TContractState> {
     fn end_round(ref self: TContractState, table_id: u32);
     fn skip_turn(ref self: TContractState, table_id: u32);
     fn determine_winner(ref self: TContractState, table_id: u32);
+    fn remove_sitting_out_players(ref self: TContractState, table_id: u32);
+    fn update_positions(ref self: TContractState, table_id: u32);
 
     // Timeout Functions
     fn kick_player(ref self: TContractState, table_id: u32, player: ContractAddress);
@@ -64,8 +66,10 @@ trait IGameMaster<TContractState> {
 mod game_master_system {
     use starknet::{ContractAddress, get_caller_address, TxInfo, get_tx_info};
     use dojo::{model::ModelStorage, world::IWorldDispatcher};
-    use dominion::models::components::ComponentTable;
-    use dominion::models::enums::EnumGameState;
+    use dominion::models::components::{ComponentTable, ComponentPlayer};
+    use dominion::models::enums::{EnumGameState, EnumPlayerState, EnumPosition};
+    use dominion::models::traits::{ITable, IPlayer};
+
     const MIN_PLAYERS: u32 = 2;
 
     #[storage]
@@ -86,24 +90,21 @@ mod game_master_system {
     #[abi(embed_v0)]
     impl GameMasterImpl of super::IGameMaster<ContractState> {
         fn start_round(ref self: ContractState, table_id: u32) {
-            // let mut world = self.world(@"dominion");
+            assert!(
+                self.game_master.read() == get_caller_address(),
+                "Only the game master can start the round"
+            );
 
-            // // Implement start round logic
-            // assert!(
-            //     self.game_master.read() == get_caller_address(),
-            //     "Only the game master can start the round"
-            // );
+            let mut world = self.world(@"dominion");
+            // Fetch the table
+            let table: ComponentTable = world.read_model(table_id);
 
-            // // Fetch the table
-            // let table: ComponentTable = world.read_model(table_id);
-
-            // // Validate minimum number of players
-            // assert!(table.m_players.len() >= MIN_PLAYERS, "Not enough players to start the round");
-
-            // assert!(table.m_game_state == EnumGameState::WaitingForPlayers, "Game is not in the waiting for players state");
-
-            
-
+            // Validate minimum number of players
+            assert!(table.m_players.len() >= MIN_PLAYERS, "Not enough players to start the round");
+            assert!(
+                table.m_state == EnumGameState::WaitingForPlayers,
+                "Game is not in the waiting for players state"
+            );
         }
 
         fn end_round(ref self: ContractState, table_id: u32) { // Implement end round logic
@@ -111,6 +112,12 @@ mod game_master_system {
                 self.game_master.read() == get_caller_address(),
                 "Only the game master can end the round"
             );
+
+            // Remove players sitting out.
+            self.remove_sitting_out_players(table_id);
+
+            // Update order and dealer chip position (Small Blind, Big Blind, etc.).
+            self.update_positions(table_id);
         }
 
         fn skip_turn(ref self: ContractState, table_id: u32) { // Implement skip turn logic
@@ -120,11 +127,72 @@ mod game_master_system {
             );
         }
 
-        fn determine_winner(ref self: ContractState, table_id: u32) { // Implement determine winner logic
+        fn determine_winner(
+            ref self: ContractState, table_id: u32
+        ) { // Implement determine winner logic
             assert!(
                 self.game_master.read() == get_caller_address(),
                 "Only the game master can determine the winner"
             );
+        }
+
+        fn remove_sitting_out_players(ref self: ContractState, table_id: u32) {
+            let mut world = self.world(@"dominion");
+
+            let mut table: ComponentTable = world.read_model(table_id);
+            for i in 0
+                ..table
+                    .m_players
+                    .len() {
+                        let mut player: ComponentPlayer = world.read_model(*table.m_players[i]);
+                        if player.m_state == EnumPlayerState::Left {
+                            self.kick_player(table_id, *table.m_players[i]);
+                        }
+                    };
+
+            world.write_model(@table);
+        }
+
+        fn update_positions(ref self: ContractState, table_id: u32) {
+            let mut world = self.world(@"dominion");
+
+            let mut table: ComponentTable = world.read_model(table_id);
+
+            let mut new_players: Array<ContractAddress> = array![];
+            for i in 0
+                ..table
+                    .m_players
+                    .len() {
+                        let mut player: ComponentPlayer = world.read_model(*table.m_players[i]);
+                        // If player is not sitting out or waiting, set their new position.
+                        if player.m_state != EnumPlayerState::Left
+                            && player.m_state != EnumPlayerState::Waiting {
+                            match player.m_position {
+                                EnumPosition::Dealer => {
+                                    player.set_position(EnumPosition::SmallBlind);
+                                },
+                                EnumPosition::SmallBlind => {
+                                    player.set_position(EnumPosition::BigBlind);
+                                },
+                                _ => {
+                                    if i + 1 < table.m_players.len() {
+                                        let mut next_player: ComponentPlayer = world
+                                            .read_model(*table.m_players[i + 1]);
+                                        player.set_position(next_player.m_position);
+                                    } else {
+                                        // Wrap around to the first player.
+                                        let mut next_player: ComponentPlayer = world
+                                            .read_model(*table.m_players[0]);
+                                        player.set_position(next_player.m_position);
+                                    }
+                                }
+                            };
+                        }
+                        new_players.append(*table.m_players[i]);
+                    };
+
+            table.m_players = new_players;
+            world.write_model(@table);
         }
 
         fn kick_player(ref self: ContractState, table_id: u32, player: ContractAddress) {
@@ -132,6 +200,13 @@ mod game_master_system {
                 self.game_master.read() == get_caller_address(),
                 "Only the game master can kick players"
             );
+
+            let mut world = self.world(@"dominion");
+            let mut table: ComponentTable = world.read_model(table_id);
+            let player_model: ComponentPlayer = world.read_model(player);
+            table.remove_player(@player);
+            world.erase_model(@player_model);
+            world.write_model(@table);
         }
 
         fn change_game_master(ref self: ContractState, new_game_master: ContractAddress) {

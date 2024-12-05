@@ -80,19 +80,6 @@ mod actions_system {
         }
 
         fn set_ready(ref self: ContractState, game_id: u32) { // Implement set ready logic
-        //     let mut world = self.world(@"dominion");
-        //     let caller = get_caller_address();
-
-        //     // Fetch the player and table
-        //     let player: ComponentPlayer = world.read_model(caller);
-        //     let table: ComponentTable = world.read_model(game_id);
-
-        //     // Validate player is in the table and game is in the pre-flop state
-        //     assert!(player.m_table_id == game_id, "Player is not in the specified table");
-        //     assert!(table.m_game_state == EnumGameState::WaitingForPlayers, "Game is not in the waiting for players state");
-
-           // Set player state to ready
-           // player.m_player_state = EnumPlayerState::Ready;
         }
     }
 }
