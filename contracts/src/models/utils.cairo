@@ -44,7 +44,7 @@
 
 use dominion::models::structs::StructCard;
 use dominion::models::enums::EnumCardValue;
-use dominion::models::traits::EnumCardValueInto;
+use dominion::models::traits::{EnumCardValueInto, StructCardDisplay, ICard};
 
 fn sort(arr: @Array<StructCard>) -> Array<StructCard> {
     // If array is empty or has 1 element, it's already sorted
@@ -64,27 +64,33 @@ fn merge(left_arr: @Array<StructCard>, right_arr: @Array<StructCard>) -> Array<S
 
     // Merge the two arrays
     while i < left_arr.len() && j < right_arr.len() {
-        let left_value: u32 = (*left_arr[i].m_value).into();
-        let right_value: u32 = (*right_arr[j].m_value).into();
+        if left_arr[i].get_value().is_none() || right_arr[j].get_value().is_none() {
+            println!("left_arr[i]: {}", left_arr[i]);
+            println!("right_arr[j]: {}", right_arr[j]);
+            panic!("Card value is none");
+        }
+
+        let left_value: u32 = left_arr[i].get_value().unwrap().into();
+        let right_value: u32 = right_arr[j].get_value().unwrap().into();
 
         if left_value <= right_value {
-            result.append((*left_arr[i]).clone());
+            result.append(left_arr[i].clone());
             i += 1;
         } else {
-            result.append((*right_arr[j]).clone());
+            result.append(right_arr[j].clone());
             j += 1;
         }
     };
 
     // Copy remaining elements from left array
     while i < left_arr.len() {
-        result.append((*left_arr[i]).clone());
+        result.append(left_arr[i].clone());
         i += 1;
     };
 
     // Copy remaining elements from right array
     while j < right_arr.len() {
-        result.append((*right_arr[j]).clone());
+        result.append(right_arr[j].clone());
         j += 1;
     };
 
@@ -95,7 +101,7 @@ fn merge(left_arr: @Array<StructCard>, right_arr: @Array<StructCard>) -> Array<S
 fn merge_sort(arr: @Array<StructCard>, left: usize, right: usize) -> Array<StructCard> {
     if left >= right {
         let mut result = array![];
-        result.append((*arr[left]).clone());
+        result.append(arr[left].clone());
         return result;
     }
 
@@ -108,14 +114,14 @@ fn merge_sort(arr: @Array<StructCard>, left: usize, right: usize) -> Array<Struc
     // Fill left subarray
     let mut i = left;
     while i <= mid {
-        left_arr.append((*arr[i]).clone());
+        left_arr.append(arr[i].clone());
         i += 1;
     };
 
     // Fill right subarray
     let mut i = mid + 1;
     while i <= right {
-        right_arr.append((*arr[i]).clone());
+        right_arr.append(arr[i].clone());
         i += 1;
     };
 

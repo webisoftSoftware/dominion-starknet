@@ -69,7 +69,7 @@ impl ComponentHandDisplay of Display<ComponentHand> {
         for card in self
             .m_cards
             .span() {
-                let str: ByteArray = format!("\n\t\t{}", *card);
+                let str: ByteArray = format!("\n\t\t{}", card);
                 f.buffer.append(@str);
             };
 
@@ -84,11 +84,12 @@ impl ComponentPlayerDisplay of Display<ComponentPlayer> {
         );
         f.buffer.append(@str);
 
+        let str: ByteArray = format!("\n\tTotal Chips: {0}", *self.m_total_chips);
+        f.buffer.append(@str);
+
         let str: ByteArray = format!("\n\tTable Chips: {0}", *self.m_table_chips);
         f.buffer.append(@str);
 
-        let str: ByteArray = format!("\n\tTotal Chips: {0}", *self.m_total_chips);
-        f.buffer.append(@str);
 
         let str: ByteArray = format!("\n\tPosition: {0}", *self.m_position);
         f.buffer.append(@str);
@@ -370,7 +371,8 @@ impl EnumCardSuitDisplay of Display<EnumCardSuit> {
 
 impl StructCardDisplay of Display<StructCard> {
     fn fmt(self: @StructCard, ref f: Formatter) -> Result<(), Error> {
-        let str: ByteArray = format!("Card: {}\n\tSuit: {}", *self.m_value, *self.m_suit);
+        assert!(self.m_string_representation.len() == 2, "Invalid card string representation");
+        let str: ByteArray = format!("{}", self.m_string_representation);
         f.buffer.append(@str);
         Result::Ok(())
     }
@@ -439,7 +441,7 @@ impl ComponentTableEq of PartialEq<ComponentTable> {
 
 impl StructCardEq of PartialEq<StructCard> {
     fn eq(lhs: @StructCard, rhs: @StructCard) -> bool {
-        *lhs.m_value == *rhs.m_value && *lhs.m_suit == *rhs.m_suit
+        lhs.m_string_representation == rhs.m_string_representation
     }
 }
 
@@ -471,7 +473,89 @@ impl ComponentHandEq of PartialEq<ComponentHand> {
 #[generate_trait]
 impl CardImpl of ICard {
     fn new(value: EnumCardValue, suit: EnumCardSuit) -> StructCard {
-        StructCard { m_value: value, m_suit: suit }
+        let str: ByteArray = format!("{}{}", value, suit);
+        StructCard { m_string_representation: str }
+    }
+
+    fn get_value(self: @StructCard) -> Option<EnumCardValue> {
+        assert!(self.m_string_representation.len() == 2, "Invalid card string representation");
+
+
+        if self.m_string_representation[0] == '2' {
+            return Option::Some(EnumCardValue::Two);
+        }
+
+        if self.m_string_representation[0] == '3' {
+            return Option::Some(EnumCardValue::Three);
+        }
+
+        if self.m_string_representation[0] == '4' {
+            return Option::Some(EnumCardValue::Four);
+        }
+
+        if self.m_string_representation[0] == '5' {
+            return Option::Some(EnumCardValue::Five);
+        }
+
+        if self.m_string_representation[0] == '6' {
+            return Option::Some(EnumCardValue::Six);
+        }
+
+        if self.m_string_representation[0] == '7' {
+            return Option::Some(EnumCardValue::Seven);
+        }
+
+        if self.m_string_representation[0] == '8' {
+            return Option::Some(EnumCardValue::Eight);
+        }
+
+        if self.m_string_representation[0] == '9' {
+            return Option::Some(EnumCardValue::Nine);
+        }
+
+        if self.m_string_representation[0] == '1' {
+            return Option::Some(EnumCardValue::Ten);
+        }
+
+        if self.m_string_representation[0] == 'J' {
+            return Option::Some(EnumCardValue::Jack);
+        }
+
+        if self.m_string_representation[0] == 'Q' {
+            return Option::Some(EnumCardValue::Queen);
+        }
+
+        if self.m_string_representation[0] == 'K' {
+            return Option::Some(EnumCardValue::King);
+        }
+
+        if self.m_string_representation[0] == 'A' {
+            return Option::Some(EnumCardValue::Ace);
+        }
+
+        return Option::None;
+    }
+
+    fn get_suit(self: @StructCard) -> Option<EnumCardSuit> {
+        assert!(self.m_string_representation.len() == 2, "Invalid card string representation");
+
+        if self.m_string_representation[1] == 'S' {
+            return Option::Some(EnumCardSuit::Spades);
+        }
+
+        if self.m_string_representation[1] == 'H' {
+            return Option::Some(EnumCardSuit::Hearts);
+        }
+
+        if self.m_string_representation[1] == 'D' {
+            return Option::Some(EnumCardSuit::Diamonds);
+        }
+
+        if self.m_string_representation[1] == 'C' {
+            return Option::Some(EnumCardSuit::Clubs);
+        }
+
+        return Option::None;
     }
 }
 
@@ -554,18 +638,22 @@ impl HandImpl of IHand {
                 // Check all cards for royal flush in current suit
                 for card in all_cards
                     .span() {
-                        if *card.m_suit != *suit {
-                            continue;
+                        if let Option::Some(suit_card) = card.get_suit() {
+                            if suit_card != *suit {
+                                continue;
+                            }
                         }
 
-                        match card.m_value {
-                            EnumCardValue::Ten => contains_ten = true,
-                            EnumCardValue::Jack => contains_jack = true,
-                            EnumCardValue::Queen => contains_queen = true,
-                            EnumCardValue::King => contains_king = true,
-                            EnumCardValue::Ace => contains_ace = true,
-                            _ => {},
-                        };
+                        if let Option::Some(value) = card.get_value() {
+                            match value {
+                                EnumCardValue::Ten => contains_ten = true,
+                                EnumCardValue::Jack => contains_jack = true,
+                                EnumCardValue::Queen => contains_queen = true,
+                                EnumCardValue::King => contains_king = true,
+                                EnumCardValue::Ace => contains_ace = true,
+                                _ => {},
+                            };
+                        }
                     };
 
                 // If we found all required cards in the same suit
@@ -606,10 +694,14 @@ impl HandImpl of IHand {
 
                 for card in all_cards
                     .span() {
-                        if *card.m_suit == *suit {
-                            suit_cards.append(*card);
+                        if let Option::Some(suit_card) = card.get_suit() {
+                            if suit_card != *suit {
+                                continue;
+                            }
                         }
-                    };
+
+                        suit_cards.append(card.clone());
+                };
 
                 // Need at least 5 cards of the same suit for a straight flush
                 if suit_cards.len() < 5 {
@@ -621,21 +713,24 @@ impl HandImpl of IHand {
                 // Check for Ace-low straight flush (A-2-3-4-5)
                 if sorted_cards.len() >= 5 {
                     let last_idx = sorted_cards.len() - 1;
-                    if *sorted_cards[last_idx].m_value == EnumCardValue::Ace {
-                        let mut has_two = false;
-                        let mut has_three = false;
-                        let mut has_four = false;
-                        let mut has_five = false;
+                    if let Option::Some(value) = sorted_cards[last_idx].get_value() {
+                        if value == EnumCardValue::Ace {
+                            let mut has_two = false;
+                            let mut has_three = false;
+                            let mut has_four = false;
+                            let mut has_five = false;
 
                         for card in sorted_cards
                             .span() {
-                                match card.m_value {
-                                    EnumCardValue::Two => has_two = true,
-                                    EnumCardValue::Three => has_three = true,
-                                    EnumCardValue::Four => has_four = true,
-                                    EnumCardValue::Five => has_five = true,
-                                    _ => {},
-                                };
+                                if let Option::Some(value) = card.get_value() {
+                                    match value {
+                                        EnumCardValue::Two => has_two = true,
+                                        EnumCardValue::Three => has_three = true,
+                                        EnumCardValue::Four => has_four = true,
+                                        EnumCardValue::Five => has_five = true,
+                                        _ => {},
+                                    };
+                                }
                             };
 
                         if has_two && has_three && has_four && has_five {
@@ -647,18 +742,17 @@ impl HandImpl of IHand {
 
                 // Check for regular straight flush
                 let mut consecutive_count: u32 = 1;
-                let mut prev_value: u32 = (*sorted_cards[0].m_value).into();
+                let mut prev_value: u32 = sorted_cards[0].get_value().unwrap().into();
 
                 for i in 1
                     ..sorted_cards
                         .len() {
-                            let current_value: u32 = (*sorted_cards[i].m_value).into();
-
-                            if current_value == prev_value {
+                        if let Option::Some(current_value) = sorted_cards[i].get_value() {
+                            if current_value.into() == prev_value {
                                 continue; // Skip duplicate values
                             }
 
-                            if current_value == prev_value + 1 {
+                            if current_value.into() == prev_value + 1 {
                                 consecutive_count += 1;
                                 if consecutive_count >= 5 {
                                     straight_flush = true;
@@ -667,8 +761,10 @@ impl HandImpl of IHand {
                             } else {
                                 consecutive_count = 1;
                             }
-                            prev_value = current_value;
+                            prev_value = current_value.into();
                         }
+                    };
+                }
             };
 
         return straight_flush;
@@ -683,20 +779,26 @@ impl HandImpl of IHand {
         }
 
         // Check if hand is a pair and board has matching value
-        if *self.m_cards[0].m_value == *self.m_cards[1].m_value {
-            let mut dup_count: u8 = 2;
-            for card in board
-                .span() {
-                    if *card.m_value == *self.m_cards[0].m_value {
-                        dup_count += 1;
-                        if dup_count >= 4 {
-                            break;
-                        }
-                    }
-                };
+        if let Option::Some(value) = self.m_cards[0].get_value() {
+            if let Option::Some(card_value) = self.m_cards[1].get_value() { 
+                if value == card_value {
+                    let mut dup_count: u8 = 2;
+                    for card in board
+                        .span() {
+                            if let Option::Some(card_value) = card.get_value() {
+                                if card_value == value {
+                                    dup_count += 1;
+                                    if dup_count >= 4 {
+                                        break;
+                                    }
+                                }
+                            }
+                    };
 
-            if dup_count >= 4 {
-                return true;
+                    if dup_count >= 4 {
+                        return true;
+                    }
+                }
             }
         }
 
@@ -706,21 +808,23 @@ impl HandImpl of IHand {
 
         // Check if there are 3 cards with the same value.
         let mut same_kind_count: u8 = 1;
-        let mut prev_value: @EnumCardValue = all_cards[0].m_value;
+        let mut prev_value: EnumCardValue = all_cards[0].get_value().unwrap();
 
         for card in all_cards
             .span() {
-                if card.m_value == prev_value {
-                    same_kind_count += 1;
+                if let Option::Some(card_value) = card.get_value() {
+                    if card_value == prev_value {
+                        same_kind_count += 1;
 
-                    if same_kind_count >= 4 {
+                        if same_kind_count >= 4 {
                         break;
+                        }
+                        continue;
                     }
-                    continue;
-                }
 
                 same_kind_count = 1;
-                prev_value = card.m_value;
+                    prev_value = card.get_value().unwrap();
+                }
             };
 
         return same_kind_count >= 4;
@@ -737,19 +841,21 @@ impl HandImpl of IHand {
         let sorted_board: Array<StructCard> = utils::sort(board);
         let all_cards: Array<StructCard> = self.m_cards.concat(@sorted_board);
 
-        let mut first_value: Option<@EnumCardValue> = Option::None;
+        let mut first_value: Option<EnumCardValue> = Option::None;
         let mut first_count: u8 = 0;
-        let mut second_value: Option<@EnumCardValue> = Option::None;
+        let mut second_value: Option<EnumCardValue> = Option::None;
         let mut second_count: u8 = 0;
-        let mut current_value: @EnumCardValue = all_cards[0].m_value;
+        let mut current_value: EnumCardValue = all_cards[0].get_value().unwrap();
         let mut current_count: u8 = 1;
 
         for i in 1
             ..all_cards
                 .len() {
-                    if all_cards[i].m_value == current_value {
-                        current_count += 1;
-                        continue;
+                    if let Option::Some(card_value) = all_cards[i].get_value() {
+                        if card_value == current_value {
+                            current_count += 1;
+                            continue;
+                        }
                     }
 
                     // Update counts when we find a different value.
@@ -769,7 +875,7 @@ impl HandImpl of IHand {
                         second_value = Option::Some(current_value);
                         second_count = current_count;
                     }
-                    current_value = all_cards[i].m_value;
+                    current_value = all_cards[i].get_value().unwrap();
                     current_count = 1;
                 };
 
@@ -813,18 +919,19 @@ impl HandImpl of IHand {
                 for i in 0
                     ..all_cards
                         .len() {
-                            let current_suit: @EnumCardSuit = all_cards[i].m_suit;
-
-                            if *current_suit == *suit {
+                        if let Option::Some(current_suit) = all_cards[i].get_suit() {
+                            if current_suit == *suit {
                                 matches += 1;
                             }
+                        }
 
-                            if matches >= 5 {
-                                is_flush = true;
-                                break;
-                            }
-                        };
-            };
+                    if matches >= 5 {
+                        is_flush = true;
+                        break;
+                    }
+                };
+        };
+
         return is_flush;
     }
 
@@ -846,25 +953,29 @@ impl HandImpl of IHand {
         // Check for Ace-low straight (A-2-3-4-5)
         if all_cards.len() >= 5 {
             let last_idx = all_cards.len() - 1;
-            if *all_cards[last_idx].m_value == EnumCardValue::Ace {
-                let mut has_two = false;
-                let mut has_three = false;
-                let mut has_four = false;
-                let mut has_five = false;
+            if let Option::Some(card_value) = all_cards[last_idx].get_value() {
+                if card_value == EnumCardValue::Ace {
+                    let mut has_two = false;
+                    let mut has_three = false;
+                    let mut has_four = false;
+                    let mut has_five = false;
 
-                for card in all_cards
-                    .span() {
-                        match card.m_value {
-                            EnumCardValue::Two => has_two = true,
-                            EnumCardValue::Three => has_three = true,
-                            EnumCardValue::Four => has_four = true,
-                            EnumCardValue::Five => has_five = true,
-                            _ => {},
-                        };
+                    for card in all_cards
+                        .span() {
+                            if let Option::Some(card_value) = card.get_value() {
+                            match card_value {
+                                EnumCardValue::Two => has_two = true,
+                                EnumCardValue::Three => has_three = true,
+                                EnumCardValue::Four => has_four = true,
+                                EnumCardValue::Five => has_five = true,
+                                _ => {},
+                            };
+                        }
                     };
 
-                if has_two && has_three && has_four && has_five {
-                    return true;
+                    if has_two && has_three && has_four && has_five {
+                        return true;
+                    }
                 }
             }
         }
@@ -872,31 +983,31 @@ impl HandImpl of IHand {
         // Check for regular straight.
         let mut is_straight: bool = false;
         let mut consecutive_count: u32 = 1;
-        let mut prev_value: u32 = (*all_cards[0].m_value).into();
+        let mut prev_value: u32 = all_cards[0].get_value().unwrap().into();
 
         // Check for consecutive values.
         for i in 1
             ..all_cards
                 .len() {
-                    let current_value: u32 = (*all_cards[i].m_value).into();
-
-                    if current_value == prev_value {
-                        continue; // Skip duplicate values.
-                    }
-
-                    if current_value == prev_value + 1 {
-                        consecutive_count += 1;
-                        prev_value = current_value;
-
-                        if consecutive_count >= 5 {
-                            is_straight = true;
-                            break;
+                    if let Option::Some(current_value) = all_cards[i].get_value() {
+                        if current_value.into() == prev_value {
+                            continue; // Skip duplicate values.
                         }
-                        continue;
-                    }
 
-                    prev_value = current_value;
-                    consecutive_count = 1;
+                        if current_value.into() == prev_value + 1 {
+                            consecutive_count += 1;
+                            prev_value = current_value.into();
+
+                            if consecutive_count >= 5 {
+                                is_straight = true;
+                                break;
+                            }
+                            continue;
+                        }
+
+                        prev_value = current_value.into();
+                        consecutive_count = 1;
+                    }
                 };
 
         return is_straight;
@@ -913,10 +1024,10 @@ impl HandImpl of IHand {
         let mut three_of_a_kind: bool = false;
 
         // Check if hand is a pair and board has matching value
-        if *self.m_cards[0].m_value == *self.m_cards[1].m_value {
+        if self.m_cards[0].get_value() == self.m_cards[1].get_value() {
             for card in board
                 .span() {
-                    if *card.m_value == *self.m_cards[0].m_value {
+                    if card.get_value() == self.m_cards[0].get_value() {
                         three_of_a_kind = true;
                         break;
                     }
@@ -932,21 +1043,23 @@ impl HandImpl of IHand {
 
         // Check if there are 3 cards with the same value.
         let mut same_kind_count: u8 = 1;
-        let mut prev_value: @EnumCardValue = all_cards[0].m_value;
+        let mut prev_value: EnumCardValue = all_cards[0].get_value().unwrap();
 
         for card in all_cards
             .span() {
-                if card.m_value == prev_value {
-                    same_kind_count += 1;
+                if let Option::Some(card_value) = card.get_value() {
+                    if card_value == prev_value {
+                        same_kind_count += 1;
 
-                    if same_kind_count >= 3 {
-                        break;
+                        if same_kind_count >= 3 {
+                            break;
+                        }
+                        continue;
                     }
-                    continue;
-                }
 
-                prev_value = card.m_value;
-                same_kind_count = 1;
+                    prev_value = card_value;
+                    same_kind_count = 1;
+                }
             };
 
         return same_kind_count >= 3;
@@ -964,15 +1077,16 @@ impl HandImpl of IHand {
         let sorted_board: Array<StructCard> = utils::sort(board);
         let all_cards: Array<StructCard> = self.m_cards.concat(@sorted_board);
         let mut consecutive_count: u8 = 1;
-        let mut prev_value: @EnumCardValue = all_cards[0].m_value;
-        let mut first_pair_value: Option<@EnumCardValue> = Option::None;
+        let mut prev_value: EnumCardValue = all_cards[0].get_value().unwrap();
+        let mut first_pair_value: Option<EnumCardValue> = Option::None;
 
         for i in 0
             ..all_cards
                 .len() {
-                    if all_cards[i].m_value == prev_value {
-                        consecutive_count += 1;
-                        if consecutive_count == 2 {
+                    if let Option::Some(card_value) = all_cards[i].get_value() {
+                        if card_value == prev_value {
+                            consecutive_count += 1;
+                            if consecutive_count == 2 {
                             if first_pair_value != Option::Some(prev_value) {
                                 num_pairs += 1;
                                 if num_pairs == 1 {
@@ -981,14 +1095,15 @@ impl HandImpl of IHand {
                             }
                         } else {
                             consecutive_count = 1;
-                            prev_value = all_cards[i].m_value;
+                            prev_value = card_value;
                         }
                     }
 
                     if num_pairs >= 2 {
                         break;
                     }
-                };
+                }
+            };
 
         return num_pairs >= 2;
     }
@@ -999,7 +1114,7 @@ impl HandImpl of IHand {
         // NAIVE APPROACH (ASSUMING THAT THE CARDS IN HAND ARE SORTED):
 
         // Check if the hand itself is a pair.
-        if *self.m_cards[0].m_value == *self.m_cards[1].m_value {
+        if self.m_cards[0].get_value() == self.m_cards[1].get_value() {
             return true;
         }
 
@@ -1014,8 +1129,8 @@ impl HandImpl of IHand {
         for i in 0
             ..sorted_board
                 .len() {
-                    if *sorted_board[i].m_value == *self.m_cards[0].m_value
-                        || *sorted_board[i].m_value == *self.m_cards[1].m_value {
+                    if sorted_board[i].get_value() == self.m_cards[0].get_value()
+                        || sorted_board[i].get_value() == self.m_cards[1].get_value() {
                         pair_found = true;
                         break;
                     }
@@ -1031,9 +1146,11 @@ impl HandImpl of IHand {
             ..self
                 .m_cards
                 .len() {
-                    let current_value: u32 = (*self.m_cards[i].m_value).into();
-                    if current_value > highest_value {
-                        highest_value = current_value;
+                    if let Option::Some(card_value) = self.m_cards[i].get_value() {
+                        let current_value: u32 = card_value.into();
+                        if current_value > highest_value {
+                            highest_value = current_value;
+                        }
                     }
                 };
         return highest_value;
@@ -1046,9 +1163,11 @@ impl HandImpl of IHand {
             ..self
                 .m_cards
                 .len() {
-                    let current_value: u32 = (*self.m_cards[i].m_value).into();
-                    total_value += current_value;
-                };
+                    if let Option::Some(card_value) = self.m_cards[i].get_value() {
+                        let current_value: u32 = card_value.into();
+                        total_value += current_value;
+                    }
+            };
         return total_value;
     }
 

@@ -44,8 +44,7 @@
 
 use dominion::models::enums::{EnumCardSuit, EnumCardValue};
 
-#[derive(Drop, Serde, Copy, Debug, Introspect)]
+#[derive(Drop, Serde, Clone, Debug, Introspect)]
 struct StructCard {
-    m_value: EnumCardValue,
-    m_suit: EnumCardSuit,
+    m_string_representation: ByteArray,
 }
