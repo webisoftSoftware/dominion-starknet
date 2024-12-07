@@ -410,15 +410,15 @@ impl EnumCardValueInto of Into<EnumCardValue, u32> {
 impl EnumHandRankInto of Into<EnumHandRank, u32> {
     fn into(self: EnumHandRank) -> u32 {
         match self {
-            EnumHandRank::HighCard => 1,
-            EnumHandRank::Pair => 2,
-            EnumHandRank::TwoPair => 3,
-            EnumHandRank::ThreeOfAKind => 4,
-            EnumHandRank::Straight => 5,
-            EnumHandRank::Flush => 6,
-            EnumHandRank::FullHouse => 7,
-            EnumHandRank::FourOfAKind => 8,
-            EnumHandRank::StraightFlush => 9,
+            EnumHandRank::HighCard(value) => value.into(),
+            EnumHandRank::Pair(value) => value.into(),
+            EnumHandRank::TwoPair((value1, value2)) => value1.into() + value2.into(),
+            EnumHandRank::ThreeOfAKind((value, _)) => value.into(),
+            EnumHandRank::Straight(value) => value.into(),
+            EnumHandRank::Flush(value) => value.into(),
+            EnumHandRank::FullHouse((value1, value2)) => value1.into() + value2.into(),
+            EnumHandRank::FourOfAKind((value, _)) => value.into(),
+            EnumHandRank::StraightFlush(value) => value.into(),
             EnumHandRank::RoyalFlush => 10,
         }
     }
@@ -575,41 +575,12 @@ impl HandImpl of IHand {
         self.m_cards = array![];
     }
 
-    fn evaluate_hand(self: @ComponentHand, board: @Array<StructCard>) -> (EnumHandRank, u32) {
-        // First analyze the hand
-        let rank_result: Result<EnumHandRank, EnumError> = self._evaluate_rank(board);
-        assert!(rank_result.is_ok(), "Invalid hand");
-
-        let value: u32 = self._evaluate_value();
-
-        // Return the appropriate score and rank in case of a tie.
-        match rank_result.unwrap() {
-            EnumHandRank::RoyalFlush => (
-                EnumHandRank::RoyalFlush, EnumHandRank::RoyalFlush.into() + value
-            ),
-            EnumHandRank::StraightFlush => (
-                EnumHandRank::StraightFlush, EnumHandRank::StraightFlush.into() + value
-            ),
-            EnumHandRank::FourOfAKind => (
-                EnumHandRank::FourOfAKind, EnumHandRank::FourOfAKind.into() + value
-            ),
-            EnumHandRank::FullHouse => (
-                EnumHandRank::FullHouse, EnumHandRank::FullHouse.into() + value
-            ),
-            EnumHandRank::Flush => (EnumHandRank::Flush, EnumHandRank::Flush.into() + value),
-            EnumHandRank::Straight => (
-                EnumHandRank::Straight, EnumHandRank::Straight.into() + value
-            ),
-            EnumHandRank::ThreeOfAKind => (
-                EnumHandRank::ThreeOfAKind, EnumHandRank::ThreeOfAKind.into() + value
-            ),
-            EnumHandRank::TwoPair => (EnumHandRank::TwoPair, EnumHandRank::TwoPair.into() + value),
-            EnumHandRank::Pair => (EnumHandRank::Pair, EnumHandRank::Pair.into() + value),
-            EnumHandRank::HighCard => (
-                EnumHandRank::HighCard, EnumHandRank::HighCard.into() + value
-            ),
-        }
-    }
+    // fn evaluate_hand(self: @ComponentHand, board: @Array<StructCard>) -> EnumHandRank {
+    //     // First analyze the hand
+    //     let rank_result: Result<EnumHandRank, EnumError> = self._evaluate_rank(board);
+    //     assert!(rank_result.is_ok(), "Invalid hand");
+    //     rank_result.unwrap()
+    // }
 
     fn _has_royal_flush(self: @ComponentHand, board: @Array<StructCard>) -> bool {
         // TODO: Implement the non-naive approach.
@@ -1173,51 +1144,51 @@ impl HandImpl of IHand {
         return total_value;
     }
 
-    fn _evaluate_rank(
-        self: @ComponentHand, board: @Array<StructCard>
-    ) -> Result<EnumHandRank, EnumError> {
-        if self.m_cards.len() != 2 {
-            return Result::Err(EnumError::InvalidHand);
-        }
+    // fn _evaluate_rank(
+    //     self: @ComponentHand, board: @Array<StructCard>
+    // ) -> Result<EnumHandRank, EnumError> {
+    //     if self.m_cards.len() != 2 {
+    //         return Result::Err(EnumError::InvalidHand);
+    //     }
 
-        if board.len() > 5 {
-            return Result::Err(EnumError::InvalidBoard);
-        }
+    //     if board.len() > 5 {
+    //         return Result::Err(EnumError::InvalidBoard);
+    //     }
 
-        if self._has_flush(board) && self._has_straight(board) {
-            return Result::Ok(EnumHandRank::StraightFlush);
-        }
+    //     if self._has_flush(board) && self._has_straight(board) {
+    //         return Result::Ok(EnumHandRank::StraightFlush);
+    //     }
 
-        if self._has_straight_flush(board) && self._has_flush(board) {
-            return Result::Ok(EnumHandRank::RoyalFlush);
-        }
+    //     if self._has_straight_flush(board) && self._has_flush(board) {
+    //         return Result::Ok(EnumHandRank::RoyalFlush);
+    //     }
 
-        if self._has_flush(board) {
-            return Result::Ok(EnumHandRank::Flush);
-        }
+    //     if self._has_flush(board) {
+    //         return Result::Ok(EnumHandRank::Flush);
+    //     }
 
-        if self._has_straight(board) {
-            return Result::Ok(EnumHandRank::Straight);
-        }
+    //     if self._has_straight(board) {
+    //         return Result::Ok(EnumHandRank::Straight);
+    //     }
 
-        if self._has_four_of_a_kind(board) {
-            return Result::Ok(EnumHandRank::FourOfAKind);
-        }
+    //     if self._has_four_of_a_kind(board) {
+    //         return Result::Ok(EnumHandRank::FourOfAKind);
+    //     }
 
-        if self._has_three_of_a_kind(board) {
-            return Result::Ok(EnumHandRank::ThreeOfAKind);
-        }
+    //     if self._has_three_of_a_kind(board) {
+    //         return Result::Ok(EnumHandRank::ThreeOfAKind);
+    //     }
 
-        if self._has_two_pair(board) {
-            return Result::Ok(EnumHandRank::TwoPair);
-        }
+    //     if self._has_two_pair(board) {
+    //         return Result::Ok(EnumHandRank::TwoPair);
+    //     }
 
-        if self._has_pair(board) {
-            return Result::Ok(EnumHandRank::Pair);
-        }
+    //     if self._has_pair(board) {
+    //         return Result::Ok(EnumHandRank::Pair);
+    //     }
 
-        Result::Ok(EnumHandRank::HighCard)
-    }
+    //     Result::Ok(EnumHandRank::HighCard)
+    // }
 }
 
 #[generate_trait]

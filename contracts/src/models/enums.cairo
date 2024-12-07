@@ -67,24 +67,24 @@ pub enum EnumPlayerState {
 
 #[derive(Drop, Serde, Copy, Debug, PartialEq, Introspect)]
 pub enum EnumPosition {
+    None,
     SmallBlind,
     BigBlind,
     Dealer,
-    None,
 }
 
-#[derive(Drop, Serde, Copy, Debug, PartialEq, Introspect)]
+#[derive(Drop, Serde, Debug, PartialEq, Introspect)]
 pub enum EnumHandRank {
-    HighCard,
-    Pair,
-    TwoPair,
-    ThreeOfAKind,
-    Straight,
-    Flush,
-    FullHouse,
-    FourOfAKind,
-    StraightFlush,
-    RoyalFlush,
+    HighCard: EnumCardValue,                                // Card value.
+    Pair: EnumCardValue,                                    // First card value only needed, since it is duplicated.
+    TwoPair: (EnumCardValue, EnumCardValue),                // First card value and second card value.
+    ThreeOfAKind: (EnumCardValue, Array<EnumCardValue>),    // First card value only needed, since it is duplicated.
+    Straight: EnumCardValue,                                // Highest card of the straight to determine highcard.
+    Flush: EnumCardValue,                                   // Sum of value of all cards falling into the flush.
+    FullHouse: (EnumCardValue, EnumCardValue),              // Three of a kind card value and pair card value.
+    FourOfAKind: (EnumCardValue, Array<EnumCardValue>),     // First card value only needed, since it is duplicated + kicker.
+    StraightFlush: EnumCardValue,                           // Only one player can have this, no need to encode anything + kicker.
+    RoyalFlush: (),                                         // Only one player can have this, no need to encode anything.
 }
 
 #[derive(Drop, Serde, Copy, Debug, PartialEq, Introspect)]
