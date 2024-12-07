@@ -100,7 +100,7 @@ fn test_display() {
     );
     assert_eq!(format!("{}", HandDefaultImpl::default()), "Hand 0:\n\tCards:");
     assert_eq!(format!("{}", ICard::new(EnumCardValue::Two, EnumCardSuit::Clubs)), "2C");
-    assert_eq!(format!("{}", EnumHandRank::HighCard), "HighCard");
+    assert_eq!(format!("{}", EnumHandRank::HighCard(EnumCardValue::Two)), "HighCard");
     assert_eq!(format!("{}", EnumCardSuit::Clubs), "C");
     assert_eq!(format!("{}", EnumCardValue::Two), "2");
     assert_eq!(format!("{}", EnumPlayerState::Active), "Active");
@@ -108,9 +108,9 @@ fn test_display() {
 
 #[test]
 fn test_into() {
-    let high_card: u32 = EnumHandRank::HighCard.into();
+    let high_card: u32 = EnumHandRank::HighCard(EnumCardValue::Ace).into();
     let two: u32 = EnumCardValue::Two.into();
 
-    assert_eq!(high_card, 1);
+    assert_eq!(high_card, 14);
     assert_eq!(two, 2);
 }
