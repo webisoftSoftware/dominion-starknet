@@ -13,7 +13,9 @@
     "vite": "^6.0.1"
   },
   "dependencies": {
-    "@noir-lang/backend_barretenberg": "^0.34.0",
-    "@noir-lang/noir_js": "^0.34.0"
+    "@noir-lang/backend_barretenberg": "0.36.0",
+    "@noir-lang/noir_js": "0.36.0",
+    "@noir-lang/noir_wasm": "0.36.0"
   }
 }
+
