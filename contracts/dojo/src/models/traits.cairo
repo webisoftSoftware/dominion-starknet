@@ -623,11 +623,10 @@ impl HandImpl of IHand {
         self.m_cards = array![];
     }
 
-    fn evaluate_hand(self: @ComponentHand, board: @Array<StructCard>) -> EnumHandRank {
+    fn evaluate_hand(self: @ComponentHand, board: @Array<StructCard>) -> Result<EnumHandRank, EnumError> {
         // First analyze the hand.
         let rank_result: Result<EnumHandRank, EnumError> = self._evaluate_rank(board);
-        assert!(rank_result.is_ok(), "Invalid hand");
-        return rank_result.unwrap();
+        return rank_result;
     }
 
     fn _has_royal_flush(self: @ComponentHand, board: @Array<StructCard>) -> bool {
@@ -1168,6 +1167,12 @@ impl TableImpl of ITable {
             EnumPosition::BigBlind => *self.m_big_blind,
             _ => 0,
         }
+    }
+
+    fn reset_table(ref self: ComponentTable) {
+        self.m_pot = 0;
+        self.m_state = EnumGameState::PreFlop;
+        self.m_community_cards = array![];
     }
 
     fn _initialize_deck(ref self: ComponentTable) {
