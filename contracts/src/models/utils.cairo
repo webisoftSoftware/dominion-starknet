@@ -14,7 +14,7 @@
 //  ░███    ███ ░███ ░███ ░███ ░███ ░███
 //  ░███  ░███ ░███  ░███ ░███ ░███ ░███
 //  ░███
-//  █���████████  ░░██████  █████░███
+//  ████████████  ░░██████  █████░███
 //  █████ █████ ████ █████
 //  █████░░██████  ████ █████
 // ░░░░░░░░░░    ░░░░░░  ░░░░░ ░░░ ░░░░░
@@ -330,4 +330,15 @@ fn merge_sort(arr: @Array<StructCard>, left: usize, right: usize) -> Array<Struc
 
     // Merge the sorted subarrays.
     return merge(@sorted_left, @sorted_right);
+}
+
+fn get_top_n_values(values: @Array<EnumCardValue>, n: usize) -> Array<EnumCardValue> {
+    let mut result: Array<EnumCardValue> = array![];
+    let count = if values.len() < n { values.len() } else { n };
+    
+    for i in 0..count {
+        result.append(*values[i]);
+    };
+    
+    return result;
 }

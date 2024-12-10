@@ -14,7 +14,7 @@
 //  ░███    ███ ░███ ░███ ░███ ░███ ░███
 //  ░███  ░███ ░███  ░███ ░███ ░███ ░███
 //  ░███
-//  █���████████  ░░██████  █████░███
+//  ████████████  ░░██████  █████░███
 //  █████ █████ ████ █████
 //  █████░░██████  ████ █████
 // ░░░░░░░░░░    ░░░░░░  ░░░░░ ░░░ ░░░░░
@@ -751,66 +751,48 @@ impl HandImpl of IHand {
     }
 
     fn _has_flush(self: @ComponentHand, board: @Array<StructCard>) -> Option<Array<EnumCardValue>> {
-        // TODO: Implement the non-naive approach.
-
-        // NAIVE APPROACH:
-        // Check if there's 5 cards with the same suit.
         if self.m_cards.len() + board.len() < 5 {
             return Option::None;
         }
 
         let all_cards: Array<StructCard> = self.m_cards.concat(board);
-    
-        // Count cards of each suit.
-        let mut spades_count: u8 = 0;
-        let mut hearts_count: u8 = 0;
-        let mut diamonds_count: u8 = 0;
-        let mut clubs_count: u8 = 0;
-        
-        // Arrays to store values for each suit.
+
+        // Count cards of each suit and store their values
         let mut spades_values: Array<EnumCardValue> = array![];
         let mut hearts_values: Array<EnumCardValue> = array![];
         let mut diamonds_values: Array<EnumCardValue> = array![];
         let mut clubs_values: Array<EnumCardValue> = array![];
 
-        // Group cards by suit.
+        // Group cards by suit
         for card in all_cards.span() {
             if let Option::Some(suit) = card.get_suit() {
                 if let Option::Some(value) = card.get_value() {
                     match suit {
-                        EnumCardSuit::Spades => {
-                            spades_count += 1;
-                            spades_values.append(value);
-                        },
-                        EnumCardSuit::Hearts => {
-                            hearts_count += 1;
-                            hearts_values.append(value);
-                        },
-                        EnumCardSuit::Diamonds => {
-                            diamonds_count += 1;
-                            diamonds_values.append(value);
-                        },
-                        EnumCardSuit::Clubs => {
-                            clubs_count += 1;
-                            clubs_values.append(value);
-                        },
-                    }
+                        EnumCardSuit::Spades => spades_values.append(value),
+                        EnumCardSuit::Hearts => hearts_values.append(value),
+                        EnumCardSuit::Diamonds => diamonds_values.append(value),
+                        EnumCardSuit::Clubs => clubs_values.append(value),
+                    };
                 }
             }
         };
 
-        // Check which suit has 5 or more cards and return its sorted values.
-        if spades_count >= 5 {
-            return Option::Some(utils::sort_values(@spades_values));
+        // Check which suit has 5 or more cards and return its top 5 values
+        if spades_values.len() >= 5 {
+            let sorted = utils::sort_values(@spades_values);
+            return Option::Some(utils::get_top_n_values(@sorted, 5));
         }
-        if hearts_count >= 5 {
-            return Option::Some(utils::sort_values(@hearts_values));
+        if hearts_values.len() >= 5 {
+            let sorted = utils::sort_values(@hearts_values);
+            return Option::Some(utils::get_top_n_values(@sorted, 5));
         }
-        if diamonds_count >= 5 {
-            return Option::Some(utils::sort_values(@diamonds_values));
+        if diamonds_values.len() >= 5 {
+            let sorted = utils::sort_values(@diamonds_values);
+            return Option::Some(utils::get_top_n_values(@sorted, 5));
         }
-        if clubs_count >= 5 {
-            return Option::Some(utils::sort_values(@clubs_values));
+        if clubs_values.len() >= 5 {
+            let sorted = utils::sort_values(@clubs_values);
+            return Option::Some(utils::get_top_n_values(@sorted, 5));
         }
 
         return Option::None;
@@ -977,23 +959,26 @@ impl HandImpl of IHand {
             return Option::None;
         }
 
-        if self.m_cards[0].get_value() == self.m_cards[1].get_value() {
-            return Option::Some(self.m_cards[0].get_value().unwrap());
-        }
-
-        // Sort board cards, since cards in hand are sorted.
-        let sorted_board: Array<StructCard> = utils::sort(board);
-        let mut pair_found: Option<EnumCardValue> = Option::None;
-
-        for i in 0..sorted_board.len() {
-            if sorted_board[i].get_value() == self.m_cards[0].get_value()
-                || sorted_board[i].get_value() == self.m_cards[1].get_value() {
-                pair_found = Option::Some(sorted_board[i].get_value().unwrap());
-                break;
+        let all_cards = self.m_cards.concat(board);
+        let mut value_counts: Felt252Dict<u8> = utils::_count_values(@all_cards);
+        
+        let mut pairs: Array<EnumCardValue> = array![];
+        
+        for card in all_cards.span() {
+            if let Option::Some(value) = card.get_value() {
+                let value_count: u32 = value.into();
+                if value_counts.get(value_count.into()) == 2 && !pairs.contains(@value) {
+                    pairs.append(value);
+                }
             }
         };
-
-        return pair_found;
+        
+        if pairs.len() >= 2 {
+            let sorted_pairs = utils::sort_values(@pairs);
+            return Option::Some(sorted_pairs[0].clone());
+        }
+        
+        return Option::None;
     }
 
     fn _evaluate_rank(
