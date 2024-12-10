@@ -51,7 +51,8 @@ async fn vrf_info() -> Json<InfoResult> {
 
 #[derive(Debug, Serialize, Deserialize)]
 struct JsonResult {
-    result: StarkVrfProof,
+    proof: StarkVrfProof,
+    random: String,
 }
 
 async fn stark_vrf(extract::Json(payload): extract::Json<StarkVrfRequest>) -> Json<JsonResult> {
@@ -83,19 +84,20 @@ async fn stark_vrf(extract::Json(payload): extract::Json<StarkVrfRequest>) -> Js
     println!("proof s: {}", proof.2);
     println!("proof verify hint: {}", sqrt_ratio_hint);
 
-    let result = StarkVrfProof {
+    let proof = StarkVrfProof {
         gamma_x: format(proof.0.x),
         gamma_y: format(proof.0.y),
         c: format(proof.1),
         s: format(proof.2),
         sqrt_ratio: format(sqrt_ratio_hint),
-        rnd: format(rnd),
     };
+    let random = format(rnd);
 
-    println!("result {result:?}");
+    println!("proof {proof:?}");
+    println!("random {random:?}");
 
     //let n = (payload.n as f64).sqrt() as u64;
-    Json(JsonResult { result })
+    Json(JsonResult { proof, random })
 }
 
 #[tokio::main(flavor = "current_thread")]
@@ -107,7 +109,7 @@ async fn main() {
         .init();
 
     async fn index() -> &'static str {
-        "OK"
+        "IT IS ALLIIIIIVVVEEE"
     }
 
     let app = Router::new()
@@ -116,11 +118,11 @@ async fn main() {
         .route("/stark_vrf", post(stark_vrf))
         .layer(TraceLayer::new_for_http());
 
-    let listener = tokio::net::TcpListener::bind("0.0.0.0:3000")
+    let listener = tokio::net::TcpListener::bind("127.0.0.1:3000")
         .await
         .expect("Failed to bind to port 3000, port already in use by another process. Change the port or terminate the other process.");
 
-    debug!("Server started on http://0.0.0.0:3000");
+    debug!("Server started on http://127.0.0.1:3000");
 
     axum::serve(listener, app)
         .with_graceful_shutdown(shutdown_signal())

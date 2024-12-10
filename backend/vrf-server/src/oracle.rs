@@ -20,6 +20,4 @@ pub struct StarkVrfProof {
     pub s: ::prost::alloc::string::String,
     #[prost(string, tag = "5")]
     pub sqrt_ratio: ::prost::alloc::string::String,
-    #[prost(string, tag = "6")]
-    pub rnd: ::prost::alloc::string::String,
 }
