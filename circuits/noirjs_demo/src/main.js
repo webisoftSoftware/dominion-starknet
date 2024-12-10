@@ -11,13 +11,68 @@ function display(container, msg) {
 
 document.getElementById('submit').addEventListener('click', async () => {
     try {
+        // Clear previous results
+        document.getElementById('logs').innerHTML = '<h2>Process Logs</h2>';
+        document.getElementById('deck-comparison-body').innerHTML = '';
+        
         display('logs', 'Starting initialization...');
         const backend = new UltraHonkBackend(circuit);
         const noir = new Noir(circuit);
         
-        // Create a smaller deck for testing
-        const deck = Array.from({ length: 16 }, (_, i) => i + 1);  // Regular integers
-        const key = 123; // Regular integer
+        // Create deck with card notation
+        const suits = ['H', 'D', 'C', 'S'];  // Hearts, Diamonds, Clubs, Spades
+        const values = ['A', '2', '3', '4', '5', '6', '7', '8', '9', 'T', 'J', 'Q', 'K'];
+        const cardNotations = [];
+        
+        // Generate card notations (HA, D5, ST, etc.)
+        for (const suit of suits) {
+            for (const value of values) {
+                cardNotations.push(suit + value);
+            }
+        }
+        
+        // Add shuffle function
+        function shuffleArray(array) {
+            for (let i = array.length - 1; i > 0; i--) {
+                const random = Math.random();
+                console.log(random);
+                const j = Math.floor(random * (i + 1));
+                
+                [array[i], array[j]] = [array[j], array[i]];
+            }
+            return array;
+        }
+        
+        // Convert card notations to meaningful integers
+        let deck = cardNotations.map(card => {
+            const suit = card[0];
+            const value = card[1];
+            
+            // Calculate suit base value
+            let suitValue = 0;
+            switch(suit) {
+                case 'H': suitValue = 0; break;
+                case 'D': suitValue = 100; break;
+                case 'C': suitValue = 200; break;
+                case 'S': suitValue = 300; break;
+            }
+            
+            // Calculate card value
+            let cardValue = 0;
+            if (value === 'A') cardValue = 1;
+            else if (value === 'T') cardValue = 10;
+            else if (value === 'J') cardValue = 11;
+            else if (value === 'Q') cardValue = 12;
+            else if (value === 'K') cardValue = 13;
+            else cardValue = parseInt(value);
+            
+            return suitValue + cardValue;
+        });
+        
+        // Shuffle the input deck
+        deck = shuffleArray([...deck]);
+        
+        const key = parseInt(import.meta.env.VITE_ENCRYPTION_KEY) || 123;
         
         const input = { 
             key,
@@ -27,6 +82,7 @@ document.getElementById('submit').addEventListener('click', async () => {
         try {
             display('logs', 'Attempting to execute noir.execute()...');
             const witnessResult = await noir.execute(input);
+            
             console.log(witnessResult);
             display('logs', 'Witness generated successfully');
             
@@ -35,11 +91,42 @@ document.getElementById('submit').addEventListener('click', async () => {
             display('logs', 'Proof generated successfully');
             
             console.log(proof);
-            display('results', 'First encrypted card: ' + proof.publicInputs[0].toString());
-            display('results', 'Last encrypted card: ' + proof.publicInputs[15].toString());
             
-            const verified = await backend.verifyProof(proof);
-            display('logs', verified ? 'Proof verified ✅' : 'Proof verification failed ❌');
+            // Create arrays of card notations for both decks
+            const originalNotations = deck.map(num => {
+                const suit = suits[Math.floor(num / 100)];
+                const valueNum = num % 100;
+                let value = '';
+                if (valueNum === 1) value = 'A';
+                else if (valueNum === 10) value = 'T';
+                else if (valueNum === 11) value = 'J';
+                else if (valueNum === 12) value = 'Q';
+                else if (valueNum === 13) value = 'K';
+                else value = valueNum.toString();
+                return suit + value;
+            });
+
+            // Clear previous results
+            const tbody = document.getElementById('deck-comparison-body');
+            tbody.innerHTML = '';
+
+            // Create table rows showing original card and its encrypted value
+            originalNotations.forEach((card, index) => {
+                const row = document.createElement('tr');
+                const originalCell = document.createElement('td');
+                const encryptedCell = document.createElement('td');
+                
+                originalCell.textContent = `${card} (${deck[index]})`;
+                const encryptedValue = witnessResult.returnValue[index];
+                const encryptedIndex = deck.indexOf(encryptedValue);
+                encryptedCell.textContent = encryptedIndex !== -1 ? 
+                    `${cardNotations[encryptedIndex]} (${encryptedValue})` : 
+                    encryptedValue;
+                
+                row.appendChild(originalCell);
+                row.appendChild(encryptedCell);
+                tbody.appendChild(row);
+            });
         } catch (execError) {
             console.error('Circuit execution error:', execError);
             display('logs', 'Circuit Error: ' + execError.toString());
