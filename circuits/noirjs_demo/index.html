@@ -1,0 +1,38 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>Card Deck Encryption Demo</title>
+  <style>
+    .outer {
+        display: flex;
+        justify-content: space-between;
+        width: 100%;
+    }
+    .inner {
+        width: 45%;
+        border: 1px solid black;
+        padding: 10px;
+        word-wrap: break-word;
+    }
+    .input-area {
+        margin: 20px 0;
+    }
+    body {
+        padding: 20px;
+        max-width: 1200px;
+        margin: 0 auto;
+    }
+  </style>
+</head>
+<body>
+  <h1>Card Deck Encryption Demo</h1>
+  <div class="input-area">
+    <button id="submit">Encrypt Deck</button>
+  </div>
+  <div class="outer">
+    <div id="logs" class="inner"><h2>Process Logs</h2></div>
+    <div id="results" class="inner"><h2>Encrypted Results</h2></div>
+  </div>
+  <script type="module" src="/src/main.js"></script>
+</body>
+</html>
