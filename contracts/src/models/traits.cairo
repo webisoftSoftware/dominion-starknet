@@ -14,7 +14,7 @@
 //  ░███    ███ ░███ ░███ ░███ ░███ ░███
 //  ░███  ░███ ░███  ░███ ░███ ░███ ░███
 //  ░███
-//  ██████████  ░░██████  █████░███
+//  █���████████  ░░██████  █████░███
 //  █████ █████ ████ █████
 //  █████░░██████  ████ █████
 // ░░░░░░░░░░    ░░░░░░  ░░░░░ ░░░ ░░░░░
@@ -407,20 +407,68 @@ impl EnumCardValueInto of Into<EnumCardValue, u32> {
     }
 }
 
+impl EnumCardSuitInto of Into<EnumCardSuit, u32> {
+    fn into(self: EnumCardSuit) -> u32 {
+        match self {
+            EnumCardSuit::Spades => 1,
+            EnumCardSuit::Hearts => 2,
+            EnumCardSuit::Diamonds => 3,
+            EnumCardSuit::Clubs => 4,
+        }
+    }
+}
+
 impl EnumHandRankInto of Into<EnumHandRank, u32> {
     fn into(self: EnumHandRank) -> u32 {
         match self {
-            EnumHandRank::HighCard(value) => value.into(),
+            EnumHandRank::HighCard(values) | EnumHandRank::Flush(values) => {
+                let mut sum: u32 = 0;
+                for value in values.span() {
+                    sum += (*value).into();
+                };
+                sum
+            },
             EnumHandRank::Pair(value) => value.into(),
             EnumHandRank::TwoPair((value1, value2)) => value1.into() + value2.into(),
-            EnumHandRank::ThreeOfAKind((value, _)) => value.into(),
+            EnumHandRank::ThreeOfAKind(value) => value.into(),
             EnumHandRank::Straight(value) => value.into(),
-            EnumHandRank::Flush(value) => value.into(),
             EnumHandRank::FullHouse((value1, value2)) => value1.into() + value2.into(),
-            EnumHandRank::FourOfAKind((value, _)) => value.into(),
-            EnumHandRank::StraightFlush(value) => value.into(),
+            EnumHandRank::FourOfAKind(value) => value.into(),
+            EnumHandRank::StraightFlush => 9,
             EnumHandRank::RoyalFlush => 10,
         }
+    }
+}
+
+/////////////////////////////////////////////////////////////////////////
+/////////////////////////////////////////////////////////////////////////
+///////////////////////////// PARTIALORD ////////////////////////////////
+/////////////////////////////////////////////////////////////////////////
+/////////////////////////////////////////////////////////////////////////
+
+impl EnumHandRankPartialOrd of PartialOrd<EnumHandRank> {
+    fn le(lhs: EnumHandRank, rhs: EnumHandRank) -> bool {
+        let left_value: u32 = lhs.into();
+        let right_value: u32 = rhs.into();
+        left_value <= right_value
+    }
+
+    fn lt(lhs: EnumHandRank, rhs: EnumHandRank) -> bool {
+        let left_value: u32 = lhs.into();
+        let right_value: u32 = rhs.into();
+        left_value < right_value
+    }
+
+    fn ge(lhs: EnumHandRank, rhs: EnumHandRank) -> bool {
+        let left_value: u32 = lhs.into();
+        let right_value: u32 = rhs.into();
+        left_value >= right_value
+    }
+
+    fn gt(lhs: EnumHandRank, rhs: EnumHandRank) -> bool {
+        let left_value: u32 = lhs.into();
+        let right_value: u32 = rhs.into();
+        left_value > right_value
     }
 }
 
@@ -575,620 +623,435 @@ impl HandImpl of IHand {
         self.m_cards = array![];
     }
 
-    // fn evaluate_hand(self: @ComponentHand, board: @Array<StructCard>) -> EnumHandRank {
-    //     // First analyze the hand
-    //     let rank_result: Result<EnumHandRank, EnumError> = self._evaluate_rank(board);
-    //     assert!(rank_result.is_ok(), "Invalid hand");
-    //     rank_result.unwrap()
-    // }
+    fn evaluate_hand(self: @ComponentHand, board: @Array<StructCard>) -> EnumHandRank {
+        // First analyze the hand.
+        let rank_result: Result<EnumHandRank, EnumError> = self._evaluate_rank(board);
+        assert!(rank_result.is_ok(), "Invalid hand");
+        return rank_result.unwrap();
+    }
 
     fn _has_royal_flush(self: @ComponentHand, board: @Array<StructCard>) -> bool {
-        // TODO: Implement the non-naive approach.
-
-        // NAIVE APPROACH (ASSUMING THAT THE CARDS IN HAND ARE SORTED):
-
-        if self.m_cards.len() + board.len() < 5 {
-            return false;
+        // We can first check if we have a flush, and then check if it's royal.
+        // This avoids doing two full passes through the cards.
+        if let Option::Some(flush_values) = self._has_flush(board) {
+            // Check if flush_values contains 10,J,Q,K,A in sequence.
+            return flush_values.len() >= 5 
+                && *flush_values[0] == EnumCardValue::Ten
+                && *flush_values[1] == EnumCardValue::Jack
+                && *flush_values[2] == EnumCardValue::Queen
+                && *flush_values[3] == EnumCardValue::King
+                && *flush_values[4] == EnumCardValue::Ace;
         }
-
-        // Combine hand and board cards
-        let mut all_cards: Array<StructCard> = self.m_cards.concat(board);
-        let mut royal_flush: bool = false;
-
-        // Check each suit
-        let suits = array![
-            EnumCardSuit::Hearts, EnumCardSuit::Diamonds, EnumCardSuit::Clubs, EnumCardSuit::Spades
-        ];
-
-        for suit in suits
-            .span() {
-                let mut contains_ten: bool = false;
-                let mut contains_jack: bool = false;
-                let mut contains_queen: bool = false;
-                let mut contains_king: bool = false;
-                let mut contains_ace: bool = false;
-
-                // Check all cards for royal flush in current suit
-                for card in all_cards
-                    .span() {
-                        if let Option::Some(suit_card) = card.get_suit() {
-                            if suit_card != *suit {
-                                continue;
-                            }
-                        }
-
-                        if let Option::Some(value) = card.get_value() {
-                            match value {
-                                EnumCardValue::Ten => contains_ten = true,
-                                EnumCardValue::Jack => contains_jack = true,
-                                EnumCardValue::Queen => contains_queen = true,
-                                EnumCardValue::King => contains_king = true,
-                                EnumCardValue::Ace => contains_ace = true,
-                                _ => {},
-                            };
-                        }
-                    };
-
-                // If we found all required cards in the same suit
-                if contains_ten
-                    && contains_jack
-                    && contains_queen
-                    && contains_king
-                    && contains_ace {
-                    royal_flush = true;
-                    break;
-                }
-            };
-
-        return royal_flush;
+        return false;
     }
 
     fn _has_straight_flush(self: @ComponentHand, board: @Array<StructCard>) -> bool {
         // TODO: Implement the non-naive approach.
 
         // NAIVE APPROACH (ASSUMING THAT THE CARDS IN HAND ARE SORTED):
+
         if self.m_cards.len() + board.len() < 5 {
             return false;
         }
 
-        // Combine hand and board cards
-        let mut all_cards: Array<StructCard> = self.m_cards.concat(board);
-        let mut straight_flush: bool = false;
-
-        // Check each suit
-        let suits = array![
-            EnumCardSuit::Hearts, EnumCardSuit::Diamonds, EnumCardSuit::Clubs, EnumCardSuit::Spades
-        ];
-
-        for suit in suits
-            .span() {
-                // Get all cards of current suit and sort them
-                let mut suit_cards: Array<StructCard> = array![];
-
-                for card in all_cards
-                    .span() {
-                        if let Option::Some(suit_card) = card.get_suit() {
-                            if suit_card != *suit {
-                                continue;
-                            }
+        // First check if we have a flush.
+        if let Option::Some(flush_values) = self._has_flush(board) {
+            // Then check if those flush cards form a straight.
+            if flush_values.len() >= 5 {
+                let mut consecutive_count: u8 = 1;
+                let mut prev_value: u32 = (*flush_values[0]).into();
+                
+                for i in 1..flush_values.len() {
+                    let curr_value: u32 = (*flush_values[i]).into();
+                    if curr_value == prev_value - 1 {
+                        consecutive_count += 1;
+                        if consecutive_count >= 5 {
+                            break;
                         }
-
-                        suit_cards.append(card.clone());
-                    };
-
-                // Need at least 5 cards of the same suit for a straight flush
-                if suit_cards.len() < 5 {
-                    continue;
-                }
-
-                let sorted_cards = utils::sort(@suit_cards);
-
-                // Check for Ace-low straight flush (A-2-3-4-5)
-                if sorted_cards.len() >= 5 {
-                    let last_idx = sorted_cards.len() - 1;
-                    if let Option::Some(value) = sorted_cards[last_idx].get_value() {
-                        if value == EnumCardValue::Ace {
-                            let mut has_two = false;
-                            let mut has_three = false;
-                            let mut has_four = false;
-                            let mut has_five = false;
-
-                            for card in sorted_cards
-                                .span() {
-                                    if let Option::Some(value) = card.get_value() {
-                                        match value {
-                                            EnumCardValue::Two => has_two = true,
-                                            EnumCardValue::Three => has_three = true,
-                                            EnumCardValue::Four => has_four = true,
-                                            EnumCardValue::Five => has_five = true,
-                                            _ => {},
-                                        };
-                                    }
-                                };
-
-                            if has_two && has_three && has_four && has_five {
-                                straight_flush = true;
-                                break;
-                            }
-                        }
+                    } else if curr_value != prev_value {
+                        consecutive_count = 1;
                     }
+                    prev_value = curr_value;
+                };
 
-                    // Check for regular straight flush
-                    let mut consecutive_count: u32 = 1;
-                    let mut prev_value: u32 = sorted_cards[0].get_value().unwrap().into();
-
-                    for i in 1
-                        ..sorted_cards
-                            .len() {
-                                if let Option::Some(current_value) = sorted_cards[i].get_value() {
-                                    if current_value.into() == prev_value {
-                                        continue; // Skip duplicate values
-                                    }
-
-                                    if current_value.into() == prev_value + 1 {
-                                        consecutive_count += 1;
-                                        if consecutive_count >= 5 {
-                                            straight_flush = true;
-                                            break;
-                                        }
-                                    } else {
-                                        consecutive_count = 1;
-                                    }
-                                    prev_value = current_value.into();
-                                }
-                            };
-                }
-            };
-
-        return straight_flush;
-    }
-
-    fn _has_four_of_a_kind(self: @ComponentHand, board: @Array<StructCard>) -> bool {
-        // TODO: Implement the non-naive approach.
-
-        // NAIVE APPROACH (ASSUMING THAT THE CARDS IN HAND ARE SORTED):
-        if self.m_cards.len() + board.len() < 4 {
-            return false;
-        }
-
-        // Check if hand is a pair and board has matching value
-        if let Option::Some(value) = self.m_cards[0].get_value() {
-            if let Option::Some(card_value) = self.m_cards[1].get_value() {
-                if value == card_value {
-                    let mut dup_count: u8 = 2;
-                    for card in board
-                        .span() {
-                            if let Option::Some(card_value) = card.get_value() {
-                                if card_value == value {
-                                    dup_count += 1;
-                                    if dup_count >= 4 {
-                                        break;
-                                    }
-                                }
-                            }
-                        };
-
-                    if dup_count >= 4 {
-                        return true;
-                    }
+                if consecutive_count >= 5 {
+                    return true;
                 }
             }
         }
 
-        // Comibne cards and sort.
-        let sorted_board: Array<StructCard> = utils::sort(board);
-        let all_cards: Array<StructCard> = self.m_cards.concat(@sorted_board);
-
-        // Check if there are 3 cards with the same value.
-        let mut same_kind_count: u8 = 1;
-        let mut prev_value: EnumCardValue = all_cards[0].get_value().unwrap();
-
-        for card in all_cards
-            .span() {
-                if let Option::Some(card_value) = card.get_value() {
-                    if card_value == prev_value {
-                        same_kind_count += 1;
-
-                        if same_kind_count >= 4 {
-                            break;
-                        }
-                        continue;
-                    }
-
-                    same_kind_count = 1;
-                    prev_value = card.get_value().unwrap();
-                }
-            };
-
-        return same_kind_count >= 4;
+        return false;
     }
 
-    fn _has_full_house(self: @ComponentHand, board: @Array<StructCard>) -> bool {
+    fn _has_four_of_a_kind(self: @ComponentHand, board: @Array<StructCard>) -> Option<EnumCardValue> {
+        // TODO: Implement the non-naive approach.
+
+        // NAIVE APPROACH (ASSUMING THAT THE CARDS IN HAND ARE SORTED):
+        if self.m_cards.len() + board.len() < 4 {
+            return Option::None;
+        }
+
+        let all_cards: Array<StructCard> = self.m_cards.concat(board);
+        let mut value_counts: Felt252Dict<u8> = Default::default();
+        
+        // Single pass to count values.
+        for card in all_cards.span() {
+            if let Option::Some(value) = card.get_value() {
+                let value_count: u32 = value.into();
+                value_counts.insert(value_count.into(), value_counts.get(value_count.into()) + 1);
+                // Early return if we find four of a kind.
+                if value_counts.get(value_count.into()) == 4 {
+                    break;
+                }
+            }
+        };
+
+        let card_value: EnumCardValue = all_cards[0].get_value().unwrap();
+        let value_count: u32 = card_value.into();
+        if value_counts.get(value_count.into()) == 4 {
+            return Option::Some(card_value);
+        }
+
+        return Option::None;
+    }
+
+    fn _has_full_house(self: @ComponentHand, board: @Array<StructCard>) -> Option<(EnumCardValue, EnumCardValue)> {
         // TODO: Implement the non-naive approach.
 
         // NAIVE APPROACH (ASSUMING THAT THE CARDS IN HAND ARE SORTED):
         if self.m_cards.len() + board.len() < 5 {
-            return false;
+            return Option::None;
         }
 
-        let sorted_board: Array<StructCard> = utils::sort(board);
-        let all_cards: Array<StructCard> = self.m_cards.concat(@sorted_board);
-
-        let mut first_value: Option<EnumCardValue> = Option::None;
-        let mut first_count: u8 = 0;
-        let mut second_value: Option<EnumCardValue> = Option::None;
-        let mut second_count: u8 = 0;
-        let mut current_value: EnumCardValue = all_cards[0].get_value().unwrap();
-        let mut current_count: u8 = 1;
-
-        for i in 1
-            ..all_cards
-                .len() {
-                    if let Option::Some(card_value) = all_cards[i].get_value() {
-                        if card_value == current_value {
-                            current_count += 1;
-                            continue;
-                        }
-                    }
-
-                    // Update counts when we find a different value.
-                    if first_value.is_none() || first_value == Option::Some(current_value) {
-                        first_value = Option::Some(current_value);
-                        first_count = current_count;
-                    } else if second_value.is_none()
-                        || second_value == Option::Some(current_value) {
-                        second_value = Option::Some(current_value);
-                        second_count = current_count;
-                    } else if current_count > first_count {
-                        second_value = first_value;
-                        second_count = first_count;
-                        first_value = Option::Some(current_value);
-                        first_count = current_count;
-                    } else if current_count > second_count {
-                        second_value = Option::Some(current_value);
-                        second_count = current_count;
-                    }
-                    current_value = all_cards[i].get_value().unwrap();
-                    current_count = 1;
-                };
-
-        // Handle the last group of cards
-        if first_value.is_none() || first_value == Option::Some(current_value) {
-            first_count = current_count;
-        } else if second_value.is_none() || second_value == Option::Some(current_value) {
-            second_count = current_count;
-        } else if current_count > first_count {
-            second_count = first_count;
-            first_count = current_count;
-        } else if current_count > second_count {
-            second_count = current_count;
+        let all_cards = self.m_cards.concat(board);
+        let mut value_counts: Felt252Dict<u8> = utils::_count_values(@all_cards);
+        
+        let mut three_of_kind: Option<EnumCardValue> = Option::None;
+        let mut pair: Option<EnumCardValue> = Option::None;
+        
+        // First find three of a kind.
+        for card in all_cards.span() {
+            if let Option::Some(value) = card.get_value() {
+                let value_count: u32 = value.into();
+                let count = value_counts.get(value_count.into());
+                if count == 3 && three_of_kind.is_none() {
+                    three_of_kind = Option::Some(value);
+                } else if count >= 2 && pair.is_none() && 
+                    (three_of_kind.is_none() || three_of_kind.unwrap() != value) {
+                    pair = Option::Some(value);
+                }
+            }
+        };
+        
+        if three_of_kind.is_some() && pair.is_some() {
+            return Option::Some((three_of_kind.unwrap(), pair.unwrap()));
         }
-
-        // Check if we have a three of a kind and a pair
-        return (first_count == 3 && second_count == 2) || (first_count == 2 && second_count == 3);
+        
+        return Option::None;
     }
 
-    fn _has_flush(self: @ComponentHand, board: @Array<StructCard>) -> bool {
+    fn _has_flush(self: @ComponentHand, board: @Array<StructCard>) -> Option<Array<EnumCardValue>> {
         // TODO: Implement the non-naive approach.
 
         // NAIVE APPROACH:
         // Check if there's 5 cards with the same suit.
         if self.m_cards.len() + board.len() < 5 {
-            return false;
+            return Option::None;
         }
 
         let all_cards: Array<StructCard> = self.m_cards.concat(board);
+    
+        // Count cards of each suit.
+        let mut spades_count: u8 = 0;
+        let mut hearts_count: u8 = 0;
+        let mut diamonds_count: u8 = 0;
+        let mut clubs_count: u8 = 0;
+        
+        // Arrays to store values for each suit.
+        let mut spades_values: Array<EnumCardValue> = array![];
+        let mut hearts_values: Array<EnumCardValue> = array![];
+        let mut diamonds_values: Array<EnumCardValue> = array![];
+        let mut clubs_values: Array<EnumCardValue> = array![];
 
-        // Check each suit
-        let suits = array![
-            EnumCardSuit::Hearts, EnumCardSuit::Diamonds, EnumCardSuit::Clubs, EnumCardSuit::Spades
-        ];
-        let mut is_flush: bool = false;
-
-        for suit in suits
-            .span() {
-                let mut matches: u8 = 0;
-
-                for i in 0
-                    ..all_cards
-                        .len() {
-                            if let Option::Some(current_suit) = all_cards[i].get_suit() {
-                                if current_suit == *suit {
-                                    matches += 1;
-                                }
-                            }
-
-                            if matches >= 5 {
-                                is_flush = true;
-                                break;
-                            }
-                        };
-            };
-
-        return is_flush;
-    }
-
-    fn _has_straight(self: @ComponentHand, board: @Array<StructCard>) -> bool {
-        // TODO: Implement the non-naive approach.
-
-        // NAIVE APPROACH (ASSUMING THAT THE CARDS IN HAND ARE SORTED):
-
-        if self.m_cards.len() + board.len() < 5 {
-            return false;
-        }
-
-        let sorted_board: Array<StructCard> = utils::sort(board);
-
-        // Combine hand and board cards into a single array
-        let all_cards: Array<StructCard> = self.m_cards.concat(@sorted_board);
-
-        // Special case: Ace can be used as 1 for A-2-3-4-5 straight.
-        // Check for Ace-low straight (A-2-3-4-5)
-        if all_cards.len() >= 5 {
-            let last_idx = all_cards.len() - 1;
-            if let Option::Some(card_value) = all_cards[last_idx].get_value() {
-                if card_value == EnumCardValue::Ace {
-                    let mut has_two = false;
-                    let mut has_three = false;
-                    let mut has_four = false;
-                    let mut has_five = false;
-
-                    for card in all_cards
-                        .span() {
-                            if let Option::Some(card_value) = card.get_value() {
-                                match card_value {
-                                    EnumCardValue::Two => has_two = true,
-                                    EnumCardValue::Three => has_three = true,
-                                    EnumCardValue::Four => has_four = true,
-                                    EnumCardValue::Five => has_five = true,
-                                    _ => {},
-                                };
-                            }
-                        };
-
-                    if has_two && has_three && has_four && has_five {
-                        return true;
+        // Group cards by suit.
+        for card in all_cards.span() {
+            if let Option::Some(suit) = card.get_suit() {
+                if let Option::Some(value) = card.get_value() {
+                    match suit {
+                        EnumCardSuit::Spades => {
+                            spades_count += 1;
+                            spades_values.append(value);
+                        },
+                        EnumCardSuit::Hearts => {
+                            hearts_count += 1;
+                            hearts_values.append(value);
+                        },
+                        EnumCardSuit::Diamonds => {
+                            diamonds_count += 1;
+                            diamonds_values.append(value);
+                        },
+                        EnumCardSuit::Clubs => {
+                            clubs_count += 1;
+                            clubs_values.append(value);
+                        },
                     }
                 }
             }
+        };
+
+        // Check which suit has 5 or more cards and return its sorted values.
+        if spades_count >= 5 {
+            return Option::Some(utils::sort_values(@spades_values));
+        }
+        if hearts_count >= 5 {
+            return Option::Some(utils::sort_values(@hearts_values));
+        }
+        if diamonds_count >= 5 {
+            return Option::Some(utils::sort_values(@diamonds_values));
+        }
+        if clubs_count >= 5 {
+            return Option::Some(utils::sort_values(@clubs_values));
         }
 
-        // Check for regular straight.
-        let mut is_straight: bool = false;
-        let mut consecutive_count: u32 = 1;
-        let mut prev_value: u32 = all_cards[0].get_value().unwrap().into();
-
-        // Check for consecutive values.
-        for i in 1
-            ..all_cards
-                .len() {
-                    if let Option::Some(current_value) = all_cards[i].get_value() {
-                        if current_value.into() == prev_value {
-                            continue; // Skip duplicate values.
-                        }
-
-                        if current_value.into() == prev_value + 1 {
-                            consecutive_count += 1;
-                            prev_value = current_value.into();
-
-                            if consecutive_count >= 5 {
-                                is_straight = true;
-                                break;
-                            }
-                            continue;
-                        }
-
-                        prev_value = current_value.into();
-                        consecutive_count = 1;
-                    }
-                };
-
-        return is_straight;
+        return Option::None;
     }
 
-    fn _has_three_of_a_kind(self: @ComponentHand, board: @Array<StructCard>) -> bool {
+    fn _has_straight(self: @ComponentHand, board: @Array<StructCard>) -> Option<EnumCardValue> {
+        // TODO: Implement the non-naive approach.
+
+        // NAIVE APPROACH (ASSUMING THAT THE CARDS IN HAND ARE SORTED):
+        if self.m_cards.len() + board.len() < 5 {
+            return Option::None;
+        }
+
+        let all_cards: Array<StructCard> = self.m_cards.concat(board);
+        let mut unique_values: Array<EnumCardValue> = array![];
+        
+        // First get unique values
+        for card in all_cards.span() {
+            if let Option::Some(value) = card.get_value() {
+                if !unique_values.contains(@value) {
+                    unique_values.append(value);
+                }
+            }
+        };
+        
+        let sorted_unique_values: Array<EnumCardValue> = utils::sort_values(@unique_values);
+        
+        // Check for regular straight.
+        let mut consecutive_count: u8 = 1;
+        let mut prev_value: u32 = (*sorted_unique_values[0]).into();
+        let mut highest_value: EnumCardValue = *sorted_unique_values[0];
+        
+        for i in 1..sorted_unique_values.len() {
+            let curr_value: u32 = (*sorted_unique_values[i]).into();
+            if curr_value == prev_value - 1 {
+                consecutive_count += 1;
+                if consecutive_count >= 5 {
+                    break;
+                }
+            } else {
+                consecutive_count = 1;
+                highest_value = *sorted_unique_values[i];
+            }
+            prev_value = curr_value;
+        };
+        
+        if consecutive_count >= 5 {
+            return Option::Some(highest_value);
+        }
+        
+        // Check for Ace-low straight.
+        if sorted_unique_values.contains(@EnumCardValue::Ace) 
+            && sorted_unique_values.contains(@EnumCardValue::Two)
+            && sorted_unique_values.contains(@EnumCardValue::Three)
+            && sorted_unique_values.contains(@EnumCardValue::Four)
+            && sorted_unique_values.contains(@EnumCardValue::Five) {
+            return Option::Some(EnumCardValue::Five);
+        }
+        
+        return Option::None;
+    }
+
+    fn _has_three_of_a_kind(self: @ComponentHand, board: @Array<StructCard>) -> Option<EnumCardValue> {
         // TODO: Implement the non-naive approach.
 
         // NAIVE APPROACH (ASSUMING THAT THE CARDS IN HAND ARE SORTED):
         if self.m_cards.len() + board.len() < 3 {
-            return false;
+            return Option::None;
         }
 
-        let mut three_of_a_kind: bool = false;
-
+        let mut three_of_a_kind: Option<EnumCardValue> = Option::None;
+        let mut first_value: EnumCardValue = self.m_cards[0].get_value().unwrap();
+        
         // Check if hand is a pair and board has matching value
-        if self.m_cards[0].get_value() == self.m_cards[1].get_value() {
-            for card in board
-                .span() {
-                    if card.get_value() == self.m_cards[0].get_value() {
-                        three_of_a_kind = true;
+        if first_value == self.m_cards[1].get_value().unwrap() {
+
+            for card in board.span() {
+                if let Option::Some(card_value) = card.get_value() {
+                    if card_value == first_value {
+                        three_of_a_kind = Option::Some(card_value);
                         break;
                     }
-                };
-            if three_of_a_kind {
-                return true;
+                }
+            };
+
+            if three_of_a_kind.is_some() {
+                return Option::Some(three_of_a_kind.unwrap());
             }
         }
 
         // Comibne cards and sort.
         let sorted_board: Array<StructCard> = utils::sort(board);
         let all_cards: Array<StructCard> = self.m_cards.concat(@sorted_board);
-
-        // Check if there are 3 cards with the same value.
         let mut same_kind_count: u8 = 1;
         let mut prev_value: EnumCardValue = all_cards[0].get_value().unwrap();
 
-        for card in all_cards
-            .span() {
-                if let Option::Some(card_value) = card.get_value() {
-                    if card_value == prev_value {
-                        same_kind_count += 1;
-
-                        if same_kind_count >= 3 {
-                            break;
-                        }
-                        continue;
-                    }
-
-                    prev_value = card_value;
-                    same_kind_count = 1;
+        for card in all_cards.span() {
+            if let Option::Some(card_value) = card.get_value() {
+                if card_value == prev_value {
+                    same_kind_count += 1;
                 }
-            };
 
-        return same_kind_count >= 3;
+                if same_kind_count >= 3 {
+                    three_of_a_kind = Option::Some(prev_value);
+                    break;
+                }
+
+                prev_value = card_value;
+                same_kind_count = 1;
+            }
+        };
+
+        return three_of_a_kind;
     }
 
-    fn _has_two_pair(self: @ComponentHand, board: @Array<StructCard>) -> bool {
+    fn _has_two_pair(self: @ComponentHand, board: @Array<StructCard>) -> Option<(EnumCardValue, EnumCardValue)> {
         // TODO: Implement the non-naive approach.
 
         // NAIVE APPROACH (ASSUMING THAT THE CARDS IN HAND ARE SORTED):
         if self.m_cards.len() + board.len() < 4 {
-            return false;
+            return Option::None;
         }
 
-        let mut num_pairs: u8 = 0;
         let sorted_board: Array<StructCard> = utils::sort(board);
         let all_cards: Array<StructCard> = self.m_cards.concat(@sorted_board);
-        let mut consecutive_count: u8 = 1;
         let mut prev_value: EnumCardValue = all_cards[0].get_value().unwrap();
         let mut first_pair_value: Option<EnumCardValue> = Option::None;
+        let mut second_pair_value: Option<EnumCardValue> = Option::None;
 
-        for i in 0
-            ..all_cards
-                .len() {
-                    if let Option::Some(card_value) = all_cards[i].get_value() {
-                        if card_value == prev_value {
-                            consecutive_count += 1;
-                            if consecutive_count == 2 {
-                                if first_pair_value != Option::Some(prev_value) {
-                                    num_pairs += 1;
-                                    if num_pairs == 1 {
-                                        first_pair_value = Option::Some(prev_value);
-                                    }
-                                }
-                            } else {
-                                consecutive_count = 1;
-                                prev_value = card_value;
-                            }
-                        }
-
-                        if num_pairs >= 2 {
-                            break;
-                        }
+        for i in 0..all_cards.len() {
+            if let Option::Some(card_value) = all_cards[i].get_value() {
+                if card_value == prev_value {
+                    if first_pair_value.is_none() {
+                        first_pair_value = Option::Some(prev_value);
+                        continue;
                     }
-                };
+                    if second_pair_value.is_none() && first_pair_value.unwrap() != prev_value {
+                        second_pair_value = Option::Some(prev_value);
+                        continue;
+                    }
+                }
 
-        return num_pairs >= 2;
+                prev_value = card_value;
+                if first_pair_value.is_some() && second_pair_value.is_some() {
+                    break;
+                }
+            }
+        };
+
+        if first_pair_value.is_none() || second_pair_value.is_none() {
+            return Option::None;
+        }
+
+        return Option::Some((first_pair_value.unwrap(), second_pair_value.unwrap()));
     }
 
-    fn _has_pair(self: @ComponentHand, board: @Array<StructCard>) -> bool {
+    fn _has_pair(self: @ComponentHand, board: @Array<StructCard>) -> Option<EnumCardValue> {
         // TODO: Implement the non-naive approach.
 
         // NAIVE APPROACH (ASSUMING THAT THE CARDS IN HAND ARE SORTED):
 
         // Check if the hand itself is a pair.
-        if self.m_cards[0].get_value() == self.m_cards[1].get_value() {
-            return true;
+        if self.m_cards.len() + board.len() < 2 {
+            return Option::None;
         }
 
-        if self.m_cards.len() + board.len() < 2 {
-            return false;
+        if self.m_cards[0].get_value() == self.m_cards[1].get_value() {
+            return Option::Some(self.m_cards[0].get_value().unwrap());
         }
 
         // Sort board cards, since cards in hand are sorted.
         let sorted_board: Array<StructCard> = utils::sort(board);
-        let mut pair_found: bool = false;
+        let mut pair_found: Option<EnumCardValue> = Option::None;
 
-        for i in 0
-            ..sorted_board
-                .len() {
-                    if sorted_board[i].get_value() == self.m_cards[0].get_value()
-                        || sorted_board[i].get_value() == self.m_cards[1].get_value() {
-                        pair_found = true;
-                        break;
-                    }
-                };
+        for i in 0..sorted_board.len() {
+            if sorted_board[i].get_value() == self.m_cards[0].get_value()
+                || sorted_board[i].get_value() == self.m_cards[1].get_value() {
+                pair_found = Option::Some(sorted_board[i].get_value().unwrap());
+                break;
+            }
+        };
 
         return pair_found;
     }
 
-    fn _get_highest_card_value(self: @ComponentHand) -> u32 {
-        let mut highest_value: u32 = 0;
+    fn _evaluate_rank(
+        self: @ComponentHand, board: @Array<StructCard>
+    ) -> Result<EnumHandRank, EnumError> {
+        if self.m_cards.len() != 2 {
+            return Result::Err(EnumError::InvalidHand);
+        }
 
-        for i in 0
-            ..self
-                .m_cards
-                .len() {
-                    if let Option::Some(card_value) = self.m_cards[i].get_value() {
-                        let current_value: u32 = card_value.into();
-                        if current_value > highest_value {
-                            highest_value = current_value;
-                        }
-                    }
-                };
-        return highest_value;
+        if board.len() > 5 {
+            return Result::Err(EnumError::InvalidBoard);
+        }
+
+        if self._has_royal_flush(board) {
+            return Result::Ok(EnumHandRank::RoyalFlush);
+        }
+
+        if self._has_straight_flush(board) {
+            return Result::Ok(EnumHandRank::StraightFlush);
+        }
+
+        if let Option::Some(four_of_a_kind_value) = self._has_four_of_a_kind(board) {
+            return Result::Ok(EnumHandRank::FourOfAKind(four_of_a_kind_value));
+        }
+
+        if let Option::Some(full_house_values) = self._has_full_house(board) {
+            return Result::Ok(EnumHandRank::FullHouse(full_house_values));
+        }
+
+        if let Option::Some(flush_values) = self._has_flush(board) {
+            return Result::Ok(EnumHandRank::Flush(flush_values));
+        }
+
+        if let Option::Some(straight_value) = self._has_straight(board) {
+            return Result::Ok(EnumHandRank::Straight(straight_value));
+        }
+
+        if let Option::Some(three_of_a_kind_value) = self._has_three_of_a_kind(board) {
+            return Result::Ok(EnumHandRank::ThreeOfAKind(three_of_a_kind_value));
+        }
+
+        if let Option::Some((first_pair_value, second_pair_value)) = self._has_two_pair(board) {
+            return Result::Ok(EnumHandRank::TwoPair((first_pair_value, second_pair_value)));
+        }
+
+        if let Option::Some(pair_value) = self._has_pair(board) {
+            return Result::Ok(EnumHandRank::Pair(pair_value));
+        }
+
+        let all_cards = self.m_cards.concat(board);
+        let mut all_values: Array<EnumCardValue> = array![];
+        for i in 0..all_cards.len() {
+            if let Option::Some(card_value) = all_cards[i].get_value() {
+                all_values.append(card_value);
+            }
+        };
+        return Result::Ok(EnumHandRank::HighCard(all_values));
     }
-
-    fn _evaluate_value(self: @ComponentHand) -> u32 {
-        let mut total_value: u32 = 0;
-
-        for i in 0
-            ..self
-                .m_cards
-                .len() {
-                    if let Option::Some(card_value) = self.m_cards[i].get_value() {
-                        let current_value: u32 = card_value.into();
-                        total_value += current_value;
-                    }
-                };
-        return total_value;
-    }
-
-    // fn _evaluate_rank(
-    //     self: @ComponentHand, board: @Array<StructCard>
-    // ) -> Result<EnumHandRank, EnumError> {
-    //     if self.m_cards.len() != 2 {
-    //         return Result::Err(EnumError::InvalidHand);
-    //     }
-
-    //     if board.len() > 5 {
-    //         return Result::Err(EnumError::InvalidBoard);
-    //     }
-
-    //     if self._has_flush(board) && self._has_straight(board) {
-    //         return Result::Ok(EnumHandRank::StraightFlush);
-    //     }
-
-    //     if self._has_straight_flush(board) && self._has_flush(board) {
-    //         return Result::Ok(EnumHandRank::RoyalFlush);
-    //     }
-
-    //     if self._has_flush(board) {
-    //         return Result::Ok(EnumHandRank::Flush);
-    //     }
-
-    //     if self._has_straight(board) {
-    //         return Result::Ok(EnumHandRank::Straight);
-    //     }
-
-    //     if self._has_four_of_a_kind(board) {
-    //         return Result::Ok(EnumHandRank::FourOfAKind);
-    //     }
-
-    //     if self._has_three_of_a_kind(board) {
-    //         return Result::Ok(EnumHandRank::ThreeOfAKind);
-    //     }
-
-    //     if self._has_two_pair(board) {
-    //         return Result::Ok(EnumHandRank::TwoPair);
-    //     }
-
-    //     if self._has_pair(board) {
-    //         return Result::Ok(EnumHandRank::Pair);
-    //     }
-
-    //     Result::Ok(EnumHandRank::HighCard)
-    // }
 }
 
 #[generate_trait]
