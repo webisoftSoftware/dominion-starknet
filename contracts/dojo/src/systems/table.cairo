@@ -95,10 +95,6 @@ mod table_system {
             min_buy_in: u32,
             max_buy_in: u32
         ) {
-            let caller = get_caller_address();
-
-            // Only game master can create tables
-            assert!(self.game_master.read() == caller, "Only game master can create table");
             assert!(max_buy_in > 0, "Maximum buy-in cannot be less than 0");
             assert!(
                 min_buy_in < max_buy_in, "Minimum buy-in cannot be greater than maximum buy-in"
@@ -109,10 +105,12 @@ mod table_system {
             let table: ComponentTable = world.read_model(table_id);
             assert!(table.m_state == EnumGameState::NotCreated, "Table is already created");
 
-            // Initialize new table with provided parameters
-            let new_table: ComponentTable = ITable::new(
+            // Initialize new table with provided parameters.
+            let mut new_table: ComponentTable = ITable::new(
                 table_id, small_blind, big_blind, min_buy_in, max_buy_in, array![]
             );
+            new_table.m_state = EnumGameState::WaitingForPlayers;
+            new_table._initialize_deck();
 
             // Save table to world state and increment counter
             world.write_model(@new_table);
