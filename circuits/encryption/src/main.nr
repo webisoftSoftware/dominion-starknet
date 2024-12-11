@@ -1,14 +1,18 @@
-fn main(key: Field, deck: [Field; 52]) -> pub [Field; 52] {
+fn main(key: Field, deck: [Field; 52]) -> pub [Field; 104] {
     println("Input Deck:");
-    println(deck);  // Print the original deck values
+    println(deck);
 
-    let mut encoded_deck: [Field; 52] = [0; 52];
+    let mut encoded_deck: [Field; 104] = [0; 104];
     println("Encoded Cards:");
+    
     for i in 0..52 {
-        let mut card: [Field; 2] = [deck[i], deck[i]];  // Use same value twice for single card
-        let mut encoded_cards = gmimc::bn254::enc::x5_2(card, key);
+        let card: [Field; 2] = [deck[i], deck[i]];
+        let encoded_cards = gmimc::bn254::enc::x5_2(card, key);
+        
+        encoded_deck[i * 2] = encoded_cards[0];
+        encoded_deck[i * 2 + 1] = encoded_cards[1];
+        
         println(encoded_cards);
-        encoded_deck[i] = encoded_cards[0];
     }
 
     println("Encoded Deck:");
