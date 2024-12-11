@@ -1,18 +1,17 @@
 import express from 'express';
 import { createServer } from 'http';
 import { Server } from 'socket.io';
+
 import { UltraHonkBackend } from '@noir-lang/backend_barretenberg';
 import { Noir } from '@noir-lang/noir_js';
-import circuit from '../../encryption/target/encryption.json' assert { type: "json" };
+import encryptionCircuit from '../../encryption/target/encryption.json' assert { type: "json" };
 import decryptionCircuit from '../../decryption/target/decryption.json' assert { type: "json" };
+import shuffleCircuit from '../../shuffle/target/shuffle.json' assert { type: "json" };
+
+import { randomInt } from 'crypto';
 import dotenv from 'dotenv';
-
-// Load environment variables from .env file
-dotenv.config();
-
-// Parse encryption key and IV from environment variables
-const key = process.env.ENCRYPTION_KEY?.split(',').map(Number);
-const iv = process.env.ENCRYPTION_IV?.split(',').map(Number);
+import fs from 'fs';
+import path from 'path';
 
 // Create Express server
 const app = express();
@@ -36,20 +35,19 @@ io.on('connection', (socket) => {
 app.use(express.json());
 
 /**
- * Function to generate a random number using VRF
+ * Function to generate random values for key, IV, and shuffle
  */
-async function generateRandomNumber() {
-    // TODO: Generate a random number using VRF
-    // randomNumber =
-
-    // TODO: Verify the VRF proof on-chain
-
-    // TODO: Derive the VRF to generate a Key and IV for the encryption
-    // key =
-    // iv =
-    // shuffle =
-
-    // TODO: Set those values in the environment variables
+async function generateRandomValues() {
+    // Generate arrays of 4 random numbers for key and IV
+    const key = Array.from({length: 4}, () => randomInt(1, 281474976710655));
+    const iv = Array.from({length: 4}, () => randomInt(1, 281474976710655));
+    const shuffle = randomInt(1, 281474976710655);
+    
+    // Create the .env content with arrays
+    const envContent = `ENCRYPTION_KEY=${key.join(',')}\nENCRYPTION_IV=${iv.join(',')}\nSHUFFLE_VALUE=${shuffle}\n`;
+    
+    // Write to .env file
+    fs.writeFileSync('.env', envContent);
 }
 
 /**
@@ -64,45 +62,80 @@ async function generateRandomNumber() {
  */
 async function encryptDeck() { // TODO: This function should be called once the request is received from Torii
     try {
-        // TODO: Setup all the environment variables in the .env file
-        // generateRandomNumber();
-    
-        // TODO: Get the deck from Torii
-        // deck =
+        // Generate new random numbers for key, iv, and shuffle
+        await generateRandomValues();
         
-        // TODO: Shuffle the deck using the VRF
-        // deck =
+        // Load environment variables from .env file
+        dotenv.config();
 
+        // Parse encryption key, IV, and shuffle key from environment variables
+        const key = process.env.ENCRYPTION_KEY?.split(',').map(Number);
+        const iv = process.env.ENCRYPTION_IV?.split(',').map(Number);
+        const shuffleKey = parseInt(process.env.SHUFFLE_VALUE);
+
+        // TODO: Get the deck from Torii
+        const deck = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13,
+                     101, 102, 103, 104, 105, 106, 107, 108, 109, 110, 111, 112, 113,
+                     201, 202, 203, 204, 205, 206, 207, 208, 209, 210, 211, 212, 213,
+                     301, 302, 303, 304, 305, 306, 307, 308, 309, 310, 311, 312, 313];
+        
         // Validate input
         if (!deck || !Array.isArray(deck) || deck.length !== 52) {
             throw new Error('Invalid deck input. Expected array of integers.');
+        }
+
+        // Initialize Noir circuit components for shuffling
+        const shuffleBackend = new UltraHonkBackend(shuffleCircuit);
+        const shuffleNoir = new Noir(shuffleCircuit);
+
+        // Prepare input for the shuffle circuit
+        const shuffleInput = {
+            deck: deck,
+            key: shuffleKey
+        };
+
+        // Execute the shuffle circuit
+        const shuffleWitnessResult = await shuffleNoir.execute(shuffleInput);
+        const shuffleProof = await shuffleBackend.generateProof(shuffleWitnessResult.witness);
+        
+        // Get the shuffled deck from the circuit's return value
+        const shuffledDeck = shuffleWitnessResult.returnValue;
+
+        // Validate input for encryption
+        if (!shuffledDeck || !Array.isArray(shuffledDeck) || shuffledDeck.length !== 52) {
+            throw new Error('Invalid deck input after shuffle. Expected array of 52 integers.');
         }
         if (!key || !iv) {
             throw new Error('Missing required parameters in environment variables');
         }
 
-        // Initialize Noir circuit components
-        const backend = new UltraHonkBackend(circuit);
-        const noir = new Noir(circuit);
+        // Initialize Noir circuit components for encryption
+        const encryptionBackend = new UltraHonkBackend(encryptionCircuit);
+        const encryptionNoir = new Noir(encryptionCircuit);
 
         // Prepare input for the encryption circuit
         const encryptionInput = {
             key,
             iv,
-            deck
+            deck: shuffledDeck
         };
 
-        // Execute the circuit to generate the witness
-        const witnessResult = await noir.execute(encryptionInput);
-        // Generate zero-knowledge proof
-        const proof = await backend.generateProof(witnessResult.witness);
+        // Execute the encryption circuit
+        const witnessResult = await encryptionNoir.execute(encryptionInput);
+        const encryptionProof = await encryptionBackend.generateProof(witnessResult.witness);
 
-        // Broadcast only the success and proof to all clients
+        // Broadcast proofs to all clients
         io.emit('encryptionComplete', {
             success: true,
-            proof
+            shuffleProof,
+            encryptionProof
         });
 
+        return {
+            success: true,
+            shuffleProof,
+            encryptionProof
+        };
         // TODO: Send the encrypted deck on-chain with the GM's wallet
 
     } catch (err) {
