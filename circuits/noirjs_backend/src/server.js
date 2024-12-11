@@ -1,4 +1,6 @@
 import express from 'express';
+import { createServer } from 'http';
+import { Server } from 'socket.io';
 import { UltraHonkBackend } from '@noir-lang/backend_barretenberg';
 import { Noir } from '@noir-lang/noir_js';
 import circuit from '../../encryption/target/encryption.json' assert { type: "json" };
@@ -13,6 +15,23 @@ const key = process.env.ENCRYPTION_KEY?.split(',').map(Number);
 const iv = process.env.ENCRYPTION_IV?.split(',').map(Number);
 
 const app = express();
+const httpServer = createServer(app);
+const io = new Server(httpServer, {
+  cors: {
+    origin: "*", // Configure according to your security requirements
+    methods: ["GET", "POST"]
+  }
+});
+
+// Handle WebSocket connections
+io.on('connection', (socket) => {
+    console.log('Client connected');
+    
+    socket.on('disconnect', () => {
+      console.log('Client disconnected');
+    });
+});
+
 app.use(express.json());
 
 /**
@@ -66,7 +85,14 @@ app.post('/encrypt', async (req, res) => { // TODO: Should be executed when the 
         // Generate zero-knowledge proof
         const proof = await backend.generateProof(witnessResult.witness);
 
+        // Broadcast only the success and proof to all clients
+        io.emit('encryptionComplete', {
+            success: true,
+            proof
+        });
+
         // Return encrypted deck and proof
+        // TODO: POST the encrypted deck on-chain
         res.json({
             success: true,
             encryptedDeck: witnessResult.returnValue,
@@ -75,6 +101,8 @@ app.post('/encrypt', async (req, res) => { // TODO: Should be executed when the 
 
     } catch (err) {
         console.error('Encryption error:', err);
+        io.emit('encryptionError', { success: false });
+        
         res.status(500).json({
             success: false,
             error: err.message
