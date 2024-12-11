@@ -14,6 +14,7 @@ dotenv.config();
 const key = process.env.ENCRYPTION_KEY?.split(',').map(Number);
 const iv = process.env.ENCRYPTION_IV?.split(',').map(Number);
 
+// Create Express server
 const app = express();
 const httpServer = createServer(app);
 const io = new Server(httpServer, {
@@ -35,32 +36,20 @@ io.on('connection', (socket) => {
 app.use(express.json());
 
 /**
- * Endpoint to encrypt a deck of cards using Noir circuit
+ * Function to encrypt a deck of cards using Noir circuit
  * 
- * Expected request body:
- * {
- *   "deck": [001, 002, 003, ...] // Array of 52 integers representing cards
- * }
  * 
  * Card values should be:
  * - Hearts: 001-013
  * - Diamonds: 101-113
  * - Clubs: 201-213
  * - Spades: 301-313
- * 
- * Returns:
- * {
- *   "success": true,
- *   "encryptedDeck": [...], // Array of encrypted card values
- *   "proof": {...} // Zero-knowledge proof
- * }
  */
-app.post('/encrypt', async (req, res) => { // TODO: Should be executed when the encrypt_card_request is received from Torii
+async function encryptDeck() { // TODO: This function should be called once the request is received from Torii
     try {
-        // Extract deck from request body
-        //TODO : The Deck should be received from Torii
-        const { deck } = req.body;
-
+        // TODO: Get the deck from Torii
+        // deck =
+        
         // Validate input
         if (!deck || !Array.isArray(deck) || deck.length !== 52) {
             throw new Error('Invalid deck input. Expected array of integers.');
@@ -91,32 +80,22 @@ app.post('/encrypt', async (req, res) => { // TODO: Should be executed when the 
             proof
         });
 
-        // Return encrypted deck and proof
-        // TODO: POST the encrypted deck on-chain
-        res.json({
-            success: true,
-            encryptedDeck: witnessResult.returnValue,
-            proof
-        });
+        // TODO: Send the encrypted deck on-chain with the GM's wallet
 
     } catch (err) {
         console.error('Encryption error:', err);
         io.emit('encryptionError', { success: false });
-        
-        res.status(500).json({
-            success: false,
-            error: err.message
-        });
+        throw err;
     }
-});
+}
 
 /**
  * Endpoint to decrypt hand 
  * 
  * Expected request body:
  * {
- *   "encryptedDeck": [...], // Encrypted deck of 52 cards
- *   "hand": ["0x45454546235656565", "0x32232323232323232"] // The player's encrypted hand
+ *   "address": 0x123456789015154, // The player's on-chain address
+ *   "secret": "1234567890" // The player's secret
  * }
  * 
  * Returns:
@@ -130,23 +109,27 @@ app.post('/encrypt', async (req, res) => { // TODO: Should be executed when the 
  * If hand=["0x45454546235656565", "0x32232323232323232"] and the decrypted values are [0x01, 0x02],
  * this means the first two cards are Ace of Hearts and 2 of Hearts
  */
-app.post('/decrypt', async (req, res) => { // TODO: Requests should only contain the client's secret & on-chain address
+app.post('/decrypt', async (req, res) => {
     try {
         // Extract parameters from request body
-        const { encryptedDeck, hand } = req.body; // TODO: The encryptedDeck  & hand should be received from Torii
+        const { playerOnChainAddress, playerSecret } = req.body;
 
         // Validate input
-        if (!encryptedDeck || !hand) {
+        if (!playerOnChainAddress || !playerSecret) {
             throw new Error('Missing required parameters');
         }
         if (!key || !iv) {
             throw new Error('Missing required parameters in environment variables');
         }
-        // TODO: Reconstruct the hash from secret & on-chain address
+        // TODO: Reconstruct the hash from on-chain address & secret
 
-        // TODO: Verify the hash with the player's hash sent from Torii
+        // TODO: Verify the hash with the player's hash sent from Torii for this player address
 
-        // TODO: Get the player's encrypted hand from Torii
+        // TODO: Get the player's encrypted hand from Torii for this player address
+        // hand =
+        
+        // TODO: Get the encrypted deck from Torii
+        // encryptedDeck =
         
         // Initialize Noir circuit components for decryption
         const decryptionBackend = new UltraHonkBackend(decryptionCircuit);
