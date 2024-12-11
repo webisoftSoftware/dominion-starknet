@@ -108,8 +108,8 @@ fn test_display() {
 
 #[test]
 fn test_into() {
-    let high_card: u32 = EnumHandRank::HighCard(array![EnumCardValue::Ace]).into();
-    let two: u32 = EnumCardValue::Two.into();
+    let high_card: u32 = (@EnumHandRank::HighCard(array![EnumCardValue::Ace])).into();
+    let two: u32 = (@EnumCardValue::Two).into();
 
     assert_eq!(high_card, 14);
     assert_eq!(two, 2);
