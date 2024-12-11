@@ -1,18 +1,31 @@
 import circuit from '../../encryption/target/encryption.json' assert { type: "json" };
 import { UltraHonkBackend, UltraHonkVerifier as Verifier } from '@noir-lang/backend_barretenberg';
 import { Noir } from '@noir-lang/noir_js';
+import decryptionCircuit from '../../decryption/target/decryption.json' assert { type: "json" };
 
-function display(container, msg) {
-    const c = document.getElementById(container);
+// Define card constants at the top level
+const suits = ['H', 'D', 'C', 'S'];  // Hearts, Diamonds, Clubs, Spades
+const values = ['A', '2', '3', '4', '5', '6', '7', '8', '9', 'T', 'J', 'Q', 'K'];
+
+function display(container, msg, type = 'info') {
+    const c = document.getElementById('log-content');
     const p = document.createElement('p');
-    p.textContent = msg;
+    const timestamp = new Date().toLocaleTimeString();
+    p.textContent = `[${timestamp}] ${msg}`;
+    p.className = `log-${type}`;
     c.appendChild(p);
+    c.scrollTop = c.scrollHeight;
 }
 
-document.getElementById('submit').addEventListener('click', async () => {
+// Store encrypted deck globally so we can access it in decrypt
+let encryptedDeck = null;
+let encryptionInput = null;
+
+// Encrypt button handler
+document.getElementById('encrypt').addEventListener('click', async () => {
     try {
         // Clear previous results
-        document.getElementById('logs').innerHTML = '<h2>Process Logs</h2>';
+        document.getElementById('logs').innerHTML = '<h2>Process Logs</h2><div id="log-content"></div>';
         document.getElementById('deck-comparison-body').innerHTML = '';
         
         display('logs', 'Starting initialization...');
@@ -20,8 +33,6 @@ document.getElementById('submit').addEventListener('click', async () => {
         const noir = new Noir(circuit);
         
         // Create deck with card notation
-        const suits = ['H', 'D', 'C', 'S'];  // Hearts, Diamonds, Clubs, Spades
-        const values = ['A', '2', '3', '4', '5', '6', '7', '8', '9', 'T', 'J', 'Q', 'K'];
         const cardNotations = [];
         
         // Generate card notations (HA, D5, ST, etc.)
@@ -31,20 +42,8 @@ document.getElementById('submit').addEventListener('click', async () => {
             }
         }
         
-        // Add shuffle function
-        function shuffleArray(array) {
-            for (let i = array.length - 1; i > 0; i--) {
-                const random = Math.random();
-                console.log(random);
-                const j = Math.floor(random * (i + 1));
-                
-                [array[i], array[j]] = [array[j], array[i]];
-            }
-            return array;
-        }
-        
         // Convert card notations to meaningful integers
-        let deck = cardNotations.map(card => {
+        const deck = cardNotations.map(card => {
             const suit = card[0];
             const value = card[1];
             
@@ -69,19 +68,15 @@ document.getElementById('submit').addEventListener('click', async () => {
             return suitValue + cardValue;
         });
         
-        // Shuffle the input deck
-        deck = shuffleArray([...deck]);
-        
-        const key = parseInt(import.meta.env.VITE_ENCRYPTION_KEY) || 123;
-        
-        const input = { 
-            key,
+        encryptionInput = { 
+            key: [75465, 45678, 98765, 45678],
+            iv: [1, 2, 3, 4],
             deck
         };
         
         try {
             display('logs', 'Attempting to execute noir.execute()...');
-            const witnessResult = await noir.execute(input);
+            const witnessResult = await noir.execute(encryptionInput);
             
             console.log(witnessResult);
             display('logs', 'Witness generated successfully');
@@ -90,43 +85,15 @@ document.getElementById('submit').addEventListener('click', async () => {
             const proof = await backend.generateProof(witnessResult.witness);
             display('logs', 'Proof generated successfully');
             
-            console.log(proof);
+            // Store encrypted deck for later use
+            encryptedDeck = witnessResult.returnValue;
             
-            // Create arrays of card notations for both decks
-            const originalNotations = deck.map(num => {
-                const suit = suits[Math.floor(num / 100)];
-                const valueNum = num % 100;
-                let value = '';
-                if (valueNum === 1) value = 'A';
-                else if (valueNum === 10) value = 'T';
-                else if (valueNum === 11) value = 'J';
-                else if (valueNum === 12) value = 'Q';
-                else if (valueNum === 13) value = 'K';
-                else value = valueNum.toString();
-                return suit + value;
-            });
-
-            // Clear previous results
-            const tbody = document.getElementById('deck-comparison-body');
-            tbody.innerHTML = '';
-
-            // Create table rows showing original card and its encrypted value
-            originalNotations.forEach((card, index) => {
-                const row = document.createElement('tr');
-                const originalCell = document.createElement('td');
-                const encryptedCell = document.createElement('td');
-                
-                originalCell.textContent = `${card} (${deck[index]})`;
-                const encryptedValue = witnessResult.returnValue[index];
-                const encryptedIndex = deck.indexOf(encryptedValue);
-                encryptedCell.textContent = encryptedIndex !== -1 ? 
-                    `${cardNotations[encryptedIndex]} (${encryptedValue})` : 
-                    encryptedValue;
-                
-                row.appendChild(originalCell);
-                row.appendChild(encryptedCell);
-                tbody.appendChild(row);
-            });
+            // Show the decrypt section
+            document.getElementById('decrypt-section').style.display = 'block';
+            
+            // Display the deck comparison
+            updateTable(deck, witnessResult.returnValue);
+            
         } catch (execError) {
             console.error('Circuit execution error:', execError);
             display('logs', 'Circuit Error: ' + execError.toString());
@@ -143,3 +110,91 @@ document.getElementById('submit').addEventListener('click', async () => {
         }
     }
 });
+
+// Decrypt button handler
+document.getElementById('decrypt').addEventListener('click', async () => {
+    try {
+        const card1 = document.getElementById('card1').value;
+        const card2 = document.getElementById('card2').value;
+        
+        if (!encryptedDeck) {
+            throw new Error('Please encrypt the deck first');
+        }
+        
+        display('logs', 'Initializing decryption circuit...');
+        const decryptionBackend = new UltraHonkBackend(decryptionCircuit);
+        const decryptionNoir = new Noir(decryptionCircuit);
+        
+        const decryptInput = {
+            key: encryptionInput.key,
+            iv: encryptionInput.iv,
+            deck: encryptedDeck,
+            hand: [card1, card2]
+        };
+        
+        display('logs', 'Attempting to decrypt hand...');
+        const decryptWitnessResult = await decryptionNoir.execute(decryptInput);
+        
+        display('logs', 'Hand decrypted successfully', 'success');
+        const decryptedHand = decryptWitnessResult.returnValue;
+        
+        display('logs', 'Generating decryption proof...', 'info');
+        const decryptProof = await decryptionBackend.generateProof(decryptWitnessResult.witness);
+        display('logs', 'Decryption proof generated successfully', 'success');
+        
+        // Display decrypted results in the dedicated section
+        displayDecryptedHand(decryptedHand);
+        
+    } catch (err) {
+        console.error('Decryption error:', err);
+        display('logs', 'Decryption Error: ' + err.toString(), 'error');
+        if (err.stack) {
+            display('logs', 'Stack: ' + err.stack, 'error');
+        }
+    }
+});
+
+function getCardNotation(cardValue) {
+    const suit = suits[Math.floor(cardValue / 100)];
+    const valueNum = cardValue % 100;
+    let value = '';
+    if (valueNum === 1) value = 'A';
+    else if (valueNum === 10) value = 'T';
+    else if (valueNum === 11) value = 'J';
+    else if (valueNum === 12) value = 'Q';
+    else if (valueNum === 13) value = 'K';
+    else value = valueNum.toString();
+    return suit + value;
+}
+
+function updateTable(deck, encryptedDeck) {
+    const tbody = document.getElementById('deck-comparison-body');
+    tbody.innerHTML = '';
+    
+    deck.forEach((card, index) => {
+        const row = document.createElement('tr');
+        const originalCell = document.createElement('td');
+        const encryptedCell = document.createElement('td');
+        
+        originalCell.textContent = getCardNotation(card);  // Just show card notation (e.g., "H7")
+        encryptedCell.textContent = encryptedDeck[index];
+        
+        row.appendChild(originalCell);
+        row.appendChild(encryptedCell);
+        tbody.appendChild(row);
+        
+        // Add slight delay for staggered animation
+        row.style.animationDelay = `${index * 50}ms`;
+    });
+}
+
+function displayDecryptedHand(decryptedHand) {
+    const handDiv = document.getElementById('decrypted-hand');
+    const card1 = document.getElementById('decrypted-card-1');
+    const card2 = document.getElementById('decrypted-card-2');
+    
+    card1.textContent = getCardNotation(decryptedHand[0]);
+    card2.textContent = getCardNotation(decryptedHand[1]);
+    
+    handDiv.style.display = 'block';
+}

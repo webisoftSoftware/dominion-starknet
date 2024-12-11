@@ -1,7 +1,7 @@
 // Helper function to find the index of the hand in the encrypted deck
-fn find_hand(deck: [Field; 17], hand: [Field; 2]) -> [u8; 2] {
+fn find_hand(deck: [Field; 52], hand: [Field; 2]) -> [u8; 2] {
     let mut result: [u8; 2] = [0; 2];
-    for i in 0..17 {
+    for i in 0..52 {
         if deck[i] == hand[0] {
             result[0] = i;
         }
@@ -12,11 +12,11 @@ fn find_hand(deck: [Field; 17], hand: [Field; 2]) -> [u8; 2] {
     result
 }
 
-fn main(key: [Field; 4], iv: [Field; 4], deck: [Field; 17], hand: [Field; 2]) -> pub [Field; 2] {
+fn main(key: [Field; 4], iv: [Field; 4], deck: [Field; 52], hand: [Field; 2]) -> pub [Field; 2] {
     // Find the index of the hand in the encrypted deck
     let hand_index = find_hand(deck, hand);
 
-    // Decrypt the whole 17 card deck
+    // Decrypt the whole 52 card deck
     let decrypted_deck = hydra::bn254::dec::decrypt(deck, key, iv);
 
     // Encrypt the decrypted deck for assertion
