@@ -36,6 +36,23 @@ io.on('connection', (socket) => {
 app.use(express.json());
 
 /**
+ * Function to generate a random number using VRF
+ */
+async function generateRandomNumber() {
+    // TODO: Generate a random number using VRF
+    // randomNumber =
+
+    // TODO: Verify the VRF proof on-chain
+
+    // TODO: Derive the VRF to generate a Key and IV for the encryption
+    // key =
+    // iv =
+    // shuffle =
+
+    // TODO: Set those values in the environment variables
+}
+
+/**
  * Function to encrypt a deck of cards using Noir circuit
  * 
  * 
@@ -47,9 +64,15 @@ app.use(express.json());
  */
 async function encryptDeck() { // TODO: This function should be called once the request is received from Torii
     try {
+        // TODO: Setup all the environment variables in the .env file
+        // generateRandomNumber();
+    
         // TODO: Get the deck from Torii
         // deck =
         
+        // TODO: Shuffle the deck using the VRF
+        // deck =
+
         // Validate input
         if (!deck || !Array.isArray(deck) || deck.length !== 52) {
             throw new Error('Invalid deck input. Expected array of integers.');
@@ -127,7 +150,7 @@ app.post('/decrypt', async (req, res) => {
 
         // TODO: Get the player's encrypted hand from Torii for this player address
         // hand =
-        
+
         // TODO: Get the encrypted deck from Torii
         // encryptedDeck =
         
