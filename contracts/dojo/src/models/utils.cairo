@@ -51,7 +51,7 @@ fn _count_values(cards: @Array<StructCard>) -> Felt252Dict<u8> {
     
     for card in cards.span() {
         if let Option::Some(value) = card.get_value() {
-            let value: u32 = value.into();
+            let value: u32 = (@value).into();
             let current_count = value_counts.get(value.into());
             value_counts.insert(value.into(), current_count + 1);
         }
@@ -66,7 +66,7 @@ fn _count_suits(cards: @Array<StructCard>) -> Felt252Dict<u8> {
     
     for card in cards.span() {
         if let Option::Some(suit) = card.get_suit() {
-            let value: u32 = suit.into();
+            let value: u32 = (@suit).into();
             let current_count = suit_counts.get(value.into());
             suit_counts.insert(value.into(), current_count + 1);
         }
@@ -80,7 +80,7 @@ fn _get_highest_card_value(cards: @Array<StructCard>) -> u32 {
 
     for i in 0..cards.len() {
         if let Option::Some(card_value) = cards[i].get_value() {
-            let current_value: u32 = card_value.into();
+            let current_value: u32 = (@card_value).into();
             if current_value > highest_value {
                 highest_value = current_value;
             }
@@ -94,7 +94,7 @@ fn _evaluate_value(cards: @Array<StructCard>) -> u32 {
 
     for i in 0..cards.len() {
         if let Option::Some(card_value) = cards[i].get_value() {
-            let current_value: u32 = card_value.into();
+            let current_value: u32 = (@card_value).into();
             total_value += current_value;
         }
     };
@@ -103,8 +103,8 @@ fn _evaluate_value(cards: @Array<StructCard>) -> u32 {
 
 fn tie_breaker(first_hand: @EnumHandRank, second_hand: @EnumHandRank) -> i32 {
     // Get numerical rank for each hand (higher is better)
-    let first_rank = get_hand_rank(first_hand.clone());
-    let second_rank = get_hand_rank(second_hand.clone());
+    let first_rank = get_hand_rank(first_hand);
+    let second_rank = get_hand_rank(second_hand);
     
     // If ranks are different, we can immediately return the comparison
     if first_rank != second_rank {
@@ -115,24 +115,24 @@ fn tie_breaker(first_hand: @EnumHandRank, second_hand: @EnumHandRank) -> i32 {
     match (first_hand, second_hand) {
         // Special case for straight with Ace-5
         (EnumHandRank::Straight(h1), EnumHandRank::Straight(h2)) => {
-            if *h1 == EnumCardValue::Five.into() && *h2 != EnumCardValue::Five.into() {
+            if h1 == @EnumCardValue::Five.into() && h2 != @EnumCardValue::Five.into() {
                 return -1;
             }
-            if *h2 == EnumCardValue::Five.into() && *h1 != EnumCardValue::Five.into() {
+            if h2 == @EnumCardValue::Five.into() && h1 != @EnumCardValue::Five.into() {
                 return 1;
             }
-            compare_cards(*h1, *h2)
+            compare_cards(h1, h2)
         },
         
         // Compare primary cards for hands with one important card
         (EnumHandRank::FourOfAKind(v1), EnumHandRank::FourOfAKind(v2)) |
         (EnumHandRank::ThreeOfAKind(v1), EnumHandRank::ThreeOfAKind(v2)) |
-        (EnumHandRank::Pair(v1), EnumHandRank::Pair(v2))  => compare_cards(*v1, *v2),
+        (EnumHandRank::Pair(v1), EnumHandRank::Pair(v2))  => compare_cards(v1, v2),
 
         (EnumHandRank::Flush(cards1), EnumHandRank::Flush(cards2)) => {
             let mut compare_result: i32 = 0;
             for i in 0..cards1.len() {
-                compare_result = compare_cards(*cards1[i], *cards2[i]);
+                compare_result = compare_cards(cards1[i], cards2[i]);
                 if compare_result != 0 {
                     break;
                 }
@@ -142,18 +142,18 @@ fn tie_breaker(first_hand: @EnumHandRank, second_hand: @EnumHandRank) -> i32 {
 
         // Compare two cards for full house and two pair
         (EnumHandRank::FullHouse((v1, v2)), EnumHandRank::FullHouse((w1, w2))) => {
-            let main_compare = compare_cards(*v1, *w1);
+            let main_compare = compare_cards(v1, w1);
             if main_compare != 0 {
                 return main_compare;
             }
-            return compare_cards(*v2, *w2);
+            return compare_cards(v2, w2);
         },
         (EnumHandRank::TwoPair((v1, v2)), EnumHandRank::TwoPair((w1, w2))) => {
-            let main_compare = compare_cards(*v1, *w1);
+            let main_compare = compare_cards(v1, w1);
             if main_compare != 0 {
                 return main_compare;
             }
-            return compare_cards(*v2, *w2);
+            return compare_cards(v2, w2);
         },
 
         // Compare arrays of cards for high card
@@ -161,7 +161,7 @@ fn tie_breaker(first_hand: @EnumHandRank, second_hand: @EnumHandRank) -> i32 {
             let mut i = 0;
             let mut compare_result: i32 = 0;
             while i < cards1.len() {
-                compare_result = compare_cards(*cards1[i], *cards2[i]);
+                compare_result = compare_cards(cards1[i], cards2[i]);
                 if compare_result != 0 {
                     break;
                 }
@@ -179,11 +179,11 @@ fn tie_breaker(first_hand: @EnumHandRank, second_hand: @EnumHandRank) -> i32 {
     }
 }
 
-fn get_hand_rank(hand: EnumHandRank) -> u32 {
+fn get_hand_rank(hand: @EnumHandRank) -> u32 {
     return hand.into();
 }
 
-fn compare_cards(first_card_value: EnumCardValue, second_card_value: EnumCardValue) -> i32 {
+fn compare_cards(first_card_value: @EnumCardValue, second_card_value: @EnumCardValue) -> i32 {
     let first_value: u32 = first_card_value.into();
     let second_value: u32 = second_card_value.into();
 
@@ -218,8 +218,8 @@ fn merge_values(left_arr: @Array<EnumCardValue>, right_arr: @Array<EnumCardValue
     let mut j = 0;
 
     while i < left_arr.len() && j < right_arr.len() {
-        let left_value: u32 = (*left_arr[i]).into();
-        let right_value: u32 = (*right_arr[j]).into();
+        let left_value: u32 = left_arr[i].into();
+        let right_value: u32 = right_arr[j].into();
 
         if left_value <= right_value {
             result.append(left_arr[i].clone());
@@ -256,8 +256,8 @@ fn merge(left_arr: @Array<StructCard>, right_arr: @Array<StructCard>) -> Array<S
             panic!("Card value is none");
         }
 
-        let left_value: u32 = left_arr[i].get_value().unwrap().into();
-        let right_value: u32 = right_arr[j].get_value().unwrap().into();
+        let left_value: u32 = (@left_arr[i].get_value().unwrap()).into();
+        let right_value: u32 = (@right_arr[j].get_value().unwrap()).into();
 
         if left_value <= right_value {
             result.append(left_arr[i].clone());

@@ -48,11 +48,15 @@ use crate::models::structs::StructCard;
 pub enum EnumGameState {
     NotCreated,
     WaitingForPlayers,
+    HandStart,
+    RoundStart,
     PreFlop,
     Flop,
     Turn,
     River,
     Showdown,
+    RoundEnd,
+    HandEnd,
 }
 
 #[derive(Drop, Serde, Copy, Debug, PartialEq, Introspect)]

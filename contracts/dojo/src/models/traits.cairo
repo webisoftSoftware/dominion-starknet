@@ -14,7 +14,7 @@
 //  ░███    ███ ░███ ░███ ░███ ░███ ░███
 //  ░███  ░███ ░███  ░███ ░███ ░███ ░███
 //  ░███
-//  ████████████  ░░██████  █████░███
+//  ██████████████  ░░██████  █████░███
 //  █████ █████ ████ █████
 //  █████░░██████  ████ █████
 // ░░░░░░░░░░    ░░░░░░  ░░░░░ ░░░ ░░░░░
@@ -155,6 +155,14 @@ impl EnumGameStateDisplay of Display<EnumGameState> {
                 let str: ByteArray = format!("NotCreated");
                 f.buffer.append(@str);
             },
+            EnumGameState::HandStart => {
+                let str: ByteArray = format!("HandStart");
+                f.buffer.append(@str);
+            },
+            EnumGameState::RoundStart => {
+                let str: ByteArray = format!("RoundStart");
+                f.buffer.append(@str);
+            },
             EnumGameState::WaitingForPlayers => {
                 let str: ByteArray = format!("WaitingForPlayers");
                 f.buffer.append(@str);
@@ -177,6 +185,14 @@ impl EnumGameStateDisplay of Display<EnumGameState> {
             },
             EnumGameState::Showdown => {
                 let str: ByteArray = format!("Showdown");
+                f.buffer.append(@str);
+            },
+            EnumGameState::RoundEnd => {
+                let str: ByteArray = format!("RoundEnd");
+                f.buffer.append(@str);
+            },
+            EnumGameState::HandEnd => {
+                let str: ByteArray = format!("HandEnd");
                 f.buffer.append(@str);
             },
         };
@@ -387,8 +403,8 @@ impl StructCardDisplay of Display<StructCard> {
 /////////////////////////////////////////////////////////////////////////
 /////////////////////////////////////////////////////////////////////////
 
-impl EnumCardValueInto of Into<EnumCardValue, u32> {
-    fn into(self: EnumCardValue) -> u32 {
+impl EnumCardValueInto of Into<@EnumCardValue, u32> {
+    fn into(self: @EnumCardValue) -> u32 {
         match self {
             EnumCardValue::Two => 2,
             EnumCardValue::Three => 3,
@@ -407,8 +423,8 @@ impl EnumCardValueInto of Into<EnumCardValue, u32> {
     }
 }
 
-impl EnumCardSuitInto of Into<EnumCardSuit, u32> {
-    fn into(self: EnumCardSuit) -> u32 {
+impl EnumCardSuitInto of Into<@EnumCardSuit, u32> {
+    fn into(self: @EnumCardSuit) -> u32 {
         match self {
             EnumCardSuit::Spades => 1,
             EnumCardSuit::Hearts => 2,
@@ -418,13 +434,13 @@ impl EnumCardSuitInto of Into<EnumCardSuit, u32> {
     }
 }
 
-impl EnumHandRankInto of Into<EnumHandRank, u32> {
-    fn into(self: EnumHandRank) -> u32 {
+impl EnumHandRankInto of Into<@EnumHandRank, u32> {
+    fn into(self: @EnumHandRank) -> u32 {
         match self {
             EnumHandRank::HighCard(values) | EnumHandRank::Flush(values) => {
                 let mut sum: u32 = 0;
                 for value in values.span() {
-                    sum += (*value).into();
+                    sum += value.into();
                 };
                 sum
             },
@@ -446,26 +462,26 @@ impl EnumHandRankInto of Into<EnumHandRank, u32> {
 /////////////////////////////////////////////////////////////////////////
 /////////////////////////////////////////////////////////////////////////
 
-impl EnumHandRankPartialOrd of PartialOrd<EnumHandRank> {
-    fn le(lhs: EnumHandRank, rhs: EnumHandRank) -> bool {
+impl EnumHandRankPartialOrd of PartialOrd<@EnumHandRank> {
+    fn le(lhs: @EnumHandRank, rhs: @EnumHandRank) -> bool {
         let left_value: u32 = lhs.into();
         let right_value: u32 = rhs.into();
         left_value <= right_value
     }
 
-    fn lt(lhs: EnumHandRank, rhs: EnumHandRank) -> bool {
+    fn lt(lhs: @EnumHandRank, rhs: @EnumHandRank) -> bool {
         let left_value: u32 = lhs.into();
         let right_value: u32 = rhs.into();
         left_value < right_value
     }
 
-    fn ge(lhs: EnumHandRank, rhs: EnumHandRank) -> bool {
+    fn ge(lhs: @EnumHandRank, rhs: @EnumHandRank) -> bool {
         let left_value: u32 = lhs.into();
         let right_value: u32 = rhs.into();
         left_value >= right_value
     }
 
-    fn gt(lhs: EnumHandRank, rhs: EnumHandRank) -> bool {
+    fn gt(lhs: @EnumHandRank, rhs: @EnumHandRank) -> bool {
         let left_value: u32 = lhs.into();
         let right_value: u32 = rhs.into();
         left_value > right_value
@@ -658,10 +674,10 @@ impl HandImpl of IHand {
             // Then check if those flush cards form a straight.
             if flush_values.len() >= 5 {
                 let mut consecutive_count: u8 = 1;
-                let mut prev_value: u32 = (*flush_values[0]).into();
+                let mut prev_value: u32 = flush_values[0].into();
                 
                 for i in 1..flush_values.len() {
-                    let curr_value: u32 = (*flush_values[i]).into();
+                    let curr_value: u32 = flush_values[i].into();
                     if curr_value == prev_value - 1 {
                         consecutive_count += 1;
                         if consecutive_count >= 5 {
@@ -696,7 +712,7 @@ impl HandImpl of IHand {
         // Single pass to count values.
         for card in all_cards.span() {
             if let Option::Some(value) = card.get_value() {
-                let value_count: u32 = value.into();
+                let value_count: u32 = (@value).into();
                 value_counts.insert(value_count.into(), value_counts.get(value_count.into()) + 1);
                 // Early return if we find four of a kind.
                 if value_counts.get(value_count.into()) == 4 {
@@ -706,7 +722,7 @@ impl HandImpl of IHand {
         };
 
         let card_value: EnumCardValue = all_cards[0].get_value().unwrap();
-        let value_count: u32 = card_value.into();
+        let value_count: u32 = (@card_value).into();
         if value_counts.get(value_count.into()) == 4 {
             return Option::Some(card_value);
         }
@@ -731,7 +747,7 @@ impl HandImpl of IHand {
         // First find three of a kind.
         for card in all_cards.span() {
             if let Option::Some(value) = card.get_value() {
-                let value_count: u32 = value.into();
+                let value_count: u32 = (@value).into();
                 let count = value_counts.get(value_count.into());
                 if count == 3 && three_of_kind.is_none() {
                     three_of_kind = Option::Some(value);
@@ -821,11 +837,11 @@ impl HandImpl of IHand {
         
         // Check for regular straight.
         let mut consecutive_count: u8 = 1;
-        let mut prev_value: u32 = (*sorted_unique_values[0]).into();
+        let mut prev_value: u32 = sorted_unique_values[0].into();
         let mut highest_value: EnumCardValue = *sorted_unique_values[0];
         
         for i in 1..sorted_unique_values.len() {
-            let curr_value: u32 = (*sorted_unique_values[i]).into();
+            let curr_value: u32 = sorted_unique_values[i].into();
             if curr_value == prev_value - 1 {
                 consecutive_count += 1;
                 if consecutive_count >= 5 {
@@ -963,9 +979,10 @@ impl HandImpl of IHand {
         
         let mut pairs: Array<EnumCardValue> = array![];
         
+        // Get all possible pairs.
         for card in all_cards.span() {
             if let Option::Some(value) = card.get_value() {
-                let value_count: u32 = value.into();
+                let value_count: u32 = (@value).into();
                 if value_counts.get(value_count.into()) == 2 && !pairs.contains(@value) {
                     pairs.append(value);
                 }
@@ -973,68 +990,116 @@ impl HandImpl of IHand {
         };
         
         if pairs.len() >= 2 {
+            // Get highest pair.
             let sorted_pairs = utils::sort_values(@pairs);
-            return Option::Some(sorted_pairs[0].clone());
+            return Option::Some(sorted_pairs[sorted_pairs.len() - 1].clone());
         }
         
         return Option::None;
     }
 
     fn _evaluate_rank(
-        self: @ComponentHand, board: @Array<StructCard>
+        self: @ComponentHand, 
+        board: @Array<StructCard>
     ) -> Result<EnumHandRank, EnumError> {
-        if self.m_cards.len() != 2 {
-            return Result::Err(EnumError::InvalidHand);
+        // Combine both checks.
+        if self.m_cards.len() != 2 || board.len() > 5 {
+            return Result::Err(
+                if self.m_cards.len() != 2 { 
+                    EnumError::InvalidHand 
+                } else { 
+                    EnumError::InvalidBoard 
+                }
+            );
         }
 
-        if board.len() > 5 {
-            return Result::Err(EnumError::InvalidBoard);
-        }
-
-        if self._has_royal_flush(board) {
-            return Result::Ok(EnumHandRank::RoyalFlush);
-        }
-
-        if self._has_straight_flush(board) {
-            return Result::Ok(EnumHandRank::StraightFlush);
-        }
-
-        if let Option::Some(four_of_a_kind_value) = self._has_four_of_a_kind(board) {
-            return Result::Ok(EnumHandRank::FourOfAKind(four_of_a_kind_value));
-        }
-
-        if let Option::Some(full_house_values) = self._has_full_house(board) {
-            return Result::Ok(EnumHandRank::FullHouse(full_house_values));
-        }
-
-        if let Option::Some(flush_values) = self._has_flush(board) {
-            return Result::Ok(EnumHandRank::Flush(flush_values));
-        }
-
-        if let Option::Some(straight_value) = self._has_straight(board) {
-            return Result::Ok(EnumHandRank::Straight(straight_value));
-        }
-
-        if let Option::Some(three_of_a_kind_value) = self._has_three_of_a_kind(board) {
-            return Result::Ok(EnumHandRank::ThreeOfAKind(three_of_a_kind_value));
-        }
-
-        if let Option::Some((first_pair_value, second_pair_value)) = self._has_two_pair(board) {
-            return Result::Ok(EnumHandRank::TwoPair((first_pair_value, second_pair_value)));
-        }
-
-        if let Option::Some(pair_value) = self._has_pair(board) {
-            return Result::Ok(EnumHandRank::Pair(pair_value));
-        }
-
+        // Single pass to collect data to prevent having to call all check functions for i.e. a simple pair.
         let all_cards = self.m_cards.concat(board);
-        let mut all_values: Array<EnumCardValue> = array![];
-        for i in 0..all_cards.len() {
-            if let Option::Some(card_value) = all_cards[i].get_value() {
-                all_values.append(card_value);
+        let mut value_counts: Felt252Dict<u8> = Default::default();
+        let mut suit_counts: Felt252Dict<u8> = Default::default();
+        let mut values: Array<EnumCardValue> = array![];
+        
+        // Track maximums during our single pass.
+        let mut max_value_count: u8 = 0;
+        let mut max_suit_count: u8 = 0;
+        let mut pair_count: u8 = 0;
+        
+        for card in all_cards.span() {
+            if let Option::Some(value) = card.get_value() {
+                let value_count: u32 = (@value).into();
+                let new_count = value_counts.get(value_count.into()) + 1;
+                value_counts.insert(value_count.into(), new_count);
+                if new_count > max_value_count {
+                    max_value_count = new_count;
+                }
+                if new_count == 2 {
+                    pair_count += 1;
+                }
+                values.append(value);
+            }
+            if let Option::Some(suit) = card.get_suit() {
+                let suit_count: u32 = (@suit).into();
+                let new_count = suit_counts.get(suit_count.into()) + 1;
+                suit_counts.insert(suit_count.into(), new_count);
+                if new_count > max_suit_count {
+                    max_suit_count = new_count;
+                }
             }
         };
-        return Result::Ok(EnumHandRank::HighCard(all_values));
+
+        // Now we can use these counts to skip impossible hands.
+        if max_suit_count >= 5 {
+            if self._has_royal_flush(board) {
+                return Result::Ok(EnumHandRank::RoyalFlush);
+            }
+            if self._has_straight_flush(board) {
+                return Result::Ok(EnumHandRank::StraightFlush);
+            }
+        }
+
+        if max_value_count == 4 {
+            if let Option::Some(value) = self._has_four_of_a_kind(board) {
+                return Result::Ok(EnumHandRank::FourOfAKind(value));
+            }
+        }
+
+        if max_value_count == 3 && pair_count >= 1 {
+            if let Option::Some((three, pair)) = self._has_full_house(board) {
+                return Result::Ok(EnumHandRank::FullHouse((three, pair)));
+            }
+        }
+
+        if max_suit_count >= 5 {
+            if let Option::Some(values) = self._has_flush(board) {
+                return Result::Ok(EnumHandRank::Flush(values));
+            }
+        }
+
+        // Check for straight (can't easily rule this out from counts alone).
+        if let Option::Some(high_card) = self._has_straight(board) {
+            return Result::Ok(EnumHandRank::Straight(high_card));
+        }
+
+        if max_value_count == 3 {
+            if let Option::Some(value) = self._has_three_of_a_kind(board) {
+                return Result::Ok(EnumHandRank::ThreeOfAKind(value));
+            }
+        }
+
+        if pair_count >= 2 {
+            if let Option::Some((high, low)) = self._has_two_pair(board) {
+                return Result::Ok(EnumHandRank::TwoPair((high, low)));
+            }
+        }
+
+        if pair_count == 1 {
+            if let Option::Some(value) = self._has_pair(board) {
+                return Result::Ok(EnumHandRank::Pair(value));
+            }
+        }
+
+        // If no other hand is found, return high card.
+        Result::Ok(EnumHandRank::HighCard(utils::sort_values(@values)))
     }
 }
 
@@ -1170,9 +1235,7 @@ impl TableImpl of ITable {
     }
 
     fn reset_table(ref self: ComponentTable) {
-        self.m_pot = 0;
-        self.m_state = EnumGameState::PreFlop;
-        self.m_community_cards = array![];
+        self = TableDefaultImpl::default();
     }
 
     fn _initialize_deck(ref self: ComponentTable) {
@@ -1200,14 +1263,20 @@ impl TableImpl of ITable {
             EnumCardValue::Ace
         ];
 
-        for i in 0
-            ..suits
-                .len() {
-                    for j in 0
-                        ..values.len() {
-                            self.m_deck.append(ICard::new(*values[j], *suits[i]));
-                        };
-                };
+        // Initialize the deck with 52 cards.
+        let mut suit_index: u32 = 0;
+        let mut value_index: u32 = 0;
+
+        for _ in 0..52_u32 {
+            self.m_deck.append(ICard::new(*values[value_index], *suits[suit_index]));
+
+            // Check if we've created every value for the current suit.
+            value_index += 1;
+            value_index = value_index % 13;
+            if value_index == 0 {
+                suit_index += 1;
+            }
+        };
     }
 }
 
