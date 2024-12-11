@@ -1,13 +1,13 @@
-fn main(key: Field, deck: [Field; 52]) -> pub [Field; 52] {
-    let mut encoded_deck: [Field; 52] = [0; 52];
-    for i in 0..52 {
-        let mut card: [Field; 2] = [deck[i], deck[i]];
-        let mut encoded_cards = gmimc::bn254::enc::x5_2(card, key);
-        println(encoded_cards);
-        encoded_deck[i] = encoded_cards[0];
-    }
-    println(encoded_deck);
-    encoded_deck
+fn main(key: [Field; 4], iv: [Field; 4], deck: [Field; 17]) -> pub [Field; 17] {
+    // Encrypt the deck of 17 cards
+    let encrypted_deck = hydra::bn254::enc::encrypt(deck, key, iv);
+
+    // Decrypt the deck of 17 cards for assertion
+    let decrypted_deck = hydra::bn254::dec::decrypt(encrypted_deck, key, iv);
+
+    // Assert that the decrypted deck is the same as the original deck (hasn't been tampered)
+    assert(decrypted_deck == deck);
+
+    // Return the encrypted deck
+    encrypted_deck
 }
-
-
