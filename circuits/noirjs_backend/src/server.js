@@ -5,7 +5,9 @@ import { Server } from 'socket.io';
 import { UltraHonkBackend } from '@noir-lang/backend_barretenberg';
 import { Noir } from '@noir-lang/noir_js';
 import encryptionCircuit from '../../encryption/target/encryption.json' assert { type: "json" };
-import decryptionCircuit from '../../decryption/target/decryption.json' assert { type: "json" };
+import decryption1CardCircuit from '../../decryption/1card_decryption/target/1card_decryption.json' assert { type: "json" };
+import decryption2CardsCircuit from '../../decryption/2cards_decryption/target/2cards_decryption.json' assert { type: "json" };
+import decryption3CardsCircuit from '../../decryption/3cards_decryption/target/3cards_decryption.json' assert { type: "json" };
 import shuffleCircuit from '../../shuffle/target/shuffle.json' assert { type: "json" };
 
 import { randomInt, createHash } from 'crypto';
@@ -145,6 +147,92 @@ async function encryptDeck() { // TODO: This function should be called once the 
 }
 
 /**
+ * Function to decrypt community cards using Noir circuit
+ * 
+ * This function will fetch the encrypted cards from Torii based on the number of cards to decrypt (1 or 3).
+ * It then decrypts the cards using the appropriate Noir circuit and broadcasts the result.
+ * 
+ * Returns:
+ * {
+ *   "success": true,
+ *   "decryptedCards": [card1, card2, ...], // Original values of the requested cards
+ *   "decryptProof": {...} // Zero-knowledge proof of correct decryption
+ * }
+ */
+async function decryptCommunityCards() { // TODO: This function should be called once the request is received from Torii
+    try {
+        // Load environment variables from .env file
+        dotenv.config();
+
+        // Parse encryption key, IV from environment variables
+        const key = process.env.ENCRYPTION_KEY?.split(',').map(Number);
+        const iv = process.env.ENCRYPTION_IV?.split(',').map(Number);
+        if (!key || !iv) {
+            throw new Error('Missing required parameters in environment variables');
+        }
+
+        // TODO: Get the encrypted cards from Torii
+        let encryptedCards;
+
+        // Get the number of cards to decrypt from Torii
+        const numCards = encryptedCards.length;
+
+        // Validate the number of cards to decrypt
+        if (numCards !== 1 && numCards !== 3) {
+            throw new Error('Invalid number of cards to decrypt');
+        }
+
+        // TODO: Get the encrypted deck from Torii
+        const encryptedDeck = [
+            0x0000000000, 0x1111111111, 0x2222222222, 0x3333333333, 0x4444444444, 0x5555555555, 0x6666666666, 0x7777777777,
+            0x8888888888, 0x9999999999, 0xAAAAAAAAAA, 0xBBBBBBBBBB, 0xCCCCCCCCCC, 0xDDDDDDDDDD, 0xEEEEEEEEEE, 0xFFFFFFFF,
+            0x1111111111, 0x2222222222, 0x3333333333, 0x4444444444, 0x5555555555, 0x6666666666, 0x7777777777, 0x8888888888,
+            0x9999999999, 0xAAAAAAAAAA, 0xBBBBBBBBBB, 0xCCCCCCCCCC, 0xDDDDDDDDDD, 0xEEEEEEEEEE, 0xFFFFFFFF, 0x0000000001,
+            0x1111111112, 0x2222222223, 0x3333333334, 0x4444444445, 0x5555555556, 0x6666666667, 0x7777777778, 0x8888888889,
+            0x999999999A, 0xAAAAAAAAAB, 0xBBBBBBBBBC, 0xCCCCCCCCCD, 0xDDDDDDDDDE, 0xEEEEEEEEEF, 0xFFFFFFFFF0, 0x1111111113,
+            0x2222222224, 0x3333333335, 0x4444444446, 0x5545654836
+        ];
+
+        // Select the appropriate Noir circuit based on the number of cards
+        let decryptionBackend, decryptionNoir;
+        if (numCards === 1) {
+            decryptionBackend = new UltraHonkBackend(decryption1CardCircuit);
+            decryptionNoir = new Noir(decryption1CardCircuit);
+        } else {
+            decryptionBackend = new UltraHonkBackend(decryption3CardsCircuit); 
+            decryptionNoir = new Noir(decryption3CardsCircuit);
+        }
+
+        // Prepare input for the decryption circuit
+        const decryptInput = {
+            key,
+            iv,
+            deck: encryptedDeck,
+            cards: encryptedCards
+        };
+
+        // Execute the circuit to decrypt the requested cards
+        const decryptWitnessResult = await decryptionNoir.execute(decryptInput);
+        // Generate zero-knowledge proof of correct decryption
+        const decryptProof = await decryptionBackend.generateProof(decryptWitnessResult.witness);
+
+        // Broadcast decryption proof to all clients
+        io.emit('decryptionComplete', {
+            success: true,
+            decryptedCards: decryptWitnessResult.returnValue,
+            decryptProof
+        });
+
+        // TODO: Send the decrypted cards on-chain with the GM's wallet
+
+    } catch (err) {
+        console.error('Decryption error:', err);
+        io.emit('decryptionError', { success: false });
+        throw err;
+    }
+}
+
+/**
  * Endpoint to decrypt hand 
  * 
  * Expected request body:
@@ -165,7 +253,7 @@ async function encryptDeck() { // TODO: This function should be called once the 
  * this means the first two cards are Ace of Hearts and 2 of Hearts
  */
 
-app.post('/decrypt', async (req, res) => {
+app.post('/decrypt-hand', async (req, res) => {
     try {
         // Extract parameters from request body
         const { playerOnChainAddress, playerSecret } = req.body;
@@ -213,8 +301,8 @@ app.post('/decrypt', async (req, res) => {
         ];
         
         // Initialize Noir circuit components for decryption
-        const decryptionBackend = new UltraHonkBackend(decryptionCircuit);
-        const decryptionNoir = new Noir(decryptionCircuit);
+        const decryptionBackend = new UltraHonkBackend(decryption2CardsCircuit);
+        const decryptionNoir = new Noir(decryption2CardsCircuit);
         
         // Prepare input for the decryption circuit
         const decryptInput = {
@@ -244,9 +332,3 @@ app.post('/decrypt', async (req, res) => {
         });
     }
 });
-
-// Start the server
-const PORT = process.env.PORT || 3000;
-app.listen(PORT, () => {
-    console.log(`Server running on port ${PORT}`);
-}); 
