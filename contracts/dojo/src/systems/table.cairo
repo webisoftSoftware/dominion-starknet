@@ -75,14 +75,11 @@ mod table_system {
         max_tables: u32,
     }
 
-    // Initialize contract state with game master and counter.
-    fn dojo_init(ref self: ContractState) {
-        let tx_info: TxInfo = get_tx_info().unbox();
-        let sender: ContractAddress = tx_info.account_contract_address;
-
-        self.game_master.write(sender); // Set initial game master and start counter at 1.
-        self.counter.write(1); // Start at 1 because 0 is reserved for the "not in any table" state.    
-        self.max_tables.write(MAX_TABLES);
+    #[constructor]
+    fn constructor(ref self: ContractState, max_tables: u32) {
+        self.game_master.write(get_caller_address());
+        self.counter.write(1);
+        self.max_tables.write(max_tables);
     }
 
     #[abi(embed_v0)]
@@ -104,7 +101,7 @@ mod table_system {
             let table_id: u32 = self.counter.read();
             let mut world = self.world(@"dominion");
             let table: ComponentTable = world.read_model(table_id);
-            assert!(table.m_state == EnumGameState::NotCreated, "Table is already created");
+            assert!(table.m_state == EnumGameState::Shutdown, "Table is already created");
 
             // Initialize new table with provided parameters.
             let mut new_table: ComponentTable = ITable::new(

@@ -54,6 +54,7 @@ trait ITableManagement<TContractState> {
     fn end_hand(ref self: TContractState, table_id: u32);
     fn skip_turn(ref self: TContractState, table_id: u32, player: ContractAddress);
     fn showdown(ref self: TContractState, table_id: u32);
+    fn shutdown_table(ref self: TContractState, table_id: u32);
     // Timeout Functions
     fn kick_player(ref self: TContractState, table_id: u32, player: ContractAddress);
     // Admin Functions
@@ -230,6 +231,18 @@ mod table_management_system {
                     InternalImpl::_distribute_chips(ref world,player, pot_share);
                 }
             }
+        }
+
+        fn shutdown_table(ref self: ContractState, table_id: u32) {
+            assert!(
+                self.game_master.read() == get_caller_address(),
+                "Only the game master can shutdown the table"
+            );
+
+            let mut world = self.world(@"dominion");
+            let mut table: ComponentTable = world.read_model(table_id);
+            table.m_state = EnumGameState::Shutdown;
+            world.write_model(@table);
         }
 
         fn kick_player(ref self: ContractState, table_id: u32, player: ContractAddress) {
