@@ -43,6 +43,7 @@
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 
 use starknet::ContractAddress;
+use core::traits::{BitOr, BitAnd};
 use core::fmt::{Display, Formatter, Error};
 use alexandria_data_structures::array_ext::ArrayTraitExt;
 use dominion::models::utils;
@@ -307,58 +308,19 @@ impl EnumHandRankDisplay of Display<EnumHandRank> {
 impl EnumCardValueDisplay of Display<EnumCardValue> {
     fn fmt(self: @EnumCardValue, ref f: Formatter) -> Result<(), Error> {
         match self {
-            EnumCardValue::Two => {
-                let str: ByteArray = format!("2");
-                f.buffer.append(@str);
-            },
-            EnumCardValue::Three => {
-                let str: ByteArray = format!("3");
-                f.buffer.append(@str);
-            },
-            EnumCardValue::Four => {
-                let str: ByteArray = format!("4");
-                f.buffer.append(@str);
-            },
-            EnumCardValue::Five => {
-                let str: ByteArray = format!("5");
-                f.buffer.append(@str);
-            },
-            EnumCardValue::Six => {
-                let str: ByteArray = format!("6");
-                f.buffer.append(@str);
-            },
-            EnumCardValue::Seven => {
-                let str: ByteArray = format!("7");
-                f.buffer.append(@str);
-            },
-            EnumCardValue::Eight => {
-                let str: ByteArray = format!("8");
-                f.buffer.append(@str);
-            },
-            EnumCardValue::Nine => {
-                let str: ByteArray = format!("9");
-                f.buffer.append(@str);
-            },
-            EnumCardValue::Ten => {
-                let str: ByteArray = format!("10");
-                f.buffer.append(@str);
-            },
-            EnumCardValue::Jack => {
-                let str: ByteArray = format!("J");
-                f.buffer.append(@str);
-            },
-            EnumCardValue::Queen => {
-                let str: ByteArray = format!("Q");
-                f.buffer.append(@str);
-            },
-            EnumCardValue::King => {
-                let str: ByteArray = format!("K");
-                f.buffer.append(@str);
-            },
-            EnumCardValue::Ace => {
-                let str: ByteArray = format!("A");
-                f.buffer.append(@str);
-            },
+            EnumCardValue::Two => f.buffer.append(@"2"),
+            EnumCardValue::Three => f.buffer.append(@"3"),
+            EnumCardValue::Four => f.buffer.append(@"4"),
+            EnumCardValue::Five => f.buffer.append(@"5"),
+            EnumCardValue::Six => f.buffer.append(@"6"),
+            EnumCardValue::Seven => f.buffer.append(@"7"),
+            EnumCardValue::Eight => f.buffer.append(@"8"),
+            EnumCardValue::Nine => f.buffer.append(@"9"),
+            EnumCardValue::Ten => f.buffer.append(@"10"),
+            EnumCardValue::Jack => f.buffer.append(@"J"),
+            EnumCardValue::Queen => f.buffer.append(@"Q"),
+            EnumCardValue::King => f.buffer.append(@"K"),
+            EnumCardValue::Ace => f.buffer.append(@"A"),
         };
         Result::Ok(())
     }
@@ -367,22 +329,10 @@ impl EnumCardValueDisplay of Display<EnumCardValue> {
 impl EnumCardSuitDisplay of Display<EnumCardSuit> {
     fn fmt(self: @EnumCardSuit, ref f: Formatter) -> Result<(), Error> {
         match self {
-            EnumCardSuit::Spades => {
-                let str: ByteArray = format!("S");
-                f.buffer.append(@str);
-            },
-            EnumCardSuit::Hearts => {
-                let str: ByteArray = format!("H");
-                f.buffer.append(@str);
-            },
-            EnumCardSuit::Diamonds => {
-                let str: ByteArray = format!("D");
-                f.buffer.append(@str);
-            },
-            EnumCardSuit::Clubs => {
-                let str: ByteArray = format!("C");
-                f.buffer.append(@str);
-            },
+            EnumCardSuit::Spades => f.buffer.append(@"S"),
+            EnumCardSuit::Hearts => f.buffer.append(@"H"),
+            EnumCardSuit::Diamonds => f.buffer.append(@"D"),
+            EnumCardSuit::Clubs => f.buffer.append(@"C"),
         };
         Result::Ok(())
     }
@@ -390,8 +340,7 @@ impl EnumCardSuitDisplay of Display<EnumCardSuit> {
 
 impl StructCardDisplay of Display<StructCard> {
     fn fmt(self: @StructCard, ref f: Formatter) -> Result<(), Error> {
-        assert!(self.m_string_representation.len() == 2, "Invalid card string representation");
-        let str: ByteArray = format!("{}", self.m_string_representation);
+        let str: ByteArray = format!("{}", self.m_num_representation);
         f.buffer.append(@str);
         Result::Ok(())
     }
@@ -508,7 +457,7 @@ impl ComponentTableEq of PartialEq<ComponentTable> {
 
 impl StructCardEq of PartialEq<StructCard> {
     fn eq(lhs: @StructCard, rhs: @StructCard) -> bool {
-        lhs.m_string_representation == rhs.m_string_representation
+        lhs.m_num_representation == rhs.m_num_representation
     }
 }
 
@@ -539,89 +488,46 @@ impl ComponentHandEq of PartialEq<ComponentHand> {
 
 #[generate_trait]
 impl CardImpl of ICard {
-    fn new(value: EnumCardValue, suit: EnumCardSuit) -> StructCard {
-        let str: ByteArray = format!("{}{}", value, suit);
-        StructCard { m_string_representation: str }
+    fn new(value: @EnumCardValue, suit: @EnumCardSuit) -> StructCard {
+        let value_as_u32: u32 = value.into();
+        let suit_as_u32: u32 = suit.into();
+        // Shift left by 8 bits to make space for the suit.
+        let num_representation: u32 = ((value_as_u32 * 256_u32) + suit_as_u32);
+        StructCard { m_num_representation: num_representation.try_into().unwrap() }
     }
 
     fn get_value(self: @StructCard) -> Option<EnumCardValue> {
-        assert!(self.m_string_representation.len() == 2, "Invalid card string representation");
-
-        if self.m_string_representation[0] == '2' {
-            return Option::Some(EnumCardValue::Two);
+        // Get the 8 most significant bits.
+        match (BitAnd::bitand(*self.m_num_representation, 0xFF00_u16) / 256_u16) {
+            0 => Option::None,
+            1 => Option::Some(EnumCardValue::Ace),
+            2 => Option::Some(EnumCardValue::Two),
+            3 => Option::Some(EnumCardValue::Three),
+            4 => Option::Some(EnumCardValue::Four),
+            5 => Option::Some(EnumCardValue::Five),
+            6 => Option::Some(EnumCardValue::Six),
+            7 => Option::Some(EnumCardValue::Seven),
+            8 => Option::Some(EnumCardValue::Eight),
+            9 => Option::Some(EnumCardValue::Nine),
+            10 => Option::Some(EnumCardValue::Ten),
+            11 => Option::Some(EnumCardValue::Jack),
+            12 => Option::Some(EnumCardValue::Queen),
+            13 => Option::Some(EnumCardValue::King),
+            14 => Option::Some(EnumCardValue::Ace),
+            _ => Option::None,
         }
-
-        if self.m_string_representation[0] == '3' {
-            return Option::Some(EnumCardValue::Three);
-        }
-
-        if self.m_string_representation[0] == '4' {
-            return Option::Some(EnumCardValue::Four);
-        }
-
-        if self.m_string_representation[0] == '5' {
-            return Option::Some(EnumCardValue::Five);
-        }
-
-        if self.m_string_representation[0] == '6' {
-            return Option::Some(EnumCardValue::Six);
-        }
-
-        if self.m_string_representation[0] == '7' {
-            return Option::Some(EnumCardValue::Seven);
-        }
-
-        if self.m_string_representation[0] == '8' {
-            return Option::Some(EnumCardValue::Eight);
-        }
-
-        if self.m_string_representation[0] == '9' {
-            return Option::Some(EnumCardValue::Nine);
-        }
-
-        if self.m_string_representation[0] == '1' {
-            return Option::Some(EnumCardValue::Ten);
-        }
-
-        if self.m_string_representation[0] == 'J' {
-            return Option::Some(EnumCardValue::Jack);
-        }
-
-        if self.m_string_representation[0] == 'Q' {
-            return Option::Some(EnumCardValue::Queen);
-        }
-
-        if self.m_string_representation[0] == 'K' {
-            return Option::Some(EnumCardValue::King);
-        }
-
-        if self.m_string_representation[0] == 'A' {
-            return Option::Some(EnumCardValue::Ace);
-        }
-
-        return Option::None;
     }
 
     fn get_suit(self: @StructCard) -> Option<EnumCardSuit> {
-        assert!(self.m_string_representation.len() == 2, "Invalid card string representation");
-
-        if self.m_string_representation[1] == 'S' {
-            return Option::Some(EnumCardSuit::Spades);
+        // Get the 8 least significant bits.
+        match BitAnd::bitand(*self.m_num_representation, 0x00FF_u16) {
+            0 => Option::None,
+            1 => Option::Some(EnumCardSuit::Spades),
+            2 => Option::Some(EnumCardSuit::Hearts),
+            3 => Option::Some(EnumCardSuit::Diamonds),
+            4 => Option::Some(EnumCardSuit::Clubs),
+            _ => Option::None,
         }
-
-        if self.m_string_representation[1] == 'H' {
-            return Option::Some(EnumCardSuit::Hearts);
-        }
-
-        if self.m_string_representation[1] == 'D' {
-            return Option::Some(EnumCardSuit::Diamonds);
-        }
-
-        if self.m_string_representation[1] == 'C' {
-            return Option::Some(EnumCardSuit::Clubs);
-        }
-
-        return Option::None;
     }
 }
 
@@ -1268,7 +1174,7 @@ impl TableImpl of ITable {
         let mut value_index: u32 = 0;
 
         for _ in 0..52_u32 {
-            self.m_deck.append(ICard::new(*values[value_index], *suits[suit_index]));
+            self.m_deck.append(ICard::new(values[value_index], suits[suit_index]));
 
             // Check if we've created every value for the current suit.
             value_index += 1;
