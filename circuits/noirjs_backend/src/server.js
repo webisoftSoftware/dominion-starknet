@@ -132,11 +132,6 @@ async function encryptDeck() { // TODO: This function should be called once the 
             encryptionProof
         });
 
-        return {
-            success: true,
-            shuffleProof,
-            encryptionProof
-        };
         // TODO: Send the encrypted deck on-chain with the GM's wallet
 
     } catch (err) {
