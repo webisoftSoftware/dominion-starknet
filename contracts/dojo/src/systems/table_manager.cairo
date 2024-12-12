@@ -47,7 +47,7 @@ use core::traits::Into;
 use core::dict::Felt252Dict;
 
 #[starknet::interface]
-trait IGameMaster<TContractState> {
+trait ITableManagement<TContractState> {
     // Game Master Functions
     fn start_hand(ref self: TContractState, table_id: u32);
     fn advance_round(ref self: TContractState, table_id: u32);
@@ -57,12 +57,12 @@ trait IGameMaster<TContractState> {
     // Timeout Functions
     fn kick_player(ref self: TContractState, table_id: u32, player: ContractAddress);
     // Admin Functions
-    fn change_game_master(ref self: TContractState, new_game_master: ContractAddress);
-    fn get_game_master(self: @TContractState) -> ContractAddress;
+    fn change_game_manager(ref self: TContractState, new_game_master: ContractAddress);
+    fn get_game_manager(self: @TContractState) -> ContractAddress;
 }
 
 #[dojo::contract]
-mod game_master_system {
+mod table_management_system {
     use starknet::{ContractAddress, get_caller_address, TxInfo, get_tx_info};
     use dojo::{model::ModelStorage, world::IWorldDispatcher};
     use dominion::models::components::{ComponentTable, ComponentPlayer, ComponentHand};
@@ -90,7 +90,7 @@ mod game_master_system {
     }
 
     #[abi(embed_v0)]
-    impl GameMasterImpl of super::IGameMaster<ContractState> {
+    impl TableManagementImpl of super::ITableManagement<ContractState> {
         fn start_hand(ref self: ContractState, table_id: u32) {
             assert!(
                 self.game_master.read() == get_caller_address(),
@@ -133,7 +133,7 @@ mod game_master_system {
             world.write_model(@table);
         }
 
-        fn end_hand(ref self: ContractState, table_id: u32) { // Implement end round logic
+        fn end_hand(ref self: ContractState, table_id: u32) {
             assert!(
                 self.game_master.read() == get_caller_address(),
                 "Only the game master can end the round"
@@ -150,7 +150,7 @@ mod game_master_system {
             world.write_model(@table);
         }
 
-        fn skip_turn(ref self: ContractState, table_id: u32, player: ContractAddress) { // Implement skip turn logic
+        fn skip_turn(ref self: ContractState, table_id: u32, player: ContractAddress) {
             assert!(
                 self.game_master.read() == get_caller_address(),
                 "Only the game master can skip the turn"
@@ -165,7 +165,7 @@ mod game_master_system {
 
             // Skip turn.
             player_component.m_state = EnumPlayerState::Folded;
-            table.m_current_turn += 1;
+            table.advance_turn();
             world.write_model(@table);
             world.write_model(@player_component);
         }
@@ -246,7 +246,7 @@ mod game_master_system {
             world.write_model(@table);
         }
 
-        fn change_game_master(ref self: ContractState, new_game_master: ContractAddress) {
+        fn change_game_manager(ref self: ContractState, new_game_master: ContractAddress) {
             assert!(
                 self.game_master.read() == get_caller_address(),
                 "Only the game master can change the game master"
@@ -254,7 +254,7 @@ mod game_master_system {
             self.game_master.write(new_game_master);
         }
 
-        fn get_game_master(self: @ContractState) -> ContractAddress {
+        fn get_game_manager(self: @ContractState) -> ContractAddress {
             self.game_master.read()
         }
     }
@@ -262,7 +262,9 @@ mod game_master_system {
     #[generate_trait]
     impl InternalImpl of InternalTrait {
         fn _distribute_chips(ref world: dojo::world::WorldStorage, player: ContractAddress, amount: u32) {
-            // TODO: Implement chip distribution logic.
+            let mut player_component: ComponentPlayer = world.read_model(player);
+            player_component.m_table_chips += amount;
+            world.write_model(@player_component);
         }
 
         fn _remove_sitting_out_players(ref world: dojo::world::WorldStorage, ref contract: ContractState, table_id: u32) {
@@ -288,25 +290,25 @@ mod game_master_system {
                     && player.m_state != EnumPlayerState::Waiting {
                     match player.m_position {
                         EnumPosition::Dealer => {
-                            player.set_position(EnumPosition::SmallBlind);
+                            player.m_position = EnumPosition::SmallBlind;
 
                             // Set the new dealer and turn.
                             table.m_current_dealer = i.try_into().expect('Index out of bounds');
                             table.m_current_turn = i.try_into().expect('Index out of bounds');
                         },
                         EnumPosition::SmallBlind => {
-                            player.set_position(EnumPosition::BigBlind);
+                            player.m_position = EnumPosition::BigBlind;
                         },
                         _ => {
                             if i + 1 < table.m_players.len() {
                                 let mut next_player: ComponentPlayer = world
                                     .read_model(*table.m_players[i + 1]);
-                                player.set_position(next_player.m_position);
+                                player.m_position = next_player.m_position;
                             } else {
                                 // Wrap around to the first player.
                                 let mut next_player: ComponentPlayer = world
                                     .read_model(*table.m_players[0]);
-                                player.set_position(next_player.m_position);
+                                player.m_position = next_player.m_position;
                             }
                         }
                     };

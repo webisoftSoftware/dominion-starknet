@@ -52,7 +52,7 @@ mod models {
 
 mod systems {
     mod actions;
-    mod game_master;
+    mod table_manager;
     mod table;
     mod bank;
 }
@@ -66,7 +66,7 @@ mod tests {
     }
     mod integration {
         mod test_actions;
-        mod test_game_master;
+        mod test_table_manager;
         mod test_table;
         mod test_bank;
     }

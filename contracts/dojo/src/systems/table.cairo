@@ -60,18 +60,19 @@ mod table_system {
     use dominion::models::components::{ComponentTable, ComponentPlayer};
     use dominion::models::enums::{EnumGameState, EnumPlayerState, EnumPosition};
     use dominion::models::traits::{ITable, IPlayer};
-    use dominion::systems::game_master::{IGameMasterDispatcher, IGameMasterDispatcherTrait};
+    use dominion::systems::table_manager::{ITableManagementDispatcher, ITableManagementDispatcherTrait};
     use starknet::{ContractAddress, get_caller_address, TxInfo, get_tx_info};
     use dojo::{model::ModelStorage, world::IWorldDispatcher};
 
     // Constant for table player limits.
     const MAX_PLAYERS: u32 = 6;
-
+    const MAX_TABLES: u32 = 10;
     // Contract specific storage.
     #[storage]
     struct Storage {
         game_master: ContractAddress, // Address of the game master who can create tables.
         counter: u32, // Counter for generating unique table IDs.
+        max_tables: u32,
     }
 
     // Initialize contract state with game master and counter.
@@ -80,9 +81,8 @@ mod table_system {
         let sender: ContractAddress = tx_info.account_contract_address;
 
         self.game_master.write(sender); // Set initial game master and start counter at 1.
-        self
-            .counter
-            .write(1); // Start at 1 because 0 is reserved for the "not in any table" state.    
+        self.counter.write(1); // Start at 1 because 0 is reserved for the "not in any table" state.    
+        self.max_tables.write(MAX_TABLES);
     }
 
     #[abi(embed_v0)]
@@ -95,6 +95,7 @@ mod table_system {
             min_buy_in: u32,
             max_buy_in: u32
         ) {
+            assert!(self.counter.read() < self.max_tables.read(), "Max tables reached");
             assert!(max_buy_in > 0, "Maximum buy-in cannot be less than 0");
             assert!(
                 min_buy_in < max_buy_in, "Minimum buy-in cannot be greater than maximum buy-in"
