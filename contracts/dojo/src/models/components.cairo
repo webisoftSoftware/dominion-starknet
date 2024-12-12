@@ -116,7 +116,7 @@ struct ComponentTable {
     m_min_buy_in: u32,
     /// Maximum buy-in amount.
     m_max_buy_in: u32,
-    /// Indicates the game's round state (NotCreated, WaitingForPlayers, PreFlop, Flop, Turn, River,
+    /// Indicates the game's round state (Shutdown, WaitingForPlayers, PreFlop, Flop, Turn, River,
     /// Showdown).
     m_state: EnumGameState,
     /// Timestamp of the last played action.

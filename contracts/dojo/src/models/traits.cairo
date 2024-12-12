@@ -152,8 +152,8 @@ impl ComponentTableDisplay of Display<ComponentTable> {
 impl EnumGameStateDisplay of Display<EnumGameState> {
     fn fmt(self: @EnumGameState, ref f: Formatter) -> Result<(), Error> {
         match self {
-            EnumGameState::NotCreated => {
-                let str: ByteArray = format!("NotCreated");
+            EnumGameState::Shutdown => {
+                let str: ByteArray = format!("Shutdown");
                 f.buffer.append(@str);
             },
             EnumGameState::HandStart => {

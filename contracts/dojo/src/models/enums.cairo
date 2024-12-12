@@ -46,7 +46,7 @@ use crate::models::structs::StructCard;
 
 #[derive(Drop, Serde, Copy, Debug, PartialEq, Introspect)]
 pub enum EnumGameState {
-    NotCreated,
+    Shutdown,
     WaitingForPlayers,
     HandStart,
     RoundStart,
