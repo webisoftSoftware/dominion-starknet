@@ -8,10 +8,9 @@ import encryptionCircuit from '../../encryption/target/encryption.json' assert {
 import decryptionCircuit from '../../decryption/target/decryption.json' assert { type: "json" };
 import shuffleCircuit from '../../shuffle/target/shuffle.json' assert { type: "json" };
 
-import { randomInt } from 'crypto';
+import { randomInt, createHash } from 'crypto';
 import dotenv from 'dotenv';
 import fs from 'fs';
-import path from 'path';
 
 // Create Express server
 const app = express();
@@ -165,6 +164,7 @@ async function encryptDeck() { // TODO: This function should be called once the 
  * If hand=["0x45454546235656565", "0x32232323232323232"] and the decrypted values are [0x01, 0x02],
  * this means the first two cards are Ace of Hearts and 2 of Hearts
  */
+
 app.post('/decrypt', async (req, res) => {
     try {
         // Extract parameters from request body
@@ -174,18 +174,43 @@ app.post('/decrypt', async (req, res) => {
         if (!playerOnChainAddress || !playerSecret) {
             throw new Error('Missing required parameters');
         }
+
+        // Load environment variables from .env file
+        dotenv.config();
+
+        // Parse encryption key, IV from environment variables
+        const key = process.env.ENCRYPTION_KEY?.split(',').map(Number);
+        const iv = process.env.ENCRYPTION_IV?.split(',').map(Number);
         if (!key || !iv) {
             throw new Error('Missing required parameters in environment variables');
         }
-        // TODO: Reconstruct the hash from on-chain address & secret
 
-        // TODO: Verify the hash with the player's hash sent from Torii for this player address
+        // Recreate the hash from on-chain address & secret
+        const reconstructedHash = createHash('sha256')
+            .update(playerOnChainAddress + playerSecret)
+            .digest('hex');
+
+        // TODO: Get the player's hash from Torii for this player address
+        const onChainHash = "a9f6054c7d2b69af6b8175ce762f4529e5d2e663596bf24c5df744989dd813d3";
+
+        // Verify the hash with the player's hash sent from Torii for this player address
+        if (reconstructedHash !== onChainHash) {
+            throw new Error('Invalid player address or secret');
+        }
 
         // TODO: Get the player's encrypted hand from Torii for this player address
-        // hand =
+        const hand = [0x0000000000, 0x1111111111]
 
         // TODO: Get the encrypted deck from Torii
-        // encryptedDeck =
+        const encryptedDeck = [
+            0x0000000000, 0x1111111111, 0x2222222222, 0x3333333333, 0x4444444444, 0x5555555555, 0x6666666666, 0x7777777777,
+            0x8888888888, 0x9999999999, 0xAAAAAAAAAA, 0xBBBBBBBBBB, 0xCCCCCCCCCC, 0xDDDDDDDDDD, 0xEEEEEEEEEE, 0xFFFFFFFF,
+            0x1111111111, 0x2222222222, 0x3333333333, 0x4444444444, 0x5555555555, 0x6666666666, 0x7777777777, 0x8888888888,
+            0x9999999999, 0xAAAAAAAAAA, 0xBBBBBBBBBB, 0xCCCCCCCCCC, 0xDDDDDDDDDD, 0xEEEEEEEEEE, 0xFFFFFFFF, 0x0000000001,
+            0x1111111112, 0x2222222223, 0x3333333334, 0x4444444445, 0x5555555556, 0x6666666667, 0x7777777778, 0x8888888889,
+            0x999999999A, 0xAAAAAAAAAB, 0xBBBBBBBBBC, 0xCCCCCCCCCD, 0xDDDDDDDDDE, 0xEEEEEEEEEF, 0xFFFFFFFFF0, 0x1111111113,
+            0x2222222224, 0x3333333335, 0x4444444446, 0x5545654836
+        ];
         
         // Initialize Noir circuit components for decryption
         const decryptionBackend = new UltraHonkBackend(decryptionCircuit);
