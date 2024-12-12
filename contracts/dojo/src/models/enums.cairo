@@ -61,6 +61,7 @@ pub enum EnumGameState {
 
 #[derive(Drop, Serde, Copy, Debug, PartialEq, Introspect)]
 pub enum EnumPlayerState {
+    NotCreated,
     Waiting,
     Ready,
     Active,

@@ -204,30 +204,13 @@ impl EnumGameStateDisplay of Display<EnumGameState> {
 impl EnumPlayerStateDisplay of Display<EnumPlayerState> {
     fn fmt(self: @EnumPlayerState, ref f: Formatter) -> Result<(), Error> {
         match self {
-            EnumPlayerState::Waiting => {
-                let str: ByteArray = format!("Waiting");
-                f.buffer.append(@str);
-            },
-            EnumPlayerState::Ready => {
-                let str: ByteArray = format!("Ready");
-                f.buffer.append(@str);
-            },
-            EnumPlayerState::Active => {
-                let str: ByteArray = format!("Active");
-                f.buffer.append(@str);
-            },
-            EnumPlayerState::Folded => {
-                let str: ByteArray = format!("Folded");
-                f.buffer.append(@str);
-            },
-            EnumPlayerState::AllIn => {
-                let str: ByteArray = format!("AllIn");
-                f.buffer.append(@str);
-            },
-            EnumPlayerState::Left => {
-                let str: ByteArray = format!("Left");
-                f.buffer.append(@str);
-            },
+            EnumPlayerState::NotCreated => f.buffer.append(@"NotCreated"),
+            EnumPlayerState::Waiting => f.buffer.append(@"Waiting"),
+            EnumPlayerState::Ready => f.buffer.append(@"Ready"),
+            EnumPlayerState::Active => f.buffer.append(@"Active"),
+            EnumPlayerState::Folded => f.buffer.append(@"Folded"),
+            EnumPlayerState::AllIn => f.buffer.append(@"AllIn"),
+            EnumPlayerState::Left => f.buffer.append(@"Left"),
         };
         Result::Ok(())
     }
@@ -236,22 +219,10 @@ impl EnumPlayerStateDisplay of Display<EnumPlayerState> {
 impl EnumPositionDisplay of Display<EnumPosition> {
     fn fmt(self: @EnumPosition, ref f: Formatter) -> Result<(), Error> {
         match self {
-            EnumPosition::SmallBlind => {
-                let str: ByteArray = format!("SmallBlind");
-                f.buffer.append(@str);
-            },
-            EnumPosition::BigBlind => {
-                let str: ByteArray = format!("BigBlind");
-                f.buffer.append(@str);
-            },
-            EnumPosition::Dealer => {
-                let str: ByteArray = format!("Dealer");
-                f.buffer.append(@str);
-            },
-            EnumPosition::None => {
-                let str: ByteArray = format!("None");
-                f.buffer.append(@str);
-            },
+            EnumPosition::SmallBlind => f.buffer.append(@"SmallBlind"),
+            EnumPosition::BigBlind => f.buffer.append(@"BigBlind"),
+            EnumPosition::Dealer => f.buffer.append(@"Dealer"),
+            EnumPosition::None => f.buffer.append(@"None"),
         };
         Result::Ok(())
     }
@@ -260,46 +231,16 @@ impl EnumPositionDisplay of Display<EnumPosition> {
 impl EnumHandRankDisplay of Display<EnumHandRank> {
     fn fmt(self: @EnumHandRank, ref f: Formatter) -> Result<(), Error> {
         match self {
-            EnumHandRank::HighCard => {
-                let str: ByteArray = format!("HighCard");
-                f.buffer.append(@str);
-            },
-            EnumHandRank::Pair => {
-                let str: ByteArray = format!("Pair");
-                f.buffer.append(@str);
-            },
-            EnumHandRank::TwoPair => {
-                let str: ByteArray = format!("TwoPair");
-                f.buffer.append(@str);
-            },
-            EnumHandRank::ThreeOfAKind => {
-                let str: ByteArray = format!("ThreeOfAKind");
-                f.buffer.append(@str);
-            },
-            EnumHandRank::Straight => {
-                let str: ByteArray = format!("Straight");
-                f.buffer.append(@str);
-            },
-            EnumHandRank::Flush => {
-                let str: ByteArray = format!("Flush");
-                f.buffer.append(@str);
-            },
-            EnumHandRank::FullHouse => {
-                let str: ByteArray = format!("FullHouse");
-                f.buffer.append(@str);
-            },
-            EnumHandRank::FourOfAKind => {
-                let str: ByteArray = format!("FourOfAKind");
-                f.buffer.append(@str);
-            },
-            EnumHandRank::StraightFlush => {
-                let str: ByteArray = format!("StraightFlush");
-                f.buffer.append(@str);
-            },
-            EnumHandRank::RoyalFlush => {
-                let str: ByteArray = format!("RoyalFlush");
-                f.buffer.append(@str);
-            },
+            EnumHandRank::HighCard => f.buffer.append(@"HighCard"),
+            EnumHandRank::Pair => f.buffer.append(@"Pair"),
+            EnumHandRank::TwoPair => f.buffer.append(@"TwoPair"),
+            EnumHandRank::ThreeOfAKind => f.buffer.append(@"ThreeOfAKind"),
+            EnumHandRank::Straight => f.buffer.append(@"Straight"),
+            EnumHandRank::Flush => f.buffer.append(@"Flush"),
+            EnumHandRank::FullHouse => f.buffer.append(@"FullHouse"),
+            EnumHandRank::FourOfAKind => f.buffer.append(@"FourOfAKind"),
+            EnumHandRank::StraightFlush => f.buffer.append(@"StraightFlush"),
+            EnumHandRank::RoyalFlush => f.buffer.append(@"RoyalFlush"),
         };
         Result::Ok(())
     }
@@ -340,7 +281,9 @@ impl EnumCardSuitDisplay of Display<EnumCardSuit> {
 
 impl StructCardDisplay of Display<StructCard> {
     fn fmt(self: @StructCard, ref f: Formatter) -> Result<(), Error> {
-        let str: ByteArray = format!("{}", self.m_num_representation);
+        let value: EnumCardValue = self.get_value().unwrap();
+        let suit: EnumCardSuit = self.get_suit().unwrap();
+        let str: ByteArray = format!("{}{}", value, suit);
         f.buffer.append(@str);
         Result::Ok(())
     }
@@ -1024,25 +967,44 @@ impl PlayerImpl of IPlayer {
         }
     }
 
-    fn set_position(ref self: ComponentPlayer, position: EnumPosition) {
-        self.m_position = position;
+    fn set_ready(ref self: ComponentPlayer) {
+        assert!(self.m_state != EnumPlayerState::NotCreated, "Player is not created");
+        assert!(self.m_state == EnumPlayerState::Waiting, "Player is not waiting");
+
+        self.m_state = EnumPlayerState::Ready;
     }
 
-    fn place_bet(ref self: ComponentPlayer, amount: u32) {
-        assert(self.m_table_chips >= amount, 'Insufficient chips');
-        self.m_table_chips -= amount;
-        self.m_current_bet += amount;
+    fn place_bet(ref self: ComponentPlayer, added_amount: u32) -> u32 {
+        assert!(self.m_state != EnumPlayerState::NotCreated, "Player is not created");
+        assert!(self.m_table_chips >= added_amount, "Insufficient chips");
+
+        if self.m_table_chips == added_amount {
+            self.m_state = EnumPlayerState::AllIn;
+        }
+
+        self.m_table_chips -= added_amount;
+        self.m_current_bet += added_amount;
+        return added_amount;
     }
 
-    fn fold(ref self: ComponentPlayer) {
+    fn fold(ref self: ComponentPlayer) -> u32 {
+        assert!(self.m_state != EnumPlayerState::NotCreated, "Player is not created");
+        assert!(self.m_state == EnumPlayerState::Active, "Player is not active");
+
         self.m_state = EnumPlayerState::Folded;
+        return self.m_current_bet;
     }
 
-    fn all_in(ref self: ComponentPlayer) {
-        self.m_current_bet += self.m_table_chips;
-        self.m_table_chips = 0;
-        self.m_state = EnumPlayerState::AllIn;
-    }
+    // fn all_in(ref self: ComponentPlayer) -> u32 {
+    //     assert!(self.m_state != EnumPlayerState::NotCreated, "Player is not created");
+    //     assert!(self.m_state == EnumPlayerState::Active, "Player is not active");
+
+    //     let added_amount: u32 = self.m_table_chips;
+    //     self.m_current_bet += added_amount;
+    //     self.m_table_chips = 0;
+    //     self.m_state = EnumPlayerState::AllIn;
+    //     return added_amount;
+    // }
 
     fn _is_created(self: @ComponentPlayer) -> bool {
         return *self.m_is_created;
@@ -1079,6 +1041,11 @@ impl TableImpl of ITable {
         };
         table._initialize_deck();
         return table;
+    }
+
+    fn advance_turn(ref self: ComponentTable) {
+        self.m_current_turn += 1;
+        self.m_current_turn = self.m_current_turn % self.m_players.len().try_into().expect('Cannot downcast turn');
     }
 
     fn find_card(self: @ComponentTable, card: @StructCard) -> Option<u32> {
