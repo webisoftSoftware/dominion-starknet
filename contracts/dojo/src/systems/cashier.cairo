@@ -45,7 +45,7 @@
 use starknet::ContractAddress;
 
 #[starknet::interface]
-trait IBank<TContractState> {
+trait ICashier<TContractState> {
     fn deposit_erc20(ref self: TContractState, amount: u256);
     fn cashout_erc20(ref self: TContractState, chips_amount: u32);
     fn transfer_chips(ref self: TContractState, to: ContractAddress, amount: u32);
@@ -60,7 +60,7 @@ trait IERC20<TContractState> {
 }
 
 #[dojo::contract]
-mod bank_system {
+mod cashier_system {
     use starknet::{ContractAddress, get_caller_address, get_contract_address};
     use dominion::models::traits::IPlayer;
     use dojo::{model::ModelStorage, world::IWorldDispatcher};
@@ -82,7 +82,7 @@ mod bank_system {
         0x049d36570d4e46f48e99674bd3fcc84644ddd6b96f7c741b1562b82f9e004dc7; // TODO: Set this
 
     #[abi(embed_v0)]
-    impl BankImpl of super::IBank<ContractState> {
+    impl BankImpl of super::ICashier<ContractState> {
         fn deposit_erc20(ref self: ContractState, amount: u256) {
             let mut world = self.world(@"dominion");
             let caller = get_caller_address();

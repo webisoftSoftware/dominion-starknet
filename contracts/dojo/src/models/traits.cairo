@@ -46,6 +46,7 @@ use starknet::ContractAddress;
 use core::traits::{BitOr, BitAnd};
 use core::fmt::{Display, Formatter, Error};
 use alexandria_data_structures::array_ext::ArrayTraitExt;
+use origami_random::deck::{Deck, DeckTrait};
 use dominion::models::utils;
 use dominion::models::structs::StructCard;
 use dominion::models::enums::{
@@ -295,7 +296,27 @@ impl StructCardDisplay of Display<StructCard> {
 /////////////////////////////////////////////////////////////////////////
 /////////////////////////////////////////////////////////////////////////
 
-impl EnumCardValueInto of Into<@EnumCardValue, u32> {
+impl EnumCardValueInto of Into<EnumCardValue, u32> {
+    fn into(self: EnumCardValue) -> u32 {
+        match self {
+            EnumCardValue::Two => 2,
+            EnumCardValue::Three => 3,
+            EnumCardValue::Four => 4,
+            EnumCardValue::Five => 5,
+            EnumCardValue::Six => 6,
+            EnumCardValue::Seven => 7,
+            EnumCardValue::Eight => 8,
+            EnumCardValue::Nine => 9,
+            EnumCardValue::Ten => 10,
+            EnumCardValue::Jack => 11,
+            EnumCardValue::Queen => 12,
+            EnumCardValue::King => 13,
+            EnumCardValue::Ace => 14,
+        }
+    }
+}
+
+impl EnumCardValueSnapshotInto of Into<@EnumCardValue, u32> {
     fn into(self: @EnumCardValue) -> u32 {
         match self {
             EnumCardValue::Two => 2,
@@ -315,7 +336,18 @@ impl EnumCardValueInto of Into<@EnumCardValue, u32> {
     }
 }
 
-impl EnumCardSuitInto of Into<@EnumCardSuit, u32> {
+impl EnumCardSuitInto of Into<EnumCardSuit, u32> {
+    fn into(self: EnumCardSuit) -> u32 {
+        match self {
+            EnumCardSuit::Spades => 1,
+            EnumCardSuit::Hearts => 2,
+            EnumCardSuit::Diamonds => 3,
+            EnumCardSuit::Clubs => 4,
+        }
+    }
+}
+
+impl EnumCardSuitSnapshotInto of Into<@EnumCardSuit, u32> {
     fn into(self: @EnumCardSuit) -> u32 {
         match self {
             EnumCardSuit::Spades => 1,
@@ -431,17 +463,17 @@ impl ComponentHandEq of PartialEq<ComponentHand> {
 
 #[generate_trait]
 impl CardImpl of ICard {
-    fn new(value: @EnumCardValue, suit: @EnumCardSuit) -> StructCard {
+    fn new(value: EnumCardValue, suit: EnumCardSuit) -> StructCard {
         let value_as_u32: u32 = value.into();
         let suit_as_u32: u32 = suit.into();
         // Shift left by 8 bits to make space for the suit.
         let num_representation: u32 = ((value_as_u32 * 256_u32) + suit_as_u32);
-        StructCard { m_num_representation: num_representation.try_into().unwrap() }
+        StructCard { m_num_representation: num_representation.into() }
     }
 
     fn get_value(self: @StructCard) -> Option<EnumCardValue> {
         // Get the 8 most significant bits.
-        match (BitAnd::bitand(*self.m_num_representation, 0xFF00_u16) / 256_u16) {
+        match (BitAnd::bitand(*self.m_num_representation, *self.m_num_representation.high) / *self.m_num_representation.low) {
             0 => Option::None,
             1 => Option::Some(EnumCardValue::Ace),
             2 => Option::Some(EnumCardValue::Two),
@@ -463,7 +495,7 @@ impl CardImpl of ICard {
 
     fn get_suit(self: @StructCard) -> Option<EnumCardSuit> {
         // Get the 8 least significant bits.
-        match BitAnd::bitand(*self.m_num_representation, 0x00FF_u16) {
+        match BitAnd::bitand(*self.m_num_representation, 0x0000_0000_0000_00FF_u256) {
             0 => Option::None,
             1 => Option::Some(EnumCardSuit::Spades),
             2 => Option::Some(EnumCardSuit::Hearts),
@@ -476,8 +508,8 @@ impl CardImpl of ICard {
 
 #[generate_trait]
 impl HandImpl of IHand {
-    fn new(address: ContractAddress) -> ComponentHand {
-        ComponentHand { m_owner: address, m_cards: array![] }
+    fn new(address: ContractAddress, commitment_hash: ByteArray) -> ComponentHand {
+        ComponentHand { m_owner: address, m_cards: array![], m_commitment_hash: commitment_hash }
     }
 
     fn add_card(ref self: ComponentHand, card: StructCard) {
@@ -1043,6 +1075,21 @@ impl TableImpl of ITable {
         return table;
     }
 
+    fn shuffle_deck(ref self: ComponentTable, seed: felt252) {
+        let mut shuffled_deck: Array<StructCard> = array![];
+        let mut deck = DeckTrait::new(seed, self.m_deck.len());
+
+        while deck.remaining > 0 {
+            // Draw a random number from 0 to 52. 
+            let card_index: u8 = deck.draw();
+
+            if let Option::Some(_) = self.m_deck.get(card_index.into()) {
+                shuffled_deck.append(self.m_deck[card_index.into()].clone());
+            }
+        };
+        self.m_deck = shuffled_deck;
+    }
+
     fn advance_turn(ref self: ComponentTable) {
         self.m_current_turn += 1;
         self.m_current_turn = self.m_current_turn % self.m_players.len().try_into().expect('Cannot downcast turn');
@@ -1075,7 +1122,7 @@ impl TableImpl of ITable {
     fn remove_player(ref self: ComponentTable, player: @ContractAddress) {
         let player_position: Option<usize> = self.find_player(player);
         assert!(player_position.is_some(), "Cannot find player");
-
+        
         let removed_player_position: usize = player_position.unwrap();
         let mut new_players: Array<ContractAddress> = array![];
         // Set the player to 0 to indicate empty seat.
@@ -1141,7 +1188,7 @@ impl TableImpl of ITable {
         let mut value_index: u32 = 0;
 
         for _ in 0..52_u32 {
-            self.m_deck.append(ICard::new(values[value_index], suits[suit_index]));
+            self.m_deck.append(ICard::new(*values[value_index], *suits[suit_index]));
 
             // Check if we've created every value for the current suit.
             value_index += 1;
@@ -1162,7 +1209,9 @@ impl TableImpl of ITable {
 impl HandDefaultImpl of Default<ComponentHand> {
     fn default() -> ComponentHand {
         return ComponentHand {
-            m_owner: starknet::contract_address_const::<0x0>(), m_cards: array![],
+            m_owner: starknet::contract_address_const::<0x0>(),
+            m_cards: array![],
+            m_commitment_hash: "",
         };
     }
 }

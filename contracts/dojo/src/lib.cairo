@@ -54,12 +54,13 @@ mod systems {
     mod actions;
     mod table_manager;
     mod table;
-    mod bank;
+    mod cashier;
 }
 
 #[cfg(test)]
 mod tests {
     mod unit {
+        mod test_card;
         mod test_utils;
         mod test_hand;
         mod test_traits;

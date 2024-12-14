@@ -45,16 +45,20 @@
 use starknet::ContractAddress;
 use core::traits::Into;
 use core::dict::Felt252Dict;
+use dominion::models::structs::StructCard;
 
 #[starknet::interface]
 trait ITableManagement<TContractState> {
     // Game Master Functions
-    fn start_hand(ref self: TContractState, table_id: u32);
-    fn advance_round(ref self: TContractState, table_id: u32);
-    fn end_hand(ref self: TContractState, table_id: u32);
+    fn start_round(ref self: TContractState, table_id: u32);
+    fn end_round(ref self: TContractState, table_id: u32);
     fn skip_turn(ref self: TContractState, table_id: u32, player: ContractAddress);
+    fn advance_street(ref self: TContractState, table_id: u32);
+    fn post_showdown(ref self: TContractState, table_id: u32, deck: Array<StructCard>);
+    fn deal_cards(ref self: TContractState, table_id: u32);
+    fn post_encrypt_deck(ref self: TContractState, table_id: u32, encrypted_deck: Array<u256>);
+    fn post_decrypted_community_cards(ref self: TContractState, table_id: u32, cards: Array<StructCard>);
     fn showdown(ref self: TContractState, table_id: u32);
-    fn shutdown_table(ref self: TContractState, table_id: u32);
     // Timeout Functions
     fn kick_player(ref self: TContractState, table_id: u32, player: ContractAddress);
     // Admin Functions
@@ -70,6 +74,8 @@ mod table_management_system {
     use dominion::models::enums::{EnumGameState, EnumPlayerState, EnumPosition, EnumHandRank};
     use dominion::models::traits::{ITable, IPlayer, IHand, EnumHandRankPartialOrd};
     use dominion::models::utils;
+    use dominion::models::structs::StructCard;
+    use dojo::event::{EventStorage};
 
     use alexandria_data_structures::array_ext::ArrayTraitExt;
 
@@ -78,6 +84,73 @@ mod table_management_system {
     #[storage]
     struct Storage {
         game_master: ContractAddress,
+    }
+
+    #[derive(Copy, Clone, Serde, Drop)]
+    #[dojo::event]
+    struct EventRoundStarted {
+        #[key]
+        m_table_id: u32,
+        m_timestamp: u64,
+    }
+
+    #[derive(Copy, Clone, Serde, Drop)]
+    #[dojo::event]
+    struct EventStreetAdvanced {
+        #[key]
+        m_table_id: u32,
+        m_timestamp: u64,
+    }
+
+    #[derive(Clone, Serde, Drop)]
+    #[dojo::event]
+    struct EventEncryptDeckRequested {
+        #[key]
+        m_table_id: u32,
+        m_deck: Array<StructCard>,
+        m_timestamp: u64
+    }
+
+    #[derive(Clone, Serde, Drop)]
+    #[dojo::event]
+    struct EventDecryptHandRequested {
+        #[key]
+        m_table_id: u32,
+        m_hand: Array<StructCard>,
+        m_timestamp: u64
+    }
+
+    #[derive(Clone, Serde, Drop)]
+    #[dojo::event]
+    struct EventDecryptCCRequested {
+        #[key]
+        m_table_id: u32,
+        m_cards: Array<StructCard>,
+        m_timestamp: u64
+    }
+
+    #[derive(Copy, Clone, Serde, Drop)]
+    #[dojo::event]
+    struct EventShowdownRequested {
+        #[key]
+        m_table_id: u32,
+        m_timestamp: u64
+    }
+
+    #[derive(Copy, Clone, Serde, Drop)]
+    #[dojo::event]
+    struct EventRoundEnded {
+        #[key]
+        m_table_id: u32,
+        m_timestamp: u64
+    }
+
+    #[derive(Copy, Clone, Serde, Drop)]
+    #[dojo::event]
+    struct EventTableShutdown {
+        #[key]
+        m_table_id: u32,
+        m_timestamp: u64
     }
 
     fn dojo_init(ref self: ContractState) {
@@ -92,12 +165,8 @@ mod table_management_system {
 
     #[abi(embed_v0)]
     impl TableManagementImpl of super::ITableManagement<ContractState> {
-        fn start_hand(ref self: ContractState, table_id: u32) {
-            assert!(
-                self.game_master.read() == get_caller_address(),
-                "Only the game master can start the round"
-            );
-
+        fn start_round(ref self: ContractState, table_id: u32) {
+            // TODO: Make this transaction automatic after all players are ready.
             let mut world = self.world(@"dominion");
             let mut table: ComponentTable = world.read_model(table_id);
 
@@ -107,40 +176,93 @@ mod table_management_system {
             );
             assert!(table.m_players.len() >= MIN_PLAYERS, "Not enough players to start the round");
 
-            // Set the game state to start of hand.
-            table.m_state = EnumGameState::HandStart;
-            world.write_model(@table);
-        }
-
-        fn advance_round(ref self: ContractState, table_id: u32) {
-            assert!(
-                self.game_master.read() == get_caller_address(),
-                "Only the game master can advance the hand"
-            );
-
-            let mut world = self.world(@"dominion");
-            let mut table: ComponentTable = world.read_model(table_id);
-            assert!(table.m_state == EnumGameState::RoundEnd, "Game is not at round end");
+            // Update order and dealer chip position (Small Blind, Big Blind, etc.).
+            InternalImpl::_update_positions(ref world, table_id);
 
             // Remove players sitting out.
             InternalImpl::_remove_sitting_out_players(ref world, ref self, table_id);
 
-            // Update order and dealer chip position (Small Blind, Big Blind, etc.).
-            InternalImpl::_update_positions(ref world, table_id);
 
-            table.m_state = EnumGameState::RoundStart;
-            table.m_pot = 0;
-            table.m_community_cards = array![];
+            // Set the game state to start of hand.
+            table.m_state = EnumGameState::HandStart;
+            world.write_model(@table);
+
+            world.emit_event(@EventRoundStarted {
+                m_table_id: table_id,
+                m_timestamp: starknet::get_block_timestamp()
+            });
+        }
+
+        fn post_encrypt_deck(ref self: ContractState, table_id: u32, encrypted_deck: Array<u256>) {
+            // TODO: implement post_encrypt_deck(encrypted_deck: Array<u256>)
+            // Update deck with encrypted deck, update game state.
+            // Then shuffle and deal cards.
+        }
+
+
+        fn deal_cards(ref self: ContractState, table_id: u32) {
+            // TODO: implement deal_cards(table_id: u32)
+
+            let mut world = self.world(@"dominion");
+            let mut table: ComponentTable = world.read_model(table_id);
+            let mut deck: Array<StructCard> = table.m_deck.clone();
+
+            // Shuffle the deck.
+            for _ in 0..deck.len() {
+                // Give card pair to each player and update table and player's hands.
+            };
+
+            // Then emit decrypt_hand_request event & update game state to Pre-Flop.
+        }
+
+        fn advance_street(ref self: ContractState, table_id: u32) {
+            // TODO: implement advance_street(table_id: u32)
+            // Update game state to Pre-Flop.
+
+            let mut world = self.world(@"dominion");
+            let mut table: ComponentTable = world.read_model(table_id);
+            table.m_state = EnumGameState::PreFlop;
+
+            match table.m_state {
+                // TODO: At every Game state changes emit an event: <table_id, cards_to_reveal>
+                // If flop 3 cards, turn 1 card, river 1 card.
+                // Pop them off the deck and emit the event.
+            
+                EnumGameState::PreFlop => {
+                    // Deal cards.
+                },
+                EnumGameState::Flop => {
+                    // Deal cards.
+                },
+                EnumGameState::Turn => {
+                    // Deal cards.
+                },
+                EnumGameState::River => {
+                    // Deal cards.
+                },
+                EnumGameState::Showdown => {
+                    // Deal cards.
+                    // TODO: Implement request_showdown(table_id: u32) // Emit event so each client knows to reveal their hand.
+                    // Then implement post_showdown(table_id: u32, players_hands: Array<u256>) that each player will call to reveal their hand.
+                },
+                EnumGameState::RoundEnd => {
+                    // Deal cards.
+                },
+                EnumGameState::HandEnd => {
+                    // Deal cards.
+                },
+                _ => panic!("Cannot advance street in this state")
+            }
+
             world.write_model(@table);
         }
 
-        fn end_hand(ref self: ContractState, table_id: u32) {
+        fn end_round(ref self: ContractState, table_id: u32) {
             assert!(
                 self.game_master.read() == get_caller_address(),
                 "Only the game master can end the round"
             );
 
-            self.advance_round(table_id);
             let mut world = self.world(@"dominion");
 
             // Reset the table.
@@ -149,6 +271,9 @@ mod table_management_system {
 
             table.m_state = EnumGameState::HandEnd;
             world.write_model(@table);
+
+            // Start the next round.
+            self.start_round(table_id);
         }
 
         fn skip_turn(ref self: ContractState, table_id: u32, player: ContractAddress) {
@@ -226,23 +351,32 @@ mod table_management_system {
 
             // Distribute pot.
             let pot_share = table.m_pot / pot_share_count;
-            for player in table.m_players {
-                if winners_dict.get(player.into()) {
-                    InternalImpl::_distribute_chips(ref world,player, pot_share);
+            for player in table.m_players.span() {
+                if winners_dict.get((*player).into()) {
+                    InternalImpl::_distribute_chips(ref world, *player, pot_share);
                 }
-            }
+            };
+
+            // Reset the table.
+            table.reset_table();
+            table.m_state = EnumGameState::HandEnd;
+            world.write_model(@table);
         }
 
-        fn shutdown_table(ref self: ContractState, table_id: u32) {
+        /// 
+        fn post_showdown(ref self: ContractState, table_id: u32, deck: Array<StructCard>) {
             assert!(
                 self.game_master.read() == get_caller_address(),
-                "Only the game master can shutdown the table"
+                "Only the game master can update the deck"
             );
+        }
 
-            let mut world = self.world(@"dominion");
-            let mut table: ComponentTable = world.read_model(table_id);
-            table.m_state = EnumGameState::Shutdown;
-            world.write_model(@table);
+        fn post_decrypted_community_cards(ref self: ContractState, table_id: u32, cards: Array<StructCard>) {
+            // TODO: Implement post_decrypted_community_cards(table_id: u32, cards: Array<u256>) so backend updates on-chain community cards array with decrypted cards.
+            assert!(
+                self.game_master.read() == get_caller_address(),
+                "Only the game master can update the community cards"
+            );
         }
 
         fn kick_player(ref self: ContractState, table_id: u32, player: ContractAddress) {
@@ -253,10 +387,17 @@ mod table_management_system {
 
             let mut world = self.world(@"dominion");
             let mut table: ComponentTable = world.read_model(table_id);
-            let player_model: ComponentPlayer = world.read_model(player);
+            let mut player_model: ComponentPlayer = world.read_model(player);
+
+            // Reset player's table state and return chips
+            player_model.m_table_id = 0;
+            player_model.m_total_chips += player_model.m_table_chips;
+            player_model.m_table_chips = 0;
+            player_model.m_state = EnumPlayerState::Left;
+
             table.remove_player(@player);
-            world.erase_model(@player_model);
             world.write_model(@table);
+            world.write_model(@player_model);
         }
 
         fn change_game_manager(ref self: ContractState, new_game_master: ContractAddress) {
@@ -295,6 +436,19 @@ mod table_management_system {
         fn _update_positions(ref world: dojo::world::WorldStorage, table_id: u32) {
             let mut table: ComponentTable = world.read_model(table_id);
 
+            // Find out if there's a dealer.
+            let mut dealer_found: bool = false;
+            for i in 0..table.m_players.len() {
+                let mut player: ComponentPlayer = world.read_model(*table.m_players[i]);
+                if player.m_state != EnumPlayerState::Left && player.m_state != EnumPlayerState::Waiting {
+                    if player.m_position == EnumPosition::Dealer {
+                        dealer_found = true;
+                        break;
+                    }
+                }
+            };
+
+
             let mut new_players: Array<ContractAddress> = array![];
             for i in 0..table.m_players.len() {
                 let mut player: ComponentPlayer = world.read_model(*table.m_players[i]);
@@ -303,25 +457,35 @@ mod table_management_system {
                     && player.m_state != EnumPlayerState::Waiting {
                     match player.m_position {
                         EnumPosition::Dealer => {
-                            player.m_position = EnumPosition::SmallBlind;
-
                             // Set the new dealer and turn.
                             table.m_current_dealer = i.try_into().expect('Index out of bounds');
-                            table.m_current_turn = i.try_into().expect('Index out of bounds');
+                            table.m_current_turn = ((i + 2) % table.m_players.len()).try_into().expect('Index out of bounds');
+                            player.m_position = EnumPosition::SmallBlind;
+
                         },
                         EnumPosition::SmallBlind => {
+                            table.m_current_turn = ((i + 2) % table.m_players.len()).try_into().expect('Index out of bounds');
                             player.m_position = EnumPosition::BigBlind;
                         },
                         _ => {
+                            if !dealer_found {
+                                // If there's no dealer, set the new dealer to this player.
+                                player.m_position = EnumPosition::Dealer;
+                                table.m_current_dealer = i.try_into().expect('Index out of bounds');
+                                table.m_current_turn = i.try_into().expect('Index out of bounds');
+                                break;
+                            }
+
                             if i + 1 < table.m_players.len() {
-                                let mut next_player: ComponentPlayer = world
-                                    .read_model(*table.m_players[i + 1]);
+                                let mut next_player: ComponentPlayer = world.read_model(*table.m_players[i + 1]);
                                 player.m_position = next_player.m_position;
+                                world.write_model(@player);
                             } else {
                                 // Wrap around to the first player.
                                 let mut next_player: ComponentPlayer = world
                                     .read_model(*table.m_players[0]);
                                 player.m_position = next_player.m_position;
+                                world.write_model(@player);
                             }
                         }
                     };
