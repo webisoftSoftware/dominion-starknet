@@ -199,13 +199,14 @@ mod actions_system {
             };
 
             // All players are ready.
-            if player_statuses.len() == table.m_players.len() {
+            if (player_statuses.len() == table.m_players.len() && table.m_players.len() > 1) {
                 world.emit_event(@EventAllPlayersReady {
                     m_table_id: table_id,
                     m_players: table.m_players,
                     m_timestamp: get_block_timestamp()
                 });
 
+                // TODO: remove start_round from table manager.
                 let mut table_manager: ITableManagementDispatcher = ITableManagementDispatcher { contract_address: self.table_manager.read() };
                 table_manager.start_round(table_id);
 
