@@ -44,84 +44,93 @@
 
 use dominion::models::structs::StructCard;
 use dominion::models::enums::{EnumCardValue, EnumHandRank};
-use dominion::models::traits::{EnumCardValueInto, EnumCardValueSnapshotInto, EnumCardSuitInto, EnumHandRankInto, StructCardDisplay, ICard};
+use dominion::models::traits::{
+    EnumCardValueInto, EnumCardValueSnapshotInto, EnumCardSuitInto, EnumHandRankInto,
+    StructCardDisplay, ICard
+};
 
 /// Utility function to count occurrences of each card value.
-/// 
+///
 /// @param cards - The array of cards to count.
 /// @returns A dictionary with the count of each card value.
 /// Can panic?: No
 fn _count_values(cards: @Array<StructCard>) -> Felt252Dict<u8> {
     let mut value_counts: Felt252Dict<u8> = Default::default();
-    
-    for card in cards.span() {
-        if let Option::Some(value) = card.get_value() {
-            let value: u32 = (@value).into();
-            let current_count = value_counts.get(value.into());
-            value_counts.insert(value.into(), current_count + 1);
-        }
-    };
-    
+
+    for card in cards
+        .span() {
+            if let Option::Some(value) = card.get_value() {
+                let value: u32 = (@value).into();
+                let current_count = value_counts.get(value.into());
+                value_counts.insert(value.into(), current_count + 1);
+            }
+        };
+
     return value_counts;
 }
 
 /// Utility function to count occurrences of each suit.
-/// 
+///
 /// @param cards - The array of cards to count.
 /// @returns A dictionary with the count of each suit.
 /// Can panic?: No
 fn _count_suits(cards: @Array<StructCard>) -> Felt252Dict<u8> {
     let mut suit_counts: Felt252Dict<u8> = Default::default();
-    
-    for card in cards.span() {
-        if let Option::Some(suit) = card.get_suit() {
-            let value: u32 = suit.into();
-            let current_count = suit_counts.get(value.into());
-            suit_counts.insert(value.into(), current_count + 1);
-        }
-    };
-    
+
+    for card in cards
+        .span() {
+            if let Option::Some(suit) = card.get_suit() {
+                let value: u32 = suit.into();
+                let current_count = suit_counts.get(value.into());
+                suit_counts.insert(value.into(), current_count + 1);
+            }
+        };
+
     return suit_counts;
 }
 
 /// Utility function to get the highest card value.
-/// 
+///
 /// @param cards - The array of cards to get the highest value from.
 /// @returns The highest card value.
 /// Can panic?: No
 fn _get_highest_card_value(cards: @Array<StructCard>) -> u32 {
     let mut highest_value: u32 = 0;
 
-    for i in 0..cards.len() {
-        if let Option::Some(card_value) = cards[i].get_value() {
-            let current_value: u32 = (@card_value).into();
-            if current_value > highest_value {
-                highest_value = current_value;
-            }
-        }
-    };
+    for i in 0
+        ..cards
+            .len() {
+                if let Option::Some(card_value) = cards[i].get_value() {
+                    let current_value: u32 = (@card_value).into();
+                    if current_value > highest_value {
+                        highest_value = current_value;
+                    }
+                }
+            };
     return highest_value;
 }
 
 /// Utility function to evaluate the value of a hand.
-/// 
+///
 /// @param cards - The array of cards to evaluate.
 /// @returns The value of the hand.
 /// Can panic?: No
 fn _evaluate_value(cards: @Array<StructCard>) -> u32 {
     let mut total_value: u32 = 0;
 
-    for i in 0..cards.len() {
-        if let Option::Some(card_value) = cards[i].get_value() {
-            let current_value: u32 = (@card_value).into();
-            total_value += current_value;
-        }
-    };
+    for i in 0
+        ..cards
+            .len() {
+                if let Option::Some(card_value) = cards[i].get_value() {
+                    let current_value: u32 = (@card_value).into();
+                    total_value += current_value;
+                }
+            };
     return total_value;
 }
 
 /// Utility function to break ties between two hands.
-/// 
+///
 /// @param first_hand - The first hand to compare.
 /// @param second_hand - The second hand to compare.
 /// @returns The result of the comparison.
@@ -130,16 +139,22 @@ fn tie_breaker(first_hand: @EnumHandRank, second_hand: @EnumHandRank) -> i32 {
     // Get numerical rank for each hand (higher is better)
     let first_rank = get_hand_rank(first_hand);
     let second_rank = get_hand_rank(second_hand);
-    
+
     // If ranks are different, we can immediately return the comparison
     if first_rank != second_rank {
-        return if first_rank > second_rank { 1 } else { -1 };
+        return if first_rank > second_rank {
+            1
+        } else {
+            -1
+        };
     }
 
     // If ranks are equal, we need to compare the specific cards
     match (first_hand, second_hand) {
         // Special case for straight with Ace-5
-        (EnumHandRank::Straight(h1), EnumHandRank::Straight(h2)) => {
+        (
+            EnumHandRank::Straight(h1), EnumHandRank::Straight(h2)
+        ) => {
             if h1 == @EnumCardValue::Five.into() && h2 != @EnumCardValue::Five.into() {
                 return -1;
             }
@@ -148,41 +163,47 @@ fn tie_breaker(first_hand: @EnumHandRank, second_hand: @EnumHandRank) -> i32 {
             }
             compare_cards(h1, h2)
         },
-        
         // Compare primary cards for hands with one important card
         (EnumHandRank::FourOfAKind(v1), EnumHandRank::FourOfAKind(v2)) |
         (EnumHandRank::ThreeOfAKind(v1), EnumHandRank::ThreeOfAKind(v2)) |
-        (EnumHandRank::Pair(v1), EnumHandRank::Pair(v2))  => compare_cards(v1, v2),
-
-        (EnumHandRank::Flush(cards1), EnumHandRank::Flush(cards2)) => {
+        (EnumHandRank::Pair(v1), EnumHandRank::Pair(v2)) => compare_cards(v1, v2),
+        (
+            EnumHandRank::Flush(cards1), EnumHandRank::Flush(cards2)
+        ) => {
             let mut compare_result: i32 = 0;
-            for i in 0..cards1.len() {
-                compare_result = compare_cards(cards1[i], cards2[i]);
-                if compare_result != 0 {
-                    break;
-                }
-            };
+            for i in 0
+                ..cards1
+                    .len() {
+                        compare_result = compare_cards(cards1[i], cards2[i]);
+                        if compare_result != 0 {
+                            break;
+                        }
+                    };
             return compare_result;
         },
-
         // Compare two cards for full house and two pair
-        (EnumHandRank::FullHouse((v1, v2)), EnumHandRank::FullHouse((w1, w2))) => {
+        (
+            EnumHandRank::FullHouse((v1, v2)), EnumHandRank::FullHouse((w1, w2))
+        ) => {
             let main_compare = compare_cards(v1, w1);
             if main_compare != 0 {
                 return main_compare;
             }
             return compare_cards(v2, w2);
         },
-        (EnumHandRank::TwoPair((v1, v2)), EnumHandRank::TwoPair((w1, w2))) => {
+        (
+            EnumHandRank::TwoPair((v1, v2)), EnumHandRank::TwoPair((w1, w2))
+        ) => {
             let main_compare = compare_cards(v1, w1);
             if main_compare != 0 {
                 return main_compare;
             }
             return compare_cards(v2, w2);
         },
-
         // Compare arrays of cards for high card
-        (EnumHandRank::HighCard(cards1), EnumHandRank::HighCard(cards2)) => {
+        (
+            EnumHandRank::HighCard(cards1), EnumHandRank::HighCard(cards2)
+        ) => {
             let mut i = 0;
             let mut compare_result: i32 = 0;
             while i < cards1.len() {
@@ -194,18 +215,16 @@ fn tie_breaker(first_hand: @EnumHandRank, second_hand: @EnumHandRank) -> i32 {
             };
             compare_result
         },
-
         // Equal hands that don't need further comparison
         (EnumHandRank::RoyalFlush, EnumHandRank::RoyalFlush) => 0,
         (EnumHandRank::StraightFlush, EnumHandRank::StraightFlush) => 0,
-        
         // We should never reach this case.
         (_, _) => 0,
     }
 }
 
 /// Utility function to get the numerical rank of a hand.
-/// 
+///
 /// @param hand - The hand to get the rank from.
 /// @returns The numerical rank of the hand.
 /// Can panic?: No
@@ -214,7 +233,7 @@ fn get_hand_rank(hand: @EnumHandRank) -> u32 {
 }
 
 /// Utility function to compare two cards.
-/// 
+///
 /// @param first_card_value - The first card value to compare.
 /// @param second_card_value - The second card value to compare.
 /// @returns The result of the comparison.
@@ -233,7 +252,7 @@ fn compare_cards(first_card_value: @EnumCardValue, second_card_value: @EnumCardV
 }
 
 /// Utility function to sort an array of cards.
-/// 
+///
 /// @param arr - The array of cards to sort.
 /// @returns The sorted array of cards.
 /// Can panic?: No
@@ -246,7 +265,7 @@ fn sort(arr: @Array<StructCard>) -> Array<StructCard> {
 }
 
 /// Utility function to sort an array of card values.
-/// 
+///
 /// @param arr - The array of card values to sort.
 /// @returns The sorted array of card values.
 /// Can panic?: No
@@ -259,12 +278,14 @@ fn sort_values(arr: @Array<EnumCardValue>) -> Array<EnumCardValue> {
 }
 
 /// Utility function to merge two arrays of card values.
-/// 
+///
 /// @param left_arr - The left array of card values to merge.
 /// @param right_arr - The right array of card values to merge.
 /// @returns The merged array of card values.
 /// Can panic?: No
-fn merge_values(left_arr: @Array<EnumCardValue>, right_arr: @Array<EnumCardValue>) -> Array<EnumCardValue> {
+fn merge_values(
+    left_arr: @Array<EnumCardValue>, right_arr: @Array<EnumCardValue>
+) -> Array<EnumCardValue> {
     let mut result: Array<EnumCardValue> = array![];
     let mut i = 0;
     let mut j = 0;
@@ -298,7 +319,7 @@ fn merge_values(left_arr: @Array<EnumCardValue>, right_arr: @Array<EnumCardValue
 }
 
 /// Utility function to merge two arrays of cards.
-/// 
+///
 /// @param left_arr - The left array of cards to merge.
 /// @param right_arr - The right array of cards to merge.
 /// @returns The merged array of cards.
@@ -342,13 +363,15 @@ fn merge(left_arr: @Array<StructCard>, right_arr: @Array<StructCard>) -> Array<S
 }
 
 /// Utility function to merge sort an array of card values.
-/// 
+///
 /// @param arr - The array of card values to sort.
 /// @param left - The left index of the array to sort.
 /// @param right - The right index of the array to sort.
 /// @returns The sorted array of card values.
 /// Can panic?: No
-fn merge_sort_values(arr: @Array<EnumCardValue>, left: usize, right: usize) -> Array<EnumCardValue> {
+fn merge_sort_values(
+    arr: @Array<EnumCardValue>, left: usize, right: usize
+) -> Array<EnumCardValue> {
     if left >= right {
         let mut result = array![];
         result.append(arr[left].clone());
@@ -362,7 +385,7 @@ fn merge_sort_values(arr: @Array<EnumCardValue>, left: usize, right: usize) -> A
 }
 
 /// Utility function to merge sort an array of cards.
-/// 
+///
 /// @param arr - The array of cards to sort.
 /// @param left - The left index of the array to sort.
 /// @param right - The right index of the array to sort.
@@ -404,18 +427,22 @@ fn merge_sort(arr: @Array<StructCard>, left: usize, right: usize) -> Array<Struc
 }
 
 /// Utility function to get the top n values from an array of card values.
-/// 
+///
 /// @param values - The array of card values to get the top n values from.
 /// @param n - The number of values to get.
 /// @returns The top n values from the array.
 /// Can panic?: No
 fn get_top_n_values(values: @Array<EnumCardValue>, n: usize) -> Array<EnumCardValue> {
     let mut result: Array<EnumCardValue> = array![];
-    let count = if values.len() < n { values.len() } else { n };
-    
+    let count = if values.len() < n {
+        values.len()
+    } else {
+        n
+    };
+
     for i in 0..count {
         result.append(*values[i]);
     };
-    
+
     return result;
 }

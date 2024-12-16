@@ -7,8 +7,7 @@ fn test_encrypt() {
     let expected_card_value: u32 = EnumCardValue::Queen.into();
     let expected_card_suit: u32 = EnumCardSuit::Hearts.into();
     let expected_num_representation: u256 = u256 {
-        low: expected_card_suit.into(),
-        high: expected_card_value.into(),
+        low: expected_card_suit.into(), high: expected_card_value.into(),
     };
 
     assert!(card.m_num_representation == expected_num_representation);

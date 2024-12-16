@@ -59,7 +59,9 @@ mod table_system {
     use dominion::models::components::{ComponentTable, ComponentPlayer};
     use dominion::models::enums::{EnumGameState, EnumPlayerState, EnumPosition};
     use dominion::models::traits::{ITable, IPlayer};
-    use dominion::systems::table_manager::{ITableManagementDispatcher, ITableManagementDispatcherTrait};
+    use dominion::systems::table_manager::{
+        ITableManagementDispatcher, ITableManagementDispatcherTrait
+    };
     use starknet::{ContractAddress, get_caller_address, TxInfo, get_tx_info, get_block_timestamp};
     use dojo::{model::ModelStorage, world::IWorldDispatcher};
     use dojo::event::{EventStorage};
@@ -103,7 +105,10 @@ mod table_system {
             min_buy_in: u32,
             max_buy_in: u32
         ) {
-            assert!(self.table_manager.read() == get_caller_address(), "Only the table manager can create tables");
+            assert!(
+                self.table_manager.read() == get_caller_address(),
+                "Only the table manager can create tables"
+            );
 
             assert!(small_blind > 0, "Small blind cannot be less than 0");
             assert!(big_blind > small_blind, "Big blind cannot be less than small blind");
@@ -129,10 +134,10 @@ mod table_system {
             world.write_model(@new_table);
             self.counter.write(table_id + 1);
 
-            world.emit_event(@EventTableCreated {
-                m_table_id: table_id,
-                m_timestamp: get_block_timestamp()
-            });
+            world
+                .emit_event(
+                    @EventTableCreated { m_table_id: table_id, m_timestamp: get_block_timestamp() }
+                );
         }
 
         // Allows a player to add more chips to their stack at the table

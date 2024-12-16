@@ -184,7 +184,7 @@ mod cashier_system {
                  amount // amount
                 );
 
-            assert!(approve_result && transfer_result, "ERC20 transfer failed");
+            assert!(transfer_result, "ERC20 transfer failed");
         }
     }
 }

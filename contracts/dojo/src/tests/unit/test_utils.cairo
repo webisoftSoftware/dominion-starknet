@@ -98,6 +98,4 @@ fn test_sort() {
 }
 
 #[test]
-fn test_count_values() {
-    
-}
+fn test_count_values() {}
