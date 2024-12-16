@@ -193,10 +193,8 @@ mod table_management_system {
             });
         }
 
+        // Update deck with encrypted deck, update game state.
         fn post_encrypt_deck(ref self: ContractState, table_id: u32, encrypted_deck: Array<StructCard>) {
-            // Update deck with encrypted deck, update game state.
-            // Then shuffle and deal cards.
-
             assert!(
                 self.table_manager.read() == get_caller_address(),
                 "Only the table manager can update the deck"
@@ -292,7 +290,7 @@ mod table_management_system {
                 self.table_manager.read() == get_caller_address(),
                 "Only the table manager can skip the turn"
             );
-
+            // TODO: Check timestamp to make sure it's been at least 60 seconds since the last turn.
             let mut world = self.world(@"dominion");
             let mut player_component: ComponentPlayer = world.read_model(player);
             assert!(player_component.m_state == EnumPlayerState::Active, "Player is not active");
@@ -388,6 +386,8 @@ mod table_management_system {
                 self.table_manager.read() == get_caller_address(),
                 "Only the table manager can update the deck"
             );
+
+            // TODO: Change game state to showdown.
         }
 
         fn post_decrypted_community_cards(ref self: ContractState, table_id: u32, cards: Array<StructCard>) {
@@ -406,6 +406,8 @@ mod table_management_system {
             let mut table: ComponentTable = world.read_model(table_id);
             table.m_community_cards = cards;
             world.write_model(@table);
+
+            // TODO: Change game state.
         }
 
         fn kick_player(ref self: ContractState, table_id: u32, player: ContractAddress) {
@@ -427,6 +429,7 @@ mod table_management_system {
             table.remove_player(@player);
             world.write_model(@table);
             world.write_model(@player_model);
+
         }
 
         fn change_table_manager(ref self: ContractState, new_table_manager: ContractAddress) {
