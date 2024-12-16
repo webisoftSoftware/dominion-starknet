@@ -220,9 +220,8 @@ mod actions_system {
                         }
                     );
 
-                // TODO: remove start_round from table manager.
                 let mut table_manager: ITableManagementDispatcher = ITableManagementDispatcher {
-                    contract_address: self.table_manager.read()
+                    contract_address: self.table_manager.read() // TODO: This should be the address of the table manager CONTRACT not WALLET.
                 };
                 table_manager.start_round(table_id);
             }
