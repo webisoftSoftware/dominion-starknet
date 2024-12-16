@@ -72,17 +72,25 @@ mod table_system {
         counter: u32, // Counter for generating unique table IDs.
     }
 
-    fn dojo_init(ref self: ContractState) {
-        self.table_manager.write(get_caller_address());
-        self.counter.write(1);
-    }
-
     #[derive(Copy, Clone, Serde, Drop)]
     #[dojo::event]
     struct EventTableCreated {
         #[key]
         m_table_id: u32,
         m_timestamp: u64
+    }
+
+    fn dojo_init(ref self: ContractState) {
+        let tx_info: TxInfo = get_tx_info().unbox();
+
+        // Access the account_contract_address field
+        let sender: ContractAddress = tx_info.account_contract_address;
+
+        // Set the table manager to the sender
+        self.table_manager.write(sender);
+
+        // Initialize the counter for table IDs
+        self.counter.write(1);
     }
 
     #[abi(embed_v0)]
