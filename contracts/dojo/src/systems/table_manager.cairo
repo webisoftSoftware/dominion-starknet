@@ -49,7 +49,7 @@ use dominion::models::structs::StructCard;
 
 #[starknet::interface]
 trait ITableManagement<TContractState> {
-    // Game Master Functions
+    // Table Manager Functions
     fn start_round(ref self: TContractState, table_id: u32);
     fn end_round(ref self: TContractState, table_id: u32);
     fn skip_turn(ref self: TContractState, table_id: u32, player: ContractAddress);
@@ -61,8 +61,8 @@ trait ITableManagement<TContractState> {
     // Timeout Functions
     fn kick_player(ref self: TContractState, table_id: u32, player: ContractAddress);
     // Admin Functions
-    fn change_game_manager(ref self: TContractState, new_game_master: ContractAddress);
-    fn get_game_manager(self: @TContractState) -> ContractAddress;
+    fn change_table_manager(ref self: TContractState, new_table_manager: ContractAddress);
+    fn get_table_manager(self: @TContractState) -> ContractAddress;
 }
 
 #[dojo::contract]
@@ -83,7 +83,7 @@ mod table_management_system {
 
     #[storage]
     struct Storage {
-        game_master: ContractAddress,
+        table_manager: ContractAddress,
     }
 
     #[derive(Copy, Clone, Serde, Drop)]
@@ -159,8 +159,8 @@ mod table_management_system {
         // Access the account_contract_address field
         let sender: ContractAddress = tx_info.account_contract_address;
 
-        // Set the game master to the sender
-        self.game_master.write(sender);
+        // Set the table manager to the sender
+        self.table_manager.write(sender);
     }
 
     #[abi(embed_v0)]
@@ -198,8 +198,8 @@ mod table_management_system {
             // Then shuffle and deal cards.
 
             assert!(
-                self.game_master.read() == get_caller_address(),
-                "Only the game master can update the deck"
+                self.table_manager.read() == get_caller_address(),
+                "Only the table manager can update the deck"
             );
 
             let mut world = self.world(@"dominion");
@@ -270,8 +270,8 @@ mod table_management_system {
 
         fn end_round(ref self: ContractState, table_id: u32) {
             assert!(
-                self.game_master.read() == get_caller_address(),
-                "Only the game master can end the round"
+                self.table_manager.read() == get_caller_address(),
+                "Only the table manager can end the round"
             );
 
             let mut world = self.world(@"dominion");
@@ -289,8 +289,8 @@ mod table_management_system {
 
         fn skip_turn(ref self: ContractState, table_id: u32, player: ContractAddress) {
             assert!(
-                self.game_master.read() == get_caller_address(),
-                "Only the game master can skip the turn"
+                self.table_manager.read() == get_caller_address(),
+                "Only the table manager can skip the turn"
             );
 
             let mut world = self.world(@"dominion");
@@ -309,8 +309,8 @@ mod table_management_system {
 
         fn showdown(ref self: ContractState, table_id: u32) {
             assert!(
-                self.game_master.read() == get_caller_address(),
-                "Only the game master can determine the winner"
+                self.table_manager.read() == get_caller_address(),
+                "Only the table manager can determine the winner"
             );
 
             let mut world = self.world(@"dominion");
@@ -385,15 +385,15 @@ mod table_management_system {
         
         fn post_showdown(ref self: ContractState, table_id: u32, deck: Array<StructCard>) {
             assert!(
-                self.game_master.read() == get_caller_address(),
-                "Only the game master can update the deck"
+                self.table_manager.read() == get_caller_address(),
+                "Only the table manager can update the deck"
             );
         }
 
         fn post_decrypted_community_cards(ref self: ContractState, table_id: u32, cards: Array<StructCard>) {
             assert!(
-                self.game_master.read() == get_caller_address(),
-                "Only the game master can update the community cards"
+                self.table_manager.read() == get_caller_address(),
+                "Only the table manager can update the community cards"
             );
 
             let mut world = self.world(@"dominion");
@@ -410,8 +410,8 @@ mod table_management_system {
 
         fn kick_player(ref self: ContractState, table_id: u32, player: ContractAddress) {
             assert!(
-                self.game_master.read() == get_caller_address(),
-                "Only the game master can kick players"
+                self.table_manager.read() == get_caller_address(),
+                "Only the table manager can kick players"
             );
 
             let mut world = self.world(@"dominion");
@@ -429,16 +429,16 @@ mod table_management_system {
             world.write_model(@player_model);
         }
 
-        fn change_game_manager(ref self: ContractState, new_game_master: ContractAddress) {
+        fn change_table_manager(ref self: ContractState, new_table_manager: ContractAddress) {
             assert!(
-                self.game_master.read() == get_caller_address(),
-                "Only the game master can change the game master"
+                self.table_manager.read() == get_caller_address(),
+                "Only the table manager can change the table manager"
             );
-            self.game_master.write(new_game_master);
+            self.table_manager.write(new_table_manager);
         }
 
-        fn get_game_manager(self: @ContractState) -> ContractAddress {
-            self.game_master.read()
+        fn get_table_manager(self: @ContractState) -> ContractAddress {
+            self.table_manager.read()
         }
     }
 

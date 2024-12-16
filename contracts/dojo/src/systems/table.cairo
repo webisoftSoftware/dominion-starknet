@@ -68,12 +68,12 @@ mod table_system {
     // Contract specific storage.
     #[storage]
     struct Storage {
-        game_master: ContractAddress, // Address of the game master who can create tables.
+        table_manager: ContractAddress, // Address of the table manager who can create tables.
         counter: u32, // Counter for generating unique table IDs.
     }
 
     fn dojo_init(ref self: ContractState) {
-        self.game_master.write(get_caller_address());
+        self.table_manager.write(get_caller_address());
         self.counter.write(1);
     }
 
@@ -95,7 +95,7 @@ mod table_system {
             min_buy_in: u32,
             max_buy_in: u32
         ) {
-            assert!(self.game_master.read() == get_caller_address(), "Only the game master can create tables");
+            assert!(self.table_manager.read() == get_caller_address(), "Only the table manager can create tables");
 
             assert!(small_blind > 0, "Small blind cannot be less than 0");
             assert!(big_blind > small_blind, "Big blind cannot be less than small blind");
@@ -148,8 +148,8 @@ mod table_system {
 
         fn shutdown_table(ref self: ContractState, table_id: u32) {
             assert!(
-                self.game_master.read() == get_caller_address(),
-                "Only the game master can shutdown the table"
+                self.table_manager.read() == get_caller_address(),
+                "Only the table manager can shutdown the table"
             );
 
             let mut world = self.world(@"dominion");
