@@ -158,10 +158,6 @@ impl EnumGameStateDisplay of Display<EnumGameState> {
                 let str: ByteArray = format!("Shutdown");
                 f.buffer.append(@str);
             },
-            EnumGameState::RoundStart => {
-                let str: ByteArray = format!("RoundStart");
-                f.buffer.append(@str);
-            },
             EnumGameState::WaitingForPlayers => {
                 let str: ByteArray = format!("WaitingForPlayers");
                 f.buffer.append(@str);
@@ -188,10 +184,6 @@ impl EnumGameStateDisplay of Display<EnumGameState> {
             },
             EnumGameState::CommunityCardsDecrypted => {
                 let str: ByteArray = format!("CommunityCardsDecrypted");
-                f.buffer.append(@str);
-            },
-            EnumGameState::RoundEnd => {
-                let str: ByteArray = format!("RoundEnd");
                 f.buffer.append(@str);
             },
         };
@@ -1121,6 +1113,17 @@ impl TableImpl of ITable {
         self.m_deck = shuffled_deck;
     }
 
+    fn advance_street(ref self: ComponentTable) {
+        self.m_state = match self.m_state {
+            EnumGameState::PreFlop => EnumGameState::Flop,
+            EnumGameState::Flop => EnumGameState::Turn,
+            EnumGameState::Turn => EnumGameState::River,
+            EnumGameState::River => EnumGameState::Showdown,
+            EnumGameState::Showdown => EnumGameState::PreFlop,
+            _ => self.m_state,
+        };
+    }
+
     fn advance_turn(ref self: ComponentTable) {
         self.m_current_turn += 1;
         self
@@ -1130,6 +1133,7 @@ impl TableImpl of ITable {
             .len()
             .try_into()
             .expect('Cannot downcast turn');
+        self.m_last_played_ts = starknet::get_block_timestamp();
     }
 
     fn find_card(self: @ComponentTable, card: @StructCard) -> Option<u32> {

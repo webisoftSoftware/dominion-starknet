@@ -43,11 +43,13 @@
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 
 use dominion::models::structs::StructCard;
+use starknet::ContractAddress;
+
 #[starknet::interface]
 trait IActions<TContractState> {
     fn bet(ref self: TContractState, table_id: u32, amount: u32);
     fn fold(ref self: TContractState, table_id: u32);
-    fn set_ready(ref self: TContractState, table_id: u32);
+    fn set_ready(ref self: TContractState, table_id: u32, table_manager: ContractAddress);
     fn join_table(ref self: TContractState, table_id: u32, chips_amount: u32);
     fn leave_table(ref self: TContractState, table_id: u32);
     fn reveal_hand(
@@ -72,11 +74,6 @@ mod actions_system {
     use dominion::systems::table_manager::{
         ITableManagementDispatcher, ITableManagementDispatcherTrait
     };
-
-    #[storage]
-    struct Storage {
-        table_manager: ContractAddress,
-    }
 
     #[derive(Clone, Drop, Serde, Debug)]
     #[dojo::event]
@@ -117,16 +114,6 @@ mod actions_system {
         #[key]
         m_player: ContractAddress,
         m_timestamp: u64,
-    }
-
-    fn dojo_init(ref self: ContractState) {
-        let tx_info: TxInfo = get_tx_info().unbox();
-
-        // Access the account_contract_address field
-        let sender: ContractAddress = tx_info.account_contract_address;
-
-        // Set the table manager to the sender
-        self.table_manager.write(sender);
     }
 
     #[abi(embed_v0)]
@@ -179,7 +166,7 @@ mod actions_system {
             world.write_model(@table);
         }
 
-        fn set_ready(ref self: ContractState, table_id: u32) {
+        fn set_ready(ref self: ContractState, table_id: u32, table_manager: ContractAddress) {
             let mut world = self.world(@"dominion");
             let caller = get_caller_address();
 
@@ -221,7 +208,7 @@ mod actions_system {
                     );
 
                 let mut table_manager: ITableManagementDispatcher = ITableManagementDispatcher {
-                    contract_address: self.table_manager.read() // TODO: This should be the address of the table manager CONTRACT not WALLET.
+                    contract_address: table_manager
                 };
                 table_manager.start_round(table_id);
             }
@@ -246,7 +233,7 @@ mod actions_system {
         fn bet(ref self: ContractState, table_id: u32, amount: u32) {
             let mut world = self.world(@"dominion");
             let mut table: ComponentTable = world.read_model(table_id);
-            assert!(table.m_state == EnumGameState::RoundStart, "Game is not in betting phase");
+            assert!(table.m_state == EnumGameState::PreFlop, "Game is not in betting phase");
 
             if amount == 0 {
                 // Player has checked.
@@ -267,7 +254,7 @@ mod actions_system {
             let mut world = self.world(@"dominion");
 
             let mut table: ComponentTable = world.read_model(table_id);
-            assert!(table.m_state == EnumGameState::RoundStart, "Game is not in betting phase");
+            assert!(table.m_state == EnumGameState::PreFlop, "Game is not in betting phase");
 
             let mut player_component: ComponentPlayer = world.read_model(get_caller_address());
             assert!(player_component.m_state == EnumPlayerState::Active, "Player is not active");

@@ -82,6 +82,14 @@ mod table_system {
         m_timestamp: u64
     }
 
+    #[derive(Copy, Clone, Serde, Drop)]
+    #[dojo::event]
+    struct EventTableShutdown {
+        #[key]
+        m_table_id: u32,
+        m_timestamp: u64
+    }
+
     fn dojo_init(ref self: ContractState) {
         let tx_info: TxInfo = get_tx_info().unbox();
 
@@ -169,6 +177,11 @@ mod table_system {
             let mut table: ComponentTable = world.read_model(table_id);
             table.m_state = EnumGameState::Shutdown;
             world.write_model(@table);
+
+            world.emit_event(@EventTableShutdown {
+                m_table_id: table_id,
+                m_timestamp: get_block_timestamp()
+            });
         }
     }
 }
