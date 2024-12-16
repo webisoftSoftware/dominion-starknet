@@ -95,6 +95,11 @@ mod table_system {
             min_buy_in: u32,
             max_buy_in: u32
         ) {
+            assert!(self.game_master.read() == get_caller_address(), "Only the game master can create tables");
+
+            assert!(small_blind > 0, "Small blind cannot be less than 0");
+            assert!(big_blind > small_blind, "Big blind cannot be less than small blind");
+
             assert!(max_buy_in > 0, "Maximum buy-in cannot be less than 0");
             assert!(
                 min_buy_in < max_buy_in, "Minimum buy-in cannot be greater than maximum buy-in"
