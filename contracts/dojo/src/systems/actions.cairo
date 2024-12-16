@@ -49,6 +49,7 @@ use starknet::ContractAddress;
 trait IActions<TContractState> {
     fn bet(ref self: TContractState, table_id: u32, amount: u32);
     fn fold(ref self: TContractState, table_id: u32);
+    fn post_commit_hash(ref self: TContractState, table_id: u32, commitment_hash: Array<u32>);
     fn set_ready(ref self: TContractState, table_id: u32, table_manager: ContractAddress);
     fn join_table(ref self: TContractState, table_id: u32, chips_amount: u32);
     fn leave_table(ref self: TContractState, table_id: u32);
@@ -56,7 +57,7 @@ trait IActions<TContractState> {
         ref self: TContractState,
         table_id: u32,
         decrypted_hand: Array<StructCard>,
-        commitment_hash: u256
+        request: ByteArray
     );
 }
 
@@ -82,7 +83,7 @@ mod actions_system {
         m_table_id: u32,
         #[key]
         m_player: ContractAddress,
-        m_commitment_hash: u256,
+        m_request: ByteArray,
         m_player_hand: Array<StructCard>,
         m_timestamp: u64,
     }
@@ -267,11 +268,19 @@ mod actions_system {
             world.write_model(@table);
         }
 
+        fn post_commit_hash(ref self: ContractState, table_id: u32, commitment_hash: Array<u32>) {
+            let mut world = self.world(@"dominion");
+            
+            let mut hand: ComponentHand = world.read_model(get_caller_address());
+            hand.m_commitment_hash = commitment_hash;
+            world.write_model(@hand);
+        }
+
         fn reveal_hand(
             ref self: ContractState,
             table_id: u32,
             decrypted_hand: Array<StructCard>,
-            commitment_hash: u256
+            request: ByteArray
         ) {
             let mut world = self.world(@"dominion");
             let caller = get_caller_address();
@@ -285,19 +294,8 @@ mod actions_system {
 
             let mut hand: ComponentHand = world.read_model(caller);
 
-            // Generate the hash as input to recompute the commitment hash.
-            let mut hand_hash: u256 = 0;
-            for i in 0..hand.m_cards.len() {
-                hand_hash += *decrypted_hand[i].m_num_representation;
-            };
-
-            for i in 0..hand.m_cards.len() {
-                hand_hash += *hand.m_cards[i].m_num_representation;
-            };
-            hand_hash += commitment_hash;
-
             // Recompute the commitment hash of the hand to verify.
-            let computed_hash: [u32; 8] = compute_sha256_byte_array(@format!("{}", hand_hash));
+            let computed_hash: [u32; 8] = compute_sha256_byte_array(@format!("{}", request));
             let static_array: [u32; 8] = [
                 *hand.m_commitment_hash[0],
                 *hand.m_commitment_hash[1],
@@ -323,7 +321,7 @@ mod actions_system {
                     @EventHandRevealed {
                         m_table_id: table_id,
                         m_player: caller,
-                        m_commitment_hash: commitment_hash,
+                        m_request: request,
                         m_player_hand: decrypted_hand,
                         m_timestamp: get_block_timestamp(),
                     }

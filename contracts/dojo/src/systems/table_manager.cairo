@@ -235,30 +235,27 @@ mod table_management_system {
                 },
                 // Flip 3 cards.
                 EnumGameState::Flop => {
-                    let cards_to_reveal: Span<StructCard> = table.m_community_cards.span().slice(0, 3);
-                    world.emit_event(@EventDecryptCCRequested {
-                        m_table_id: table_id,
-                        m_cards: cards_to_reveal,
-                        m_timestamp: starknet::get_block_timestamp()
-                    });
+                    for _ in 0..3_u8 {
+                        let mut cards_to_reveal: Array<StructCard> = array![];
+                        if let Option::Some(card_to_reveal) = table.m_deck.pop_front() {
+                            cards_to_reveal.append(card_to_reveal);
+                        }
+                        world.emit_event(@EventDecryptCCRequested {
+                            m_table_id: table_id,
+                            m_cards: cards_to_reveal.span(),
+                            m_timestamp: starknet::get_block_timestamp()
+                        });
+                    };
                 },
                 // Flip 1 card.
-                EnumGameState::Turn => {
-                    let cards_to_reveal: Span<StructCard> = table.m_community_cards.span().slice(3, 4);
-                    world.emit_event(@EventDecryptCCRequested {
-                        m_table_id: table_id,
-                        m_cards: cards_to_reveal,
-                        m_timestamp: starknet::get_block_timestamp()
-                    });
-                },
-                // Flip 1 card.
-                EnumGameState::River => {
-                    let cards_to_reveal: Span<StructCard> = table.m_community_cards.span().slice(4, 5);
-                    world.emit_event(@EventDecryptCCRequested {
-                        m_table_id: table_id,
-                        m_cards: cards_to_reveal,
-                        m_timestamp: starknet::get_block_timestamp()
-                    });
+                EnumGameState::Turn | EnumGameState::River => {
+                    if let Option::Some(card_to_reveal) = table.m_deck.pop_front() {
+                        world.emit_event(@EventDecryptCCRequested {
+                            m_table_id: table_id,
+                            m_cards: array![card_to_reveal].span(),
+                            m_timestamp: starknet::get_block_timestamp()
+                        });
+                    }
                 },
                 // Showdown.
                 EnumGameState::Showdown => {
