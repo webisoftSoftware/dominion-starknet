@@ -288,6 +288,10 @@ mod actions_system {
             // Generate the hash as input to recompute the commitment hash.
             let mut hand_hash: u256 = 0;
             for i in 0..hand.m_cards.len() {
+                hand_hash += *decrypted_hand[i].m_num_representation;
+            };
+
+            for i in 0..hand.m_cards.len() {
                 hand_hash += *hand.m_cards[i].m_num_representation;
             };
             hand_hash += commitment_hash;
