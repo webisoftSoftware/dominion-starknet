@@ -59,7 +59,7 @@ struct ComponentHand {
     /// The cards the player has in their hand (2).
     m_cards: Array<StructCard>,
     /// The commitment hash of the hand.
-    m_commitment_hash: ByteArray,
+    m_commitment_hash: Array<u32>,
 }
 
 /// Component that represents a single player at a table.

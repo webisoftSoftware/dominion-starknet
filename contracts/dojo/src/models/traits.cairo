@@ -157,10 +157,6 @@ impl EnumGameStateDisplay of Display<EnumGameState> {
                 let str: ByteArray = format!("Shutdown");
                 f.buffer.append(@str);
             },
-            EnumGameState::HandStart => {
-                let str: ByteArray = format!("HandStart");
-                f.buffer.append(@str);
-            },
             EnumGameState::RoundStart => {
                 let str: ByteArray = format!("RoundStart");
                 f.buffer.append(@str);
@@ -189,12 +185,12 @@ impl EnumGameStateDisplay of Display<EnumGameState> {
                 let str: ByteArray = format!("Showdown");
                 f.buffer.append(@str);
             },
-            EnumGameState::RoundEnd => {
-                let str: ByteArray = format!("RoundEnd");
+            EnumGameState::CommunityCardsDecrypted => {
+                let str: ByteArray = format!("CommunityCardsDecrypted");
                 f.buffer.append(@str);
             },
-            EnumGameState::HandEnd => {
-                let str: ByteArray = format!("HandEnd");
+            EnumGameState::RoundEnd => {
+                let str: ByteArray = format!("RoundEnd");
                 f.buffer.append(@str);
             },
         };
@@ -212,6 +208,7 @@ impl EnumPlayerStateDisplay of Display<EnumPlayerState> {
             EnumPlayerState::Folded => f.buffer.append(@"Folded"),
             EnumPlayerState::AllIn => f.buffer.append(@"AllIn"),
             EnumPlayerState::Left => f.buffer.append(@"Left"),
+            EnumPlayerState::Revealed => f.buffer.append(@"Revealed"),
         };
         Result::Ok(())
     }
@@ -466,14 +463,12 @@ impl CardImpl of ICard {
     fn new(value: EnumCardValue, suit: EnumCardSuit) -> StructCard {
         let value_as_u32: u32 = value.into();
         let suit_as_u32: u32 = suit.into();
-        // Shift left by 8 bits to make space for the suit.
-        let num_representation: u32 = ((value_as_u32 * 256_u32) + suit_as_u32);
-        StructCard { m_num_representation: num_representation.into() }
+        StructCard { m_num_representation: u256 {high: value_as_u32.into(), low: suit_as_u32.into()} }
     }
 
     fn get_value(self: @StructCard) -> Option<EnumCardValue> {
         // Get the 8 most significant bits.
-        match (BitAnd::bitand(*self.m_num_representation, *self.m_num_representation.high) / *self.m_num_representation.low) {
+        match *self.m_num_representation.high {
             0 => Option::None,
             1 => Option::Some(EnumCardValue::Ace),
             2 => Option::Some(EnumCardValue::Two),
@@ -495,7 +490,7 @@ impl CardImpl of ICard {
 
     fn get_suit(self: @StructCard) -> Option<EnumCardSuit> {
         // Get the 8 least significant bits.
-        match BitAnd::bitand(*self.m_num_representation, 0x0000_0000_0000_00FF_u256) {
+        match *self.m_num_representation.low {
             0 => Option::None,
             1 => Option::Some(EnumCardSuit::Spades),
             2 => Option::Some(EnumCardSuit::Hearts),
@@ -509,7 +504,11 @@ impl CardImpl of ICard {
 #[generate_trait]
 impl HandImpl of IHand {
     fn new(address: ContractAddress, commitment_hash: ByteArray) -> ComponentHand {
-        ComponentHand { m_owner: address, m_cards: array![], m_commitment_hash: commitment_hash }
+        let mut commitment_hash_num: Array<u32> = array![];
+        for i in 0..8_u32 {
+            commitment_hash_num.append(commitment_hash[i].into());
+        };
+        ComponentHand { m_owner: address, m_cards: array![], m_commitment_hash: commitment_hash_num }
     }
 
     fn add_card(ref self: ComponentHand, card: StructCard) {
@@ -1155,7 +1154,8 @@ impl TableImpl of ITable {
     }
 
     fn reset_table(ref self: ComponentTable) {
-        self = TableDefaultImpl::default();
+        self.m_pot = 0;
+        self.m_community_cards = array![];
     }
 
     fn _initialize_deck(ref self: ComponentTable) {
@@ -1211,7 +1211,7 @@ impl HandDefaultImpl of Default<ComponentHand> {
         return ComponentHand {
             m_owner: starknet::contract_address_const::<0x0>(),
             m_cards: array![],
-            m_commitment_hash: "",
+            m_commitment_hash: array![],
         };
     }
 }
