@@ -55,7 +55,7 @@ trait IActions<TContractState> {
 
 #[dojo::contract]
 mod actions_system {
-    use starknet::{ContractAddress, get_caller_address, get_block_timestamp};
+    use starknet::{ContractAddress, get_caller_address, get_block_timestamp, TxInfo, get_tx_info};
     use dojo::{model::ModelStorage, world::IWorldDispatcher};
     use dojo::event::{EventStorage};
     use dominion::models::components::{ComponentTable, ComponentPlayer, ComponentHand};
@@ -112,9 +112,14 @@ mod actions_system {
         m_timestamp: u64,
     }
 
-    #[constructor]
-    fn constructor(ref self: ContractState, table_manager: ContractAddress) {
-        self.table_manager.write(table_manager);
+    fn dojo_init(ref self: ContractState) {
+        let tx_info: TxInfo = get_tx_info().unbox();
+
+        // Access the account_contract_address field
+        let sender: ContractAddress = tx_info.account_contract_address;
+
+        // Set the table manager to the sender
+        self.table_manager.write(sender);
     }
 
     #[abi(embed_v0)]
