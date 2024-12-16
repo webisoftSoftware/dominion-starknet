@@ -55,8 +55,7 @@ trait ITableManagement<TContractState> {
     fn skip_turn(ref self: TContractState, table_id: u32, player: ContractAddress);
     fn advance_street(ref self: TContractState, table_id: u32);
     fn post_showdown(ref self: TContractState, table_id: u32, deck: Array<StructCard>);
-    fn deal_cards(ref self: TContractState, table_id: u32);
-    fn post_encrypt_deck(ref self: TContractState, table_id: u32, encrypted_deck: Array<u256>);
+    fn post_encrypt_deck(ref self: TContractState, table_id: u32, encrypted_deck: Array<StructCard>);
     fn post_decrypted_community_cards(ref self: TContractState, table_id: u32, cards: Array<StructCard>);
     fn showdown(ref self: TContractState, table_id: u32);
     // Timeout Functions
@@ -76,6 +75,7 @@ mod table_management_system {
     use dominion::models::utils;
     use dominion::models::structs::StructCard;
     use dojo::event::{EventStorage};
+    use origami_random::deck::{Deck, DeckTrait};
 
     use alexandria_data_structures::array_ext::ArrayTraitExt;
 
@@ -171,7 +171,7 @@ mod table_management_system {
             let mut table: ComponentTable = world.read_model(table_id);
 
             assert!(
-                table.m_state == EnumGameState::WaitingForPlayers || table.m_state == EnumGameState::HandEnd,
+                table.m_state == EnumGameState::WaitingForPlayers || table.m_state == EnumGameState::RoundEnd,
                 "Game is already in progress"
             );
             assert!(table.m_players.len() >= MIN_PLAYERS, "Not enough players to start the round");
@@ -184,7 +184,7 @@ mod table_management_system {
 
 
             // Set the game state to start of hand.
-            table.m_state = EnumGameState::HandStart;
+            table.m_state = EnumGameState::RoundStart;
             world.write_model(@table);
 
             world.emit_event(@EventRoundStarted {
@@ -193,35 +193,49 @@ mod table_management_system {
             });
         }
 
-        fn post_encrypt_deck(ref self: ContractState, table_id: u32, encrypted_deck: Array<u256>) {
-            // TODO: implement post_encrypt_deck(encrypted_deck: Array<u256>)
+        fn post_encrypt_deck(ref self: ContractState, table_id: u32, encrypted_deck: Array<StructCard>) {
             // Update deck with encrypted deck, update game state.
             // Then shuffle and deal cards.
-        }
 
-
-        fn deal_cards(ref self: ContractState, table_id: u32) {
-            // TODO: implement deal_cards(table_id: u32)
+            assert!(
+                self.game_master.read() == get_caller_address(),
+                "Only the game master can update the deck"
+            );
 
             let mut world = self.world(@"dominion");
             let mut table: ComponentTable = world.read_model(table_id);
-            let mut deck: Array<StructCard> = table.m_deck.clone();
+            table.m_deck = encrypted_deck;
+
+            let mut dealer = origami_random::deck::DeckTrait::new(starknet::get_block_timestamp().into(), table.m_deck.len());
 
             // Shuffle the deck.
-            for _ in 0..deck.len() {
+            for i in 0..table.m_players.len() {
                 // Give card pair to each player and update table and player's hands.
+                let random_index: u8 = dealer.draw();
+                let card: StructCard = table.m_deck[random_index.into()].clone();
+                let mut player_hand: ComponentHand = world.read_model(*table.m_players[i]);
+                assert!(player_hand.m_cards.len() < 2, "Player already has 2 cards");
+                player_hand.m_cards.append(card);
+
+                let random_index: u8 = dealer.draw();
+                let card: StructCard = table.m_deck[random_index.into()].clone();
+                player_hand.m_cards.append(card);
+                world.write_model(@player_hand);
+
+                world.emit_event(@EventDecryptHandRequested {
+                    m_table_id: table_id,
+                    m_hand: player_hand.m_cards,
+                    m_timestamp: starknet::get_block_timestamp()
+                });
             };
 
-            // Then emit decrypt_hand_request event & update game state to Pre-Flop.
+            table.m_state = EnumGameState::PreFlop;
+            world.write_model(@table);
         }
 
         fn advance_street(ref self: ContractState, table_id: u32) {
-            // TODO: implement advance_street(table_id: u32)
-            // Update game state to Pre-Flop.
-
             let mut world = self.world(@"dominion");
             let mut table: ComponentTable = world.read_model(table_id);
-            table.m_state = EnumGameState::PreFlop;
 
             match table.m_state {
                 // TODO: At every Game state changes emit an event: <table_id, cards_to_reveal>
@@ -248,9 +262,6 @@ mod table_management_system {
                 EnumGameState::RoundEnd => {
                     // Deal cards.
                 },
-                EnumGameState::HandEnd => {
-                    // Deal cards.
-                },
                 _ => panic!("Cannot advance street in this state")
             }
 
@@ -269,7 +280,7 @@ mod table_management_system {
             let mut table: ComponentTable = world.read_model(table_id);
             table.reset_table();
 
-            table.m_state = EnumGameState::HandEnd;
+            table.m_state = EnumGameState::RoundEnd;
             world.write_model(@table);
 
             // Start the next round.
@@ -290,7 +301,7 @@ mod table_management_system {
             assert!(table.m_current_turn == table.m_players.position(@player).unwrap().try_into().unwrap(), "Player is not the current turn");
 
             // Skip turn.
-            player_component.m_state = EnumPlayerState::Folded;
+            player_component.fold();
             table.advance_turn();
             world.write_model(@table);
             world.write_model(@player_component);
@@ -305,6 +316,14 @@ mod table_management_system {
             let mut world = self.world(@"dominion");
             let mut table: ComponentTable = world.read_model(table_id);
             assert!(table.m_state == EnumGameState::Showdown, "Hand is not at showdown");
+            assert!(table.m_community_cards.len() == 5, "Community cards are not set");
+            assert!(table.m_state == EnumGameState::CommunityCardsDecrypted, "Community cards are not decrypted");
+
+            // Before calculating hand, make sure all players have revealed their hands.
+            for player in table.m_players.span() {
+                let player_component: ComponentPlayer = world.read_model(*player);
+                assert!(player_component.m_state == EnumPlayerState::Revealed, "All Players must have revealed their hand");
+            };
 
             // Track winners and their hand ranks in a single pass.
             let mut winners_dict: Felt252Dict<bool> = Default::default();
@@ -359,11 +378,11 @@ mod table_management_system {
 
             // Reset the table.
             table.reset_table();
-            table.m_state = EnumGameState::HandEnd;
+            table.m_state = EnumGameState::RoundEnd;
             world.write_model(@table);
         }
 
-        /// 
+        
         fn post_showdown(ref self: ContractState, table_id: u32, deck: Array<StructCard>) {
             assert!(
                 self.game_master.read() == get_caller_address(),
@@ -372,11 +391,21 @@ mod table_management_system {
         }
 
         fn post_decrypted_community_cards(ref self: ContractState, table_id: u32, cards: Array<StructCard>) {
-            // TODO: Implement post_decrypted_community_cards(table_id: u32, cards: Array<u256>) so backend updates on-chain community cards array with decrypted cards.
             assert!(
                 self.game_master.read() == get_caller_address(),
                 "Only the game master can update the community cards"
             );
+
+            let mut world = self.world(@"dominion");
+            world.emit_event(@EventDecryptCCRequested {
+                m_table_id: table_id,
+                m_cards: cards.clone(),
+                m_timestamp: starknet::get_block_timestamp()
+            });
+
+            let mut table: ComponentTable = world.read_model(table_id);
+            table.m_community_cards = cards;
+            world.write_model(@table);
         }
 
         fn kick_player(ref self: ContractState, table_id: u32, player: ContractAddress) {

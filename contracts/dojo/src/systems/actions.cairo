@@ -50,7 +50,7 @@ trait IActions<TContractState> {
     fn set_ready(ref self: TContractState, table_id: u32);
     fn join_table(ref self: TContractState, table_id: u32, chips_amount: u32);
     fn leave_table(ref self: TContractState, table_id: u32);
-    fn reveal_hand(ref self: TContractState, table_id: u32, player_hand: Array<StructCard>, commit_hash: ByteArray);
+    fn reveal_hand(ref self: TContractState, table_id: u32, decrypted_hand: Array<StructCard>, commitment_hash: u256);
 }
 
 #[dojo::contract]
@@ -78,8 +78,7 @@ mod actions_system {
         m_table_id: u32,
         #[key]
         m_player: ContractAddress,
-        #[key]
-        m_commitment_hash: ByteArray,
+        m_commitment_hash: u256,
         m_player_hand: Array<StructCard>,
         m_timestamp: u64,
     }
@@ -262,29 +261,7 @@ mod actions_system {
             world.write_model(@table);
         }
 
-        // fn check(ref self: ContractState, table_id: u32) {
-        //     let mut world = self.world(@"dominion");
-        //     let mut table: ComponentTable = world.read_model(table_id);
-        //     assert!(table.m_state == EnumGameState::RoundStart, "Game is not in betting phase");
-
-        //     let mut player_component: ComponentPlayer = world.read_model(get_caller_address());
-        //     assert!(player_component.m_state == EnumPlayerState::Active, "Player is not active");
-        // }
-
-        // fn set_ready(ref self: ContractState, table_id: u32) {
-        //     let mut world = self.world(@"dominion");
-        //     let mut table: ComponentTable = world.read_model(table_id);
-        //     assert!(table.m_state == EnumGameState::WaitingForPlayers, "Game is not in waiting for players phase");
-
-        //     let mut player_component: ComponentPlayer = world.read_model(get_caller_address());
-        //     player_component.set_ready();
-
-        //     table.advance_turn();
-        //     world.write_model(@table);
-        //     world.write_model(@player_component);
-        // }
-
-        fn reveal_hand(ref self: ContractState, table_id: u32, player_hand: Array<StructCard>, commit_hash: ByteArray) {
+        fn reveal_hand(ref self: ContractState, table_id: u32, decrypted_hand: Array<StructCard>, commitment_hash: u256) {
             let mut world = self.world(@"dominion");
             let caller = get_caller_address();
 
@@ -297,33 +274,36 @@ mod actions_system {
 
             let mut hand: ComponentHand = world.read_model(caller);
 
-            // Recompute the commitment hash of the hand to verify.
-            let computed_hash: [u32; 8] = compute_sha256_byte_array(@commit_hash);
-            // assert!(computed_hash == hand.m_commitment_hash, "Commitment hash does not match");
+            // Generate the hash as input to recompute the commitment hash.
+            let mut hand_hash: u256 = 0;
+            for i in 0..hand.m_cards.len() {
+                hand_hash += *hand.m_cards[i].m_num_representation;
+            };
+            hand_hash += commitment_hash;
 
-            // Commitment has verified, overwrite the encrypted cards with unencrypted ones to display to all players.
-            hand.m_cards = player_hand.clone();
-            //TODO: Update player state to Revealed.
-            // Before calcualting hand, make sure all players have revealed their hands.
+
+            // Recompute the commitment hash of the hand to verify.
+            let computed_hash: [u32; 8] = compute_sha256_byte_array(@format!("{}", hand_hash));
+            let static_array: [u32; 8] = [*hand.m_commitment_hash[0],
+             *hand.m_commitment_hash[1], *hand.m_commitment_hash[2], *hand.m_commitment_hash[3],
+             *hand.m_commitment_hash[4], *hand.m_commitment_hash[5], *hand.m_commitment_hash[6],
+             *hand.m_commitment_hash[7]];
+
+            assert!(computed_hash == static_array, "Commitment hash does not match");
+
+            // Commitment has been verified, overwrite the encrypted cards with unencrypted ones to display to all players.
+            hand.m_cards = decrypted_hand.clone();
+            player.m_state = EnumPlayerState::Revealed;
+
             world.write_model(@hand);
+            world.write_model(@player);
             world.emit_event(@EventHandRevealed {
                 m_table_id: table_id,
                 m_player: caller,
-                m_commitment_hash: commit_hash,
-                m_player_hand: player_hand,
+                m_commitment_hash: commitment_hash,
+                m_player_hand: decrypted_hand,
                 m_timestamp: get_block_timestamp(),
             });
         }
-
-        // }
-
-        // fn call(ref self: ContractState, table_id: u32) { // Implement call logic
-        // }
-
-        // fn raise(ref self: ContractState, table_id: u32, amount: u256) { // Implement raise logic
-        // }
-
-        // fn all_in(ref self: ContractState, table_id: u32) { // Implement all-in logic
-        // }
     }
 }
