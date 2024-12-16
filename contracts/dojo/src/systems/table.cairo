@@ -70,14 +70,11 @@ mod table_system {
     struct Storage {
         game_master: ContractAddress, // Address of the game master who can create tables.
         counter: u32, // Counter for generating unique table IDs.
-        max_tables: u32,
     }
 
-    #[constructor]
-    fn constructor(ref self: ContractState, max_tables: u32) {
+    fn dojo_init(ref self: ContractState) {
         self.game_master.write(get_caller_address());
         self.counter.write(1);
-        self.max_tables.write(max_tables);
     }
 
     #[derive(Copy, Clone, Serde, Drop)]
@@ -98,7 +95,6 @@ mod table_system {
             min_buy_in: u32,
             max_buy_in: u32
         ) {
-            assert!(self.counter.read() < self.max_tables.read(), "Max tables reached");
             assert!(max_buy_in > 0, "Maximum buy-in cannot be less than 0");
             assert!(
                 min_buy_in < max_buy_in, "Minimum buy-in cannot be greater than maximum buy-in"
