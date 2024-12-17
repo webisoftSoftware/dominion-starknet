@@ -207,7 +207,7 @@ mod actions_system {
                             m_timestamp: get_block_timestamp()
                         }
                     );
-
+                //TODO : Could be nice if you could add the table_manager address to a model instead of passing it as a parameter.
                 let mut table_manager: ITableManagementDispatcher = ITableManagementDispatcher {
                     contract_address: table_manager
                 };
@@ -223,6 +223,7 @@ mod actions_system {
             let mut player: ComponentPlayer = world.read_model(caller);
 
             // Reset player's table state and return chips
+            // TODO : Place current bet in the pot.
             player.m_table_id = 0;
             player.m_total_chips += player.m_table_chips;
             player.m_table_chips = 0;
@@ -235,7 +236,6 @@ mod actions_system {
             let mut world = self.world(@"dominion");
             let mut table: ComponentTable = world.read_model(table_id);
             assert!(table.m_state == EnumGameState::PreFlop, "Game is not in betting phase");
-
             if amount == 0 {
                 // Player has checked.
                 table.advance_turn();
@@ -244,7 +244,8 @@ mod actions_system {
 
             let mut player_component: ComponentPlayer = world.read_model(get_caller_address());
             assert!(player_component.m_state == EnumPlayerState::Active, "Player is not active");
-
+            // TODO: Check for the table.m_current_turn.
+            // TODO: Check if the player has enough chips to place the bet.
             table.m_pot += player_component.place_bet(amount);
             table.advance_turn();
             world.write_model(@player_component);
@@ -255,10 +256,13 @@ mod actions_system {
             let mut world = self.world(@"dominion");
 
             let mut table: ComponentTable = world.read_model(table_id);
+            // TODO: That is wrong, you need to check if the game is in any betting phase.
+            // PreFlop, Flop, Turn, River
             assert!(table.m_state == EnumGameState::PreFlop, "Game is not in betting phase");
 
             let mut player_component: ComponentPlayer = world.read_model(get_caller_address());
             assert!(player_component.m_state == EnumPlayerState::Active, "Player is not active");
+            // TODO: Check for the table.m_current_turn.
 
             if player_component.m_table_chips > 0 {
                 table.m_pot += player_component.fold();
@@ -287,6 +291,7 @@ mod actions_system {
 
             let mut table: ComponentTable = world.read_model(table_id);
             assert!(table.m_state == EnumGameState::Showdown, "Table is not at showdown phase");
+            // TODO: You can just check if player.m_table_id == table_id.
             assert!(table.m_players.contains(@caller), "Player is not at this table");
 
             let mut player: ComponentPlayer = world.read_model(caller);
@@ -296,6 +301,7 @@ mod actions_system {
 
             // Recompute the commitment hash of the hand to verify.
             let computed_hash: [u32; 8] = compute_sha256_byte_array(@format!("{}", request));
+            // CHECK : Why dont you just use the hand.m_commitment_hash directly?
             let static_array: [u32; 8] = [
                 *hand.m_commitment_hash[0],
                 *hand.m_commitment_hash[1],
@@ -309,7 +315,7 @@ mod actions_system {
 
             assert!(computed_hash == static_array, "Commitment hash does not match");
 
-            // Commitment has been verified, overwrite the encrypted cards with unencrypted ones to
+            // Commitment has been verified, overwrite the encrypted cards with deccrypted ones to
             // display to all players.
             hand.m_cards = decrypted_hand.clone();
             player.m_state = EnumPlayerState::Revealed;

@@ -155,6 +155,8 @@ mod table_management_system {
             let mut world = self.world(@"dominion");
             let mut table: ComponentTable = world.read_model(table_id);
 
+            // CHECK : What happens when we start a new round from an existing round ?
+            // I am not sure this will work.
             assert!(
                 table.m_state == EnumGameState::WaitingForPlayers || table.m_state == EnumGameState::Shutdown,
                 "Game is already in progress"
@@ -166,6 +168,8 @@ mod table_management_system {
 
             // Remove players sitting out.
             InternalImpl::_remove_sitting_out_players(ref world, ref self, table_id);
+
+            // TODO : Submit an event to notify the backend to encrypt the deck.
 
             // Set the game state to start of hand.
             self.advance_street(table_id);
@@ -204,6 +208,7 @@ mod table_management_system {
 
                 if player_hand.m_cards.len() == 2 {
                     world.write_model(@player_hand);
+                    // TODO : Add the player's address to the event.
                     world.emit_event(@EventDecryptHandRequested {
                         m_table_id: table_id,
                         m_hand: player_hand.m_cards.span(),
@@ -225,9 +230,12 @@ mod table_management_system {
             // Advance table state to the next street.
             table.advance_street();
 
+            // TODO : You do not write the table after modifying it in the following match statement.
             match table.m_state {
+                // TODO: please triple check that the Game State is being updated correctly by PLAYERS.
                 // Betting round.
                 EnumGameState::PreFlop => {
+                    // TODO : This is not needed since no encryption / decryption is happening.
                     world.emit_event(@EventRequestBet {
                         m_table_id: table_id,
                         m_timestamp: starknet::get_block_timestamp()
@@ -267,13 +275,16 @@ mod table_management_system {
                     // Request each player to reveal their hand.
                     for player in table.m_players.span() {
                         let player_hand: ComponentHand = world.read_model(*player);
+                        //TODO : You should submit a different event here.
+                        // Such as EventRevealHandShowdownRequested
+                        // This event will emit the player's address, table_id, and timestamp.
                         world.emit_event(@EventDecryptHandRequested {
                             m_table_id: table_id,
                             m_hand: player_hand.m_cards.span(),
                             m_timestamp: starknet::get_block_timestamp()
                         });
                     };
-
+        
                     // Determine the winner.
                     self.showdown(table_id);
                 },
@@ -305,6 +316,7 @@ mod table_management_system {
             assert!(player_component.m_state == EnumPlayerState::Active, "Player is not active");
 
             let mut table: ComponentTable = world.read_model(table_id);
+            // TODO : Logic is wrong here, you just need to check if player == table.m_current_turn.
             assert!(
                 table
                     .m_current_turn == table
@@ -328,6 +340,7 @@ mod table_management_system {
         }
 
         fn showdown(ref self: ContractState, table_id: u32) {
+            // TODO : Remove this, since this function can be called by anyone in advance_street().
             assert!(
                 self.table_manager.read() == get_caller_address(),
                 "Only the table manager can determine the winner"
@@ -337,6 +350,7 @@ mod table_management_system {
             let mut table: ComponentTable = world.read_model(table_id);
             assert!(table.m_state == EnumGameState::Showdown, "Hand is not at showdown");
             assert!(table.m_community_cards.len() == 5, "Community cards are not set");
+            // CHECK : Why is this check needed ? Can't you just check the length of the community cards array ?
             assert!(
                 table.m_state == EnumGameState::CommunityCardsDecrypted,
                 "Community cards are not decrypted"
@@ -413,6 +427,8 @@ mod table_management_system {
 
             // Reset the table.
             table.reset_table();
+            // CHECK : Not sure this is going to work, you need to call start_round() to reset the table and start a new round.
+            // Please check that the rounds loop perfectly.
             table.m_state = EnumGameState::PreFlop;
             world.write_model(@table);
         }
@@ -426,6 +442,7 @@ mod table_management_system {
             );
 
             let mut world = self.world(@"dominion");
+            // TODO : Remove this event, since you are doing it in advance_street().
             world
                 .emit_event(
                     @EventDecryptCCRequested {
@@ -437,7 +454,7 @@ mod table_management_system {
 
             let mut table: ComponentTable = world.read_model(table_id);
             assert!(
-                table.m_state != EnumGameState::CommunityCardsDecrypted,
+                table.m_state != EnumGameState::CommunityCardsDecrypted, // CHECK: Why is this check needed ?
                 "Community cards are already decrypted"
             );
             assert!(
@@ -446,7 +463,7 @@ mod table_management_system {
                 "Community cards are not at the correct street"
             );
 
-            table.m_community_cards = cards;
+            table.m_community_cards = cards; // TODO : You need to append to the exisiting community cards array or it will be overwritting the already revealed cards.
             table.m_state = EnumGameState::CommunityCardsDecrypted;
             world.write_model(@table);
         }
@@ -462,6 +479,7 @@ mod table_management_system {
             let mut player_model: ComponentPlayer = world.read_model(player);
 
             // Reset player's table state and return chips
+            // TODO : Set current bet in the pot.
             player_model.m_table_id = 0;
             player_model.m_total_chips += player_model.m_table_chips;
             player_model.m_table_chips = 0;

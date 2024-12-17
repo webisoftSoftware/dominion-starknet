@@ -68,7 +68,7 @@ mod cashier_system {
     use super::{IERC20Dispatcher, IERC20DispatcherTrait};
 
     // Constants
-    const ETH_TO_CHIPS_RATIO: u256 = 10000000000000; // 100,000 chips per ETH
+    const ETH_TO_CHIPS_RATIO: u256 = 10000000000000; // 100,000 chips per ETH // TODO: Change this to 1,000,000 chips per ETH
     const PAYMASTER_FEE_PERCENTAGE: u32 = 0; // Turned off for now
     const WITHDRAWAL_FEE_PERCENTAGE: u32 = 2; // 2% withdrawal fee
 
