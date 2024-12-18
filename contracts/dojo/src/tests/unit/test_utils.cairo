@@ -45,10 +45,10 @@
 use dominion::models::structs::StructCard;
 use dominion::models::enums::{EnumCardValue, EnumCardSuit};
 use dominion::models::traits::{StructCardEq, StructCardDisplay, ICard};
-use dominion::models::utils::{sort, merge_sort};
+use dominion::models::utils::{sort, merge_sort, _merge_sort_players};
 
 #[test]
-fn test_sort() {
+fn test_sort_cards() {
     // Check identical arrays.
     let input_arr = array![
         ICard::new(EnumCardValue::Two, EnumCardSuit::Spades),
@@ -98,4 +98,18 @@ fn test_sort() {
 }
 
 #[test]
-fn test_count_values() {}
+fn test_sort_bets() {
+    let players = array![
+        (starknet::contract_address_const::<1>(), 300),
+        (starknet::contract_address_const::<2>(), 100),
+        (starknet::contract_address_const::<3>(), 200)
+    ];
+    let expected_array = array![
+        (starknet::contract_address_const::<2>(), 100),
+        (starknet::contract_address_const::<3>(), 200),
+        (starknet::contract_address_const::<1>(), 300)
+    ];
+
+    let new_array = _merge_sort_players(@players);
+    assert_eq!(new_array, expected_array);
+}
