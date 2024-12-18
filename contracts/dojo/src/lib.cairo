@@ -53,7 +53,6 @@ mod models {
 mod systems {
     mod actions;
     mod table_manager;
-    mod table;
     mod cashier;
 }
 
@@ -66,6 +65,7 @@ mod tests {
         mod test_traits;
     }
     mod integration {
+        mod utils;
         mod test_actions;
         mod test_table_manager;
         mod test_table;
