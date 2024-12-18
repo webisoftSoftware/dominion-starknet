@@ -52,7 +52,6 @@ pub enum EnumGameState {
     Flop,
     Turn,
     River,
-    CommunityCardsDecrypted,
     Showdown,
 }
 

@@ -124,3 +124,6 @@ struct ComponentTable {
     /// Timestamp of the last played action.
     m_last_played_ts: u64,
 }
+
+
+// TODO: Add sidepot component for all eligible players.

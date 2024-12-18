@@ -53,6 +53,7 @@ trait ITableManagement<TContractState> {
     fn start_round(ref self: TContractState, table_id: u32);
     fn skip_turn(ref self: TContractState, table_id: u32, player: ContractAddress);
     fn advance_street(ref self: TContractState, table_id: u32);
+    fn post_auth_hash(ref self: TContractState, table_id: u32, auth_hash: ByteArray);
     fn post_encrypt_deck(
         ref self: TContractState, table_id: u32, encrypted_deck: Array<StructCard>
     );
@@ -62,6 +63,12 @@ trait ITableManagement<TContractState> {
     fn showdown(ref self: TContractState, table_id: u32);
     // Timeout Functions
     fn kick_player(ref self: TContractState, table_id: u32, player: ContractAddress);
+    
+    fn create_table(
+        ref self: TContractState, small_blind: u32, big_blind: u32, min_buy_in: u32, max_buy_in: u32
+    );
+
+    fn shutdown_table(ref self: TContractState, table_id: u32);
     // Admin Functions
     fn change_table_manager(ref self: TContractState, new_table_manager: ContractAddress);
     fn get_table_manager(self: @TContractState) -> ContractAddress;
@@ -86,6 +93,23 @@ mod table_management_system {
     #[storage]
     struct Storage {
         table_manager: ContractAddress,
+        counter: u32,
+    }
+
+    #[derive(Copy, Clone, Serde, Drop)]
+    #[dojo::event]
+    struct EventTableCreated {
+        #[key]
+        m_table_id: u32,
+        m_timestamp: u64
+    }
+
+    #[derive(Copy, Clone, Serde, Drop)]
+    #[dojo::event]
+    struct EventTableShutdown {
+        #[key]
+        m_table_id: u32,
+        m_timestamp: u64
     }
 
     #[derive(Copy, Clone, Serde, Drop)]
@@ -118,6 +142,8 @@ mod table_management_system {
     struct EventDecryptHandRequested {
         #[key]
         m_table_id: u32,
+        #[key]
+        m_player: ContractAddress,
         m_hand: Span<StructCard>,
         m_timestamp: u64
     }
@@ -139,6 +165,36 @@ mod table_management_system {
         m_timestamp: u64
     }
 
+    #[derive(Clone, Serde, Drop)]
+    #[dojo::event]
+    struct EventAuthHashRequested {
+        #[key]
+        m_table_id: u32,
+        #[key]
+        m_player: ContractAddress,
+        m_auth_hash: ByteArray,
+        m_timestamp: u64
+    }
+
+    #[derive(Clone, Serde, Drop)]
+    #[dojo::event]
+    struct EventRevealShowdownRequested {
+        #[key]
+        m_table_id: u32,
+        #[key]
+        m_player: ContractAddress,
+        m_hand: Span<StructCard>,
+        m_timestamp: u64
+    }
+
+    #[derive(Copy, Clone, Serde, Drop)]
+    #[dojo::event]
+    struct EventAuthHashVerified {
+        #[key]
+        m_table_id: u32,
+        m_timestamp: u64
+    }
+
     fn dojo_init(ref self: ContractState) {
         let tx_info: TxInfo = get_tx_info().unbox();
 
@@ -147,16 +203,74 @@ mod table_management_system {
 
         // Set the table manager to the sender
         self.table_manager.write(sender);
+        self.counter.write(1);
     }
 
     #[abi(embed_v0)]
     impl TableManagementImpl of super::ITableManagement<ContractState> {
+        fn create_table(
+            ref self: ContractState,
+            small_blind: u32,
+            big_blind: u32,
+            min_buy_in: u32,
+            max_buy_in: u32
+        ) {
+            assert!(
+                self.table_manager.read() == get_caller_address(),
+                "Only the table manager can create tables"
+            );
+
+            assert!(small_blind > 0, "Small blind cannot be less than 0");
+            assert!(big_blind > small_blind, "Big blind cannot be less than small blind");
+
+            assert!(max_buy_in > 0, "Maximum buy-in cannot be less than 0");
+            assert!(
+                min_buy_in < max_buy_in, "Minimum buy-in cannot be greater than maximum buy-in"
+            );
+
+            let table_id: u32 = self.counter.read();
+            let mut world = self.world(@"dominion");
+            let table: ComponentTable = world.read_model(table_id);
+            assert!(table.m_state == EnumGameState::Shutdown, "Table is already created");
+
+            // Initialize new table with provided parameters.
+            let mut new_table: ComponentTable = ITable::new(
+                table_id, small_blind, big_blind, min_buy_in, max_buy_in, array![]
+            );
+            new_table.m_state = EnumGameState::WaitingForPlayers;
+            new_table._initialize_deck();
+
+            // Save table to world state and increment counter
+            world.write_model(@new_table);
+            self.counter.write(table_id + 1);
+
+            world.emit_event(@EventTableCreated { 
+                m_table_id: table_id,
+                m_timestamp: starknet::get_block_timestamp()
+            });
+        }
+
+        fn shutdown_table(ref self: ContractState, table_id: u32) {
+            assert!(
+                self.table_manager.read() == get_caller_address(),
+                "Only the table manager can shutdown the table"
+            );
+
+            let mut world = self.world(@"dominion");
+            let mut table: ComponentTable = world.read_model(table_id);
+            table.m_state = EnumGameState::Shutdown;
+            world.write_model(@table);
+
+            world.emit_event(@EventTableShutdown {
+                m_table_id: table_id,
+                m_timestamp: starknet::get_block_timestamp()
+            });
+        }
+
         fn start_round(ref self: ContractState, table_id: u32) {
             let mut world = self.world(@"dominion");
             let mut table: ComponentTable = world.read_model(table_id);
 
-            // CHECK : What happens when we start a new round from an existing round ?
-            // I am not sure this will work.
             assert!(
                 table.m_state == EnumGameState::WaitingForPlayers || table.m_state == EnumGameState::Shutdown,
                 "Game is already in progress"
@@ -169,7 +283,11 @@ mod table_management_system {
             // Remove players sitting out.
             InternalImpl::_remove_sitting_out_players(ref world, ref self, table_id);
 
-            // TODO : Submit an event to notify the backend to encrypt the deck.
+            world.emit_event(@EventEncryptDeckRequested {
+                m_table_id: table_id,
+                m_deck: table.m_deck.span(),
+                m_timestamp: starknet::get_block_timestamp()
+            });
 
             // Set the game state to start of hand.
             self.advance_street(table_id);
@@ -208,9 +326,9 @@ mod table_management_system {
 
                 if player_hand.m_cards.len() == 2 {
                     world.write_model(@player_hand);
-                    // TODO : Add the player's address to the event.
                     world.emit_event(@EventDecryptHandRequested {
                         m_table_id: table_id,
+                        m_player: *table.m_players[i],
                         m_hand: player_hand.m_cards.span(),
                         m_timestamp: starknet::get_block_timestamp()
                     });
@@ -230,12 +348,9 @@ mod table_management_system {
             // Advance table state to the next street.
             table.advance_street();
 
-            // TODO : You do not write the table after modifying it in the following match statement.
             match table.m_state {
-                // TODO: please triple check that the Game State is being updated correctly by PLAYERS.
                 // Betting round.
                 EnumGameState::PreFlop => {
-                    // TODO : This is not needed since no encryption / decryption is happening.
                     world.emit_event(@EventRequestBet {
                         m_table_id: table_id,
                         m_timestamp: starknet::get_block_timestamp()
@@ -275,11 +390,9 @@ mod table_management_system {
                     // Request each player to reveal their hand.
                     for player in table.m_players.span() {
                         let player_hand: ComponentHand = world.read_model(*player);
-                        //TODO : You should submit a different event here.
-                        // Such as EventRevealHandShowdownRequested
-                        // This event will emit the player's address, table_id, and timestamp.
-                        world.emit_event(@EventDecryptHandRequested {
+                        world.emit_event(@EventRevealShowdownRequested {
                             m_table_id: table_id,
+                            m_player: *player,
                             m_hand: player_hand.m_cards.span(),
                             m_timestamp: starknet::get_block_timestamp()
                         });
@@ -306,6 +419,19 @@ mod table_management_system {
             });
         }
 
+        fn post_auth_hash(ref self: ContractState, table_id: u32, auth_hash: ByteArray) {
+            let mut world = self.world(@"dominion");
+            let mut table: ComponentTable = world.read_model(table_id);
+            assert!(table.m_state != EnumGameState::Shutdown, "Game is shutdown");
+            
+            world.emit_event(@EventAuthHashRequested {
+                m_table_id: table_id,
+                m_player: get_caller_address(),
+                m_auth_hash: auth_hash,
+                m_timestamp: starknet::get_block_timestamp()
+            });
+        }
+
         fn skip_turn(ref self: ContractState, table_id: u32, player: ContractAddress) {
             assert!(
                 self.table_manager.read() == get_caller_address(),
@@ -316,17 +442,7 @@ mod table_management_system {
             assert!(player_component.m_state == EnumPlayerState::Active, "Player is not active");
 
             let mut table: ComponentTable = world.read_model(table_id);
-            // TODO : Logic is wrong here, you just need to check if player == table.m_current_turn.
-            assert!(
-                table
-                    .m_current_turn == table
-                    .m_players
-                    .position(@player)
-                    .unwrap()
-                    .try_into()
-                    .unwrap(),
-                "Player is not the current turn"
-            );
+            assert!(table.check_turn(@player), "Player is not the current turn");
             assert!(
                 table.m_last_played_ts < starknet::get_block_timestamp() - 60,
                 "Player has not been inactive for at least 60 seconds"
@@ -340,21 +456,10 @@ mod table_management_system {
         }
 
         fn showdown(ref self: ContractState, table_id: u32) {
-            // TODO : Remove this, since this function can be called by anyone in advance_street().
-            assert!(
-                self.table_manager.read() == get_caller_address(),
-                "Only the table manager can determine the winner"
-            );
-
             let mut world = self.world(@"dominion");
             let mut table: ComponentTable = world.read_model(table_id);
             assert!(table.m_state == EnumGameState::Showdown, "Hand is not at showdown");
             assert!(table.m_community_cards.len() == 5, "Community cards are not set");
-            // CHECK : Why is this check needed ? Can't you just check the length of the community cards array ?
-            assert!(
-                table.m_state == EnumGameState::CommunityCardsDecrypted,
-                "Community cards are not decrypted"
-            );
 
             // Before calculating hand, make sure all players have revealed their hands.
             for player in table
@@ -426,15 +531,11 @@ mod table_management_system {
                 };
 
             // Reset the table.
-            table.reset_table();
-            // CHECK : Not sure this is going to work, you need to call start_round() to reset the table and start a new round.
-            // Please check that the rounds loop perfectly.
-            table.m_state = EnumGameState::PreFlop;
-            world.write_model(@table);
+            self.advance_street(table_id);
         }
 
         fn post_decrypted_community_cards(
-            ref self: ContractState, table_id: u32, cards: Array<StructCard>
+            ref self: ContractState, table_id: u32, mut cards: Array<StructCard>
         ) {
             assert!(
                 self.table_manager.read() == get_caller_address(),
@@ -442,29 +543,14 @@ mod table_management_system {
             );
 
             let mut world = self.world(@"dominion");
-            // TODO : Remove this event, since you are doing it in advance_street().
-            world
-                .emit_event(
-                    @EventDecryptCCRequested {
-                        m_table_id: table_id,
-                        m_cards: cards.span(),
-                        m_timestamp: starknet::get_block_timestamp()
-                    }
-                );
-
             let mut table: ComponentTable = world.read_model(table_id);
-            assert!(
-                table.m_state != EnumGameState::CommunityCardsDecrypted, // CHECK: Why is this check needed ?
-                "Community cards are already decrypted"
-            );
             assert!(
                 table.m_state == EnumGameState::Flop || table.m_state == EnumGameState::Turn
                     || table.m_state == EnumGameState::River,
                 "Community cards are not at the correct street"
             );
 
-            table.m_community_cards = cards; // TODO : You need to append to the exisiting community cards array or it will be overwritting the already revealed cards.
-            table.m_state = EnumGameState::CommunityCardsDecrypted;
+            table.m_community_cards.append_all(ref cards);
             world.write_model(@table);
         }
 
@@ -479,7 +565,7 @@ mod table_management_system {
             let mut player_model: ComponentPlayer = world.read_model(player);
 
             // Reset player's table state and return chips
-            // TODO : Set current bet in the pot.
+            table.m_pot += player_model.m_current_bet;
             player_model.m_table_id = 0;
             player_model.m_total_chips += player_model.m_table_chips;
             player_model.m_table_chips = 0;

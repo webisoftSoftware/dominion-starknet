@@ -182,10 +182,6 @@ impl EnumGameStateDisplay of Display<EnumGameState> {
                 let str: ByteArray = format!("Showdown");
                 f.buffer.append(@str);
             },
-            EnumGameState::CommunityCardsDecrypted => {
-                let str: ByteArray = format!("CommunityCardsDecrypted");
-                f.buffer.append(@str);
-            },
         };
         Result::Ok(())
     }
@@ -1096,6 +1092,16 @@ impl TableImpl of ITable {
         };
         table._initialize_deck();
         return table;
+    }
+
+    fn check_turn(ref self: ComponentTable, player: @ContractAddress) -> bool {
+        assert!(self.m_players.contains(player), "Player is not at this table");
+
+        let player_position: Option<usize> = self.find_player(player);
+        assert!(player_position.is_some(), "Cannot find player");
+
+        let player_position: usize = player_position.unwrap();
+        return self.m_current_turn == player_position.try_into().expect('Cannot downcast turn');
     }
 
     fn shuffle_deck(ref self: ComponentTable, seed: felt252) {

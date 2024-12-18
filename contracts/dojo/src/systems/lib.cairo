@@ -44,5 +44,4 @@
 
 mod actions;
 mod bank;
-mod table;
 mod table_management;
