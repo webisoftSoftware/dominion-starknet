@@ -1085,7 +1085,7 @@ impl TableImpl of ITable {
         max_buy_in: u32,
         m_players: Array<ContractAddress>
     ) -> ComponentTable {
-        assert!(min_buy_in > max_buy_in, "Minimum buy-in cannot be greater than maximum buy-in");
+        assert!(max_buy_in > min_buy_in, "Minimum buy-in cannot be greater than maximum buy-in");
         assert!(m_players.len() <= 6, "There must be at most 6 players");
 
         let mut table: ComponentTable = ComponentTable {
@@ -1120,11 +1120,20 @@ impl TableImpl of ITable {
 
     fn shuffle_deck(ref self: ComponentTable, seed: felt252) {
         let mut shuffled_deck: Array<StructCard> = array![];
+        println!("Deck length: {}", self.m_deck.len());
         let mut deck = DeckTrait::new(seed, self.m_deck.len());
 
         while deck.remaining > 0 {
             // Draw a random number from 0 to 52.
             let card_index: u8 = deck.draw();
+
+            // Avoid going out of bounds since the second param for DeckTrait is inclusive.
+            if card_index != 0 {
+                if let Option::Some(_) = self.m_deck.get(card_index.into() - 1) {
+                    shuffled_deck.append(self.m_deck[card_index.into() - 1].clone());
+                }
+                continue;
+            }
 
             if let Option::Some(_) = self.m_deck.get(card_index.into()) {
                 shuffled_deck.append(self.m_deck[card_index.into()].clone());
