@@ -224,9 +224,7 @@ mod table_management_system {
             assert!(big_blind > small_blind, "Big blind cannot be less than small blind");
 
             assert!(max_buy_in > 0, "Maximum buy-in cannot be less than 0");
-            assert!(
-                min_buy_in < max_buy_in, "Minimum buy-in cannot be greater than maximum buy-in"
-            );
+            assert!(max_buy_in > min_buy_in, "Minimum buy-in cannot be greater than maximum buy-in");
 
             let table_id: u32 = self.counter.read();
             let mut world = self.world(@"dominion");
@@ -272,8 +270,8 @@ mod table_management_system {
             let mut table: ComponentTable = world.read_model(table_id);
 
             assert!(
-                table.m_state == EnumGameState::WaitingForPlayers || table.m_state == EnumGameState::Shutdown,
-                "Game is already in progress"
+                table.m_state == EnumGameState::WaitingForPlayers || table.m_state == EnumGameState::Showdown,
+                "Game is not in a valid state to start a round"
             );
             assert!(table.m_players.len() >= MIN_PLAYERS, "Not enough players to start the round");
 
@@ -419,14 +417,6 @@ mod table_management_system {
                     // Determine the winner.
                     self.showdown(table_id);
                 },
-                EnumGameState::Shutdown => {
-                    // Reset the table.
-                    let mut table: ComponentTable = world.read_model(table_id);
-                    table.reset_table();
-
-                    // Start the next round.
-                    self.start_round(table_id);
-                },
                 _ => {}
             }
 
@@ -545,8 +535,11 @@ mod table_management_system {
                 InternalImpl::_distribute_chips(ref world, *winner, pot_share);
             };
 
-            // Reset the table
-            self.advance_street(table_id);
+           // Reset the table.
+           table.reset_table();
+
+           // Start the next round.
+           self.start_round(table_id);
         }
 
         fn post_decrypted_community_cards(
