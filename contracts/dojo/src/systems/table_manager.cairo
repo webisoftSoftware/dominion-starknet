@@ -345,6 +345,24 @@ mod table_management_system {
 
             assert!(table.m_state != EnumGameState::WaitingForPlayers, "Round has not started");
 
+            // Create sidepots before advancing street if there are any all-in players.
+            let mut player_bets: Array<u32> = array![];
+            let mut has_all_in = false;
+            
+            // Collect all current bets and check for all-in players.
+            for player in table.m_players.span() {
+                let player_component: ComponentPlayer = world.read_model(*player);
+                player_bets.append(player_component.m_current_bet);
+                if player_component.m_table_chips == 0 && player_component.m_state == EnumPlayerState::Active {
+                    has_all_in = true;
+                }
+            };
+
+            // Create sidepots if there are all-in players.
+            if has_all_in {
+                InternalImpl::_create_sidepots(ref world, table_id, table.m_players.clone(), player_bets);
+            }
+
             // Advance table state to the next street.
             table.advance_street();
 
@@ -590,7 +608,7 @@ mod table_management_system {
 
     #[generate_trait]
     impl InternalImpl of InternalTrait {
-        fn create_sidepots(
+        fn _create_sidepots(
             ref world: dojo::world::WorldStorage,
             table_id: u32,
             players: Array<ContractAddress>,
