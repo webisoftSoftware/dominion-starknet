@@ -42,6 +42,7 @@
 // DEALINGS IN THE SOFTWARE.
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 
+use starknet::ContractAddress;
 use dominion::models::structs::StructCard;
 use dominion::models::enums::{EnumCardValue, EnumHandRank};
 use dominion::models::traits::{
@@ -442,6 +443,69 @@ fn get_top_n_values(values: @Array<EnumCardValue>, n: usize) -> Array<EnumCardVa
 
     for i in 0..count {
         result.append(*values[i]);
+    };
+
+    return result;
+}
+
+fn _merge_sort_players(arr: @Array<(ContractAddress, u32)>) -> Array<(ContractAddress, u32)> {
+    let len = arr.len();
+    if len <= 1 {
+        return arr.clone();
+    }
+
+    let mid = len / 2;
+    let mut left: Array<(ContractAddress, u32)> = array![];
+    let mut right: Array<(ContractAddress, u32)> = array![];
+
+    // Split array into left and right halves.
+    for i in 0..mid {
+        left.append(*arr[i]);
+    };
+
+    for i in mid..len {
+        right.append(*arr[i]);
+    };
+
+    // Recursively sort both halves.
+    left = _merge_sort_players(@left);
+    right = _merge_sort_players(@right);
+
+    // Merge the sorted halves.
+    return _merge_players(@left, @right);
+}
+
+fn _merge_players(
+    left: @Array<(ContractAddress, u32)>, right: @Array<(ContractAddress, u32)>
+) -> Array<(ContractAddress, u32)> {
+    let mut result: Array<(ContractAddress, u32)> = array![];
+    let mut left_idx: usize = 0;
+    let mut right_idx: usize = 0;
+    let left_len = left.len();
+    let right_len = right.len();
+
+    // Merge while both arrays have elements.
+    while left_idx < left_len && right_idx < right_len {
+        let (_, left_bet) = *left[left_idx];
+        let (_, right_bet) = *right[right_idx];
+
+        if left_bet <= right_bet {
+            result.append(*left[left_idx]);
+            left_idx += 1;
+        } else {
+            result.append(*right[right_idx]);
+            right_idx += 1;
+        }
+    };
+
+    // Append remaining elements from left array.
+    for i in left_idx..left_len {
+        result.append(*left[i]);
+    };
+
+    // Append remaining elements from right array.
+    for i in right_idx..right_len {
+        result.append(*right[i]);
     };
 
     return result;

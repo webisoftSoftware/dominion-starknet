@@ -54,7 +54,7 @@ use dominion::models::enums::{
     EnumCardSuit, EnumCardValue, EnumGameState, EnumPlayerState, EnumPosition, EnumHandRank,
     EnumError
 };
-use dominion::models::components::{ComponentTable, ComponentPlayer, ComponentHand};
+use dominion::models::components::{ComponentTable, ComponentPlayer, ComponentHand, ComponentSidepot};
 
 /////////////////////////////////////////////////////////////////////////
 /////////////////////////////////////////////////////////////////////////
@@ -1063,6 +1063,19 @@ impl PlayerImpl of IPlayer {
 }
 
 #[generate_trait]
+impl SidepotImpl of ISidepot {
+    fn new(table_id: u32, amount: u32, player: ContractAddress, sidepot_id: u8, min_bet: u32) -> ComponentSidepot nopanic {
+        return ComponentSidepot {
+            m_table_id: table_id,
+            m_amount: amount,
+            m_player: player,
+            m_sidepot_id: sidepot_id,
+            m_min_bet: min_bet,
+        };
+    }
+}
+
+#[generate_trait]
 impl TableImpl of ITable {
     fn new(
         id: u32,
@@ -1089,6 +1102,7 @@ impl TableImpl of ITable {
             m_max_buy_in: max_buy_in,
             m_state: EnumGameState::WaitingForPlayers,
             m_last_played_ts: 0,
+            m_num_sidepots: 0,
         };
         table._initialize_deck();
         return table;
@@ -1296,6 +1310,7 @@ impl TableDefaultImpl of Default<ComponentTable> {
             m_min_buy_in: 0,
             m_state: EnumGameState::WaitingForPlayers,
             m_last_played_ts: 0,
+            m_num_sidepots: 0,
         };
     }
 }

@@ -14,7 +14,7 @@
 //  ░███    ███ ░███ ░███ ░███ ░███ ░███
 //  ░███  ░███ ░███  ░███ ░███ ░███ ░███
 //  ░███
-//  █���████████  ░░██████  █████░███
+//  ████████  ░░██████  █████░███
 //  █████ █████ ████ █████
 //  █████░░██████  ████ █████
 // ░░░░░░░░░░    ░░░░░░  ░░░░░ ░░░ ░░░░░
@@ -78,9 +78,9 @@ trait ITableManagement<TContractState> {
 mod table_management_system {
     use starknet::{ContractAddress, get_caller_address, TxInfo, get_tx_info};
     use dojo::{model::ModelStorage, world::IWorldDispatcher};
-    use dominion::models::components::{ComponentTable, ComponentPlayer, ComponentHand};
+    use dominion::models::components::{ComponentTable, ComponentPlayer, ComponentHand, ComponentSidepot};
     use dominion::models::enums::{EnumGameState, EnumPlayerState, EnumPosition, EnumHandRank};
-    use dominion::models::traits::{ITable, IPlayer, IHand, EnumHandRankPartialOrd};
+    use dominion::models::traits::{ITable, IPlayer, IHand, EnumHandRankPartialOrd, ISidepot};
     use dominion::models::utils;
     use dominion::models::structs::StructCard;
     use dojo::event::{EventStorage};
@@ -514,23 +514,20 @@ mod table_management_system {
                     }
                 };
 
+            // Determine winners and distribute pot.
+            let (winners, pot_share_count) = InternalImpl::_determine_winners(ref world, @table, @table.m_players);
+            let pot_share = table.m_pot / pot_share_count;
+            
             // At this point:
             // - Winners_dict contains all winning players (winners_dict.get(player.into()) ==
             // true).
             // - Pot_share_count contains the number of winners to split the pot between.
             // - Current_best_rank contains the winning hand rank.
+            for winner in winners.span() {
+                InternalImpl::_distribute_chips(ref world, *winner, pot_share);
+            };
 
-            // Distribute pot.
-            let pot_share = table.m_pot / pot_share_count;
-            for player in table
-                .m_players
-                .span() {
-                    if winners_dict.get((*player).into()) {
-                        InternalImpl::_distribute_chips(ref world, *player, pot_share);
-                    }
-                };
-
-            // Reset the table.
+            // Reset the table
             self.advance_street(table_id);
         }
 
@@ -589,8 +586,121 @@ mod table_management_system {
         }
     }
 
+    const MAX_BET: u32 = 1000000000;
+
     #[generate_trait]
     impl InternalImpl of InternalTrait {
+        fn create_sidepots(
+            ref world: dojo::world::WorldStorage,
+            table_id: u32,
+            players: Array<ContractAddress>,
+            bets: Array<u32>
+        ) {
+            // Track the current sidepot ID for this table.
+            let mut sidepot_id = 0;
+            let mut remaining_players = players.clone();
+            let mut remaining_bets = bets.clone();
+            let mut processed_amounts: Array<u32> = array![];
+
+            while !remaining_players.is_empty() {
+                // Find smallest non-zero bet among remaining players.
+                let mut min_bet: u32 = MAX_BET;
+                let mut active_players: u8 = 0;
+                
+                for i in 0..remaining_bets.len() {
+                    if *remaining_bets[i] > 0 {
+                        active_players += 1;
+                        if *remaining_bets[i] < min_bet {
+                            min_bet = *remaining_bets[i];
+                        }
+                    }
+                };
+
+                // Exit if no more active players or valid bets.
+                if active_players < 2 || min_bet == MAX_BET {
+                    break;
+                }
+
+                // Calculate pot amount for this level.
+                let mut pot_amount: u32 = 0;
+                let mut contribution_for_pot: u32 = min_bet;
+                
+                if !processed_amounts.is_empty() {
+                    // Subtract amounts already processed in previous pots.
+                    let mut total_processed: u32 = 0;
+                    for amount in processed_amounts.span() {
+                        total_processed += *amount;
+                    };
+                    contribution_for_pot = min_bet - total_processed;
+                }
+
+                // Add contribution from each eligible player.
+                let mut new_remaining_bets: Array<u32> = array![];
+                for i in 0..remaining_bets.len() {
+                    if *remaining_bets[i] >= min_bet {
+                        pot_amount += contribution_for_pot;
+                        // Create new bet amount with reduction
+                        new_remaining_bets.append(*remaining_bets[i] - min_bet);
+                    } else {
+                        new_remaining_bets.append(*remaining_bets[i]);
+                    }
+                };
+                remaining_bets = new_remaining_bets;
+
+                // Create eligibility entries for all players who contributed.
+                for i in 0..remaining_players.len() {
+                    let player: ContractAddress = *remaining_players[i];
+                    if *remaining_bets[i] >= min_bet {
+                        world.write_model(
+                            @ISidepot::new(
+                                table_id,
+                                pot_amount,
+                                player,
+                                sidepot_id,
+                                contribution_for_pot
+                            )
+                        );
+                    }
+                };
+
+                processed_amounts.append(min_bet);
+                sidepot_id += 1;
+            };
+        }
+        
+        fn _distribute_sidepots(
+            ref world: dojo::world::WorldStorage,
+            table_id: u32,
+            winners: Array<(ContractAddress, u32)> // (player address, hand strength)
+        ) {
+            let table: ComponentTable = world.read_model(table_id);
+            // Get all sidepots this winner is eligible for.
+            let eligible_sidepots: u8 = table.m_num_sidepots;
+        
+            // Process each winner in order of hand strength
+            for i in 0..winners.len() {
+                let (winner_address, _) = winners[i];
+        
+                // Award each eligible sidepot to the winner.
+                for j in 0..eligible_sidepots {
+                    let sidepot: ComponentSidepot = world.read_model((table_id, *winner_address, j));
+                    
+                    // Update winner's chips.
+                    let mut winner: ComponentPlayer = world.read_model(*winner_address);
+                    winner.m_table_chips += sidepot.m_amount;
+                    world.write_model(@winner);
+        
+                    // Remove this sidepot eligibility for all players.
+                    for k in 0..table.m_players.len() {
+                        let player: ContractAddress = *table.m_players[k];
+                        world.erase_model(
+                            @ISidepot::new(table_id, sidepot.m_amount, player, sidepot.m_sidepot_id, sidepot.m_min_bet)
+                        );
+                    };
+                };
+            };
+        }
+
         fn _distribute_chips(
             ref world: dojo::world::WorldStorage, player: ContractAddress, amount: u32
         ) {
@@ -699,6 +809,50 @@ mod table_management_system {
 
             table.m_players = new_players;
             world.write_model(@table);
+        }
+
+        fn _determine_winners(
+            ref world: dojo::world::WorldStorage,
+            table: @ComponentTable,
+            eligible_players: @Array<ContractAddress>
+        ) -> (Array<ContractAddress>, u32) {
+            let mut winners: Array<ContractAddress> = array![];
+            let mut current_best_rank: Option<EnumHandRank> = Option::None;
+            let mut pot_share_count: u32 = 0;
+    
+            // Find winners among eligible players.
+            for player in eligible_players.span() {
+                let player_component: ComponentPlayer = world.read_model(*player);
+                if player_component.m_state == EnumPlayerState::Active {
+                    let hand: ComponentHand = world.read_model(*player);
+                    let hand_rank = hand
+                        .evaluate_hand(table.m_community_cards)
+                        .expect('Hand evaluation failed');
+    
+                    match @current_best_rank {
+                        Option::None => {
+                            winners.append(*player);
+                            current_best_rank = Option::Some(hand_rank);
+                            pot_share_count = 1;
+                        },
+                        Option::Some(best_rank) => {
+                            let comparison = utils::tie_breaker(@hand_rank, best_rank);
+                            if comparison > 0 {
+                                // New best hand found- clear previous winners.
+                                winners = array![*player];
+                                current_best_rank = Option::Some(hand_rank);
+                                pot_share_count = 1;
+                            } else if comparison == 0 {
+                                // Tied for best hand- add to winners.
+                                winners.append(*player);
+                                pot_share_count += 1;
+                            }
+                        }
+                    };
+                }
+            };
+    
+            return (winners, pot_share_count);
         }
     }
 }

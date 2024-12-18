@@ -14,7 +14,7 @@
 //  ░███    ███ ░███ ░███ ░███ ░███ ░███
 //  ░███  ░███ ░███  ░███ ░███ ░███ ░███
 //  ░███
-//  █���████████  ░░██████  █████░███
+//  ████████  ░░██████  █████░███
 //  █████ █████ ████ █████
 //  █████░░██████  ████ █████
 // ░░░░░░░░░░    ░░░░░░  ░░░░░ ░░░ ░░░░░
@@ -123,7 +123,28 @@ struct ComponentTable {
     m_state: EnumGameState,
     /// Timestamp of the last played action.
     m_last_played_ts: u64,
+    /// Number of sidepots in the table.
+    m_num_sidepots: u8,
 }
 
 
-// TODO: Add sidepot component for all eligible players.
+/// Component that represents a sidepot for a table.
+///
+/// One or multiple per round/per table.
+#[derive(Drop, Serde, Debug, Introspect)]
+#[dojo::model]
+struct ComponentSidepot {
+    // The table ID
+    #[key]
+    m_table_id: u32,
+    // The player address
+    #[key]
+    m_player: ContractAddress,
+    // The sidepot ID (can be an incrementing counter per table)
+    #[key]
+    m_sidepot_id: u8,
+    // The amount in this sidepot
+    m_amount: u32,
+    // The minimum bet required to be part of this sidepot
+    m_min_bet: u32,
+}
