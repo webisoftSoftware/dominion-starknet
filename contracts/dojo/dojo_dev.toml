@@ -16,8 +16,8 @@ default = "dominion"
 [env]
 rpc_url = "https://starknet-sepolia.public.blastapi.io/rpc/v0_7"
 # Default account for katana with seed = 0
-account_address = "0x0111e4cba299238e466c4dc38b77d79087192fafe1978295c3352c2dde258755"
-private_key = "0x06e5767faed8e32ac5c6b4e03c5616cbdd9c0dc2207aff476b281a9c0dc5026d"
+account_address = "0x127fd5f1fe78a71f8bcd1fec63e3fe2f0486b6ecd5c86a0466c3a21fa5cfcec"
+private_key = "0xc5b2fcab997346f3ea1c00b002ecf6f382c5f9c9659a3894eb783c5320f912"
 # world_address = "0x06171ed98331e849d6084bf2b3e3186a7ddf35574dd68cab4691053ee8ab69d7"
 
 [init_call_args]
