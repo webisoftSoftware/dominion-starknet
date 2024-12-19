@@ -125,6 +125,7 @@ struct ComponentTable {
     m_last_played_ts: u64,
     /// Number of sidepots in the table.
     m_num_sidepots: u8,
+    
 }
 
 

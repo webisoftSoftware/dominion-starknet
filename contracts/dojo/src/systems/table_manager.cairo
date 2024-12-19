@@ -275,6 +275,9 @@ mod table_management_system {
             );
             assert!(table.m_players.len() >= MIN_PLAYERS, "Not enough players to start the round");
 
+            // Reset the table.
+            table.reset_table();
+
             // Update order and dealer chip position (Small Blind, Big Blind, etc.).
             InternalImpl::_update_positions(ref world, table_id);
 
@@ -470,57 +473,13 @@ mod table_management_system {
             assert!(table.m_community_cards.len() == 5, "Community cards are not set");
 
             // Before calculating hand, make sure all players have revealed their hands.
-            for player in table
-                .m_players
-                .span() {
-                    let player_component: ComponentPlayer = world.read_model(*player);
-                    assert!(
-                        player_component.m_state == EnumPlayerState::Revealed,
-                        "All Players must have revealed their hand"
-                    );
-                };
-
-            // Track winners and their hand ranks in a single pass.
-            let mut winners_dict: Felt252Dict<bool> = Default::default();
-            let mut current_best_rank: Option<EnumHandRank> = Option::None;
-            let mut pot_share_count: u32 = 0;
-
-            // Single pass through all players.
-            for address in table
-                .m_players
-                .span() {
-                    let player_component: ComponentPlayer = world.read_model(*address);
-                    if player_component.m_state == EnumPlayerState::Active {
-                        let hand: ComponentHand = world.read_model(*address);
-                        let hand_rank = hand
-                            .evaluate_hand(@table.m_community_cards)
-                            .expect('Hand evaluation failed');
-
-                        match @current_best_rank {
-                            Option::None => {
-                                // First active player sets the initial best rank.
-                                winners_dict.insert((*address).into(), true);
-                                current_best_rank = Option::Some(hand_rank);
-                                pot_share_count = 1;
-                            },
-                            Option::Some(best_rank) => {
-                                let comparison = utils::tie_breaker(@hand_rank, best_rank);
-                                if comparison > 0 {
-                                    // New best hand found- clear previous winners.
-                                    winners_dict = Default::default();
-                                    winners_dict.insert((*address).into(), true);
-                                    current_best_rank = Option::Some(hand_rank);
-                                    pot_share_count = 1;
-                                } else if comparison == 0 {
-                                    // Tied for best hand- add to winners.
-                                    winners_dict.insert((*address).into(), true);
-                                    pot_share_count += 1;
-                                }
-                                // If comparison < 0, this hand is worse, so we ignore it.
-                            }
-                        };
-                    }
-                };
+            for player in table.m_players.span() {
+                let player_component: ComponentPlayer = world.read_model(*player);
+                assert!(
+                    player_component.m_state == EnumPlayerState::Revealed,
+                    "All Players must have revealed their hand"
+                );
+            };
 
             // Determine winners and distribute pot.
             let (winners, pot_share_count) = InternalImpl::_determine_winners(ref world, @table, @table.m_players);
@@ -534,9 +493,6 @@ mod table_management_system {
             for winner in winners.span() {
                 InternalImpl::_distribute_chips(ref world, *winner, pot_share);
             };
-
-           // Reset the table.
-           table.reset_table();
 
            // Start the next round.
            self.start_round(table_id);
