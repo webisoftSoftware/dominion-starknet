@@ -8,10 +8,12 @@ sierra-replace-ids = true
 [dependencies]
 dojo = { git = "https://github.com/dojoengine/dojo"}
 origami_random = { git = "https://github.com/dojoengine/origami.git", tag = "v1.0.1"}
-alexandria_data_structures = { git = "https://github.com/keep-starknet-strange/alexandria.git"}
+alexandria_data_structures = { git = "https://github.com/keep-starknet-strange/alexandria.git", rev = "6a989d636243494a0529fc3af06a924493499564"}
 
 [[target.starknet-contract]]
 build-external-contracts = ["dojo::world::world_contract::world"]
 
 [dev-dependencies]
 dojo_cairo_test = { git = "https://github.com/dojoengine/dojo"}
+
+[profile.sepolia]
