@@ -1,47 +1,3 @@
-////////////////////////////////////////////////////////////////////////////////////////////////////
-// ██████████                             ███              ███
-// ░░███░░░░███                           ░░░              ░░░
-//  ░███   ░░███  ██████  █████████████
-//  ████  ████████   ████   ██████
-//  ████████
-//  ░███    ░███
-//  ███░░███░░███░░███░░███ ░░███
-//  ░░███░░███ ░░███
-//  ███░░███░░███░░███
-//  ░███    ░███░███ ░███ ░███ ░███ ░███
-//  ░███  ░███ ░███  ░███ ░███ ░███ ░███
-//  ░███
-//  ░███    ███ ░███ ░███ ░███ ░███ ░███
-//  ░███  ░███ ░███  ░███ ░███ ░███ ░███
-//  ░███
-//  ████████  ░░██████  █████░███
-//  █████ █████ ████ █████
-//  █████░░██████  ████ █████
-// ░░░░░░░░░░    ░░░░░░  ░░░░░ ░░░ ░░░░░
-// ░░░░░ ░░░░ ░░░░░ ░░░░░  ░░░░░░  ░░░░
-// ░░░░░
-//
-// Copyright (c) 2024 Dominion
-//
-// Permission is hereby granted, free of charge, to any person obtaining a
-// copy of this software and associated documentation files (the "Software"),
-// to deal in the Software without restriction, including without limitation
-// the rights to use, copy, modify, merge, publish, distribute, sublicense,
-// and/or sell copies of the Software, and to permit persons to whom the Software
-// is furnished to do so, subject to the following conditions:
-//
-// The above copyright notice and this permission notice shall be included
-// in all copies or substantial portions of the Software.
-//
-// THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS
-// OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
-// FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL
-// THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
-// LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
-// FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER
-// DEALINGS IN THE SOFTWARE.
-////////////////////////////////////////////////////////////////////////////////////////////////////
-
 use starknet::ContractAddress;
 use core::traits::Into;
 use core::dict::Felt252Dict;
@@ -80,7 +36,7 @@ mod table_management_system {
     use dojo::{model::ModelStorage, world::IWorldDispatcher};
     use dominion::models::components::{ComponentTable, ComponentPlayer, ComponentHand, ComponentSidepot};
     use dominion::models::enums::{EnumGameState, EnumPlayerState, EnumPosition, EnumHandRank};
-    use dominion::models::traits::{ITable, IPlayer, IHand, EnumHandRankPartialOrd, ISidepot};
+    use dominion::models::traits::{ITable, IPlayer, IHand, EnumHandRankPartialOrd, ISidepot, ComponentPlayerDisplay};
     use dominion::models::utils;
     use dominion::models::structs::StructCard;
     use dojo::event::{EventStorage};
@@ -275,24 +231,24 @@ mod table_management_system {
             );
             assert!(table.m_players.len() >= MIN_PLAYERS, "Not enough players to start the round");
 
-            // Reset the table.
+            // Reset the table (Community cards and pot are cleared out).
             table.reset_table();
 
             // Update order and dealer chip position (Small Blind, Big Blind, etc.).
-            InternalImpl::_update_positions(ref world, table_id);
+            InternalImpl::_update_positions(ref world, ref table);
 
             // Remove players sitting out.
-            InternalImpl::_remove_sitting_out_players(ref world, ref self, table_id);
+            InternalImpl::_remove_sitting_out_players(ref world, ref self, ref table);
+
+            // let mut table: ComponentTable = world.read_model(table_id);
+            table.m_state = EnumGameState::RoundStarted;
+            world.write_model(@table);
 
             world.emit_event(@EventEncryptDeckRequested {
                 m_table_id: table_id,
                 m_deck: table.m_deck.span(),
                 m_timestamp: starknet::get_block_timestamp()
             });
-
-            // Set the game state to start of hand.
-            self.advance_street(table_id);
-            world.write_model(@table);
         }
 
         // Update deck with encrypted deck, update game state.
@@ -303,9 +259,14 @@ mod table_management_system {
                 self.table_manager.read() == get_caller_address(),
                 "Only the table manager can update the deck"
             );
-
+            assert!(encrypted_deck.len() == 52, "Deck must contain 52 cards");
+            
             let mut world = self.world(@"dominion");
             let mut table: ComponentTable = world.read_model(table_id);
+            assert!(
+                table.m_state == EnumGameState::RoundStarted,
+                "Table is not in a valid state to update the deck"
+            );
             table.m_deck = encrypted_deck;
 
             // Shuffle the deck.
@@ -336,7 +297,7 @@ mod table_management_system {
                 }
             };
 
-            table.m_state = EnumGameState::PreFlop;
+            table.m_state = EnumGameState::DeckEncrypted;
             world.write_model(@table);
         }
 
@@ -344,25 +305,9 @@ mod table_management_system {
             let mut world = self.world(@"dominion");
             let mut table: ComponentTable = world.read_model(table_id);
 
-            assert!(table.m_state != EnumGameState::WaitingForPlayers, "Round has not started");
-
-            // Create sidepots before advancing street if there are any all-in players.
-            let mut player_bets: Array<u32> = array![];
-            let mut has_all_in = false;
-            
-            // Collect all current bets and check for all-in players.
-            for player in table.m_players.span() {
-                let player_component: ComponentPlayer = world.read_model(*player);
-                player_bets.append(player_component.m_current_bet);
-                if player_component.m_table_chips == 0 && player_component.m_state == EnumPlayerState::Active {
-                    has_all_in = true;
-                }
-            };
-
-            // Create sidepots if there are all-in players.
-            if has_all_in {
-                InternalImpl::_create_sidepots(ref world, table_id, table.m_players.clone(), player_bets);
-            }
+            assert!(table.m_state != EnumGameState::WaitingForPlayers && table.m_state != EnumGameState::Shutdown &&
+                 table.m_state != EnumGameState::RoundStarted, "Round has not started or deck is not encrypted");
+            assert!(table.m_finished_street || table.m_state == EnumGameState::DeckEncrypted, "Not all players have played their turn");
 
             // Advance table state to the next street.
             table.advance_street();
@@ -370,6 +315,7 @@ mod table_management_system {
             match table.m_state {
                 // Betting round.
                 EnumGameState::PreFlop => {
+                    assert!(table.m_community_cards.is_empty(), "Street was not just started");
                     world.emit_event(@EventRequestBet {
                         m_table_id: table_id,
                         m_timestamp: starknet::get_block_timestamp()
@@ -377,6 +323,7 @@ mod table_management_system {
                 },
                 // Flip 3 cards.
                 EnumGameState::Flop => {
+                    assert!(table.m_community_cards.is_empty(), "Street was not at pre-flop");
                     for _ in 0..3_u8 {
                         let mut cards_to_reveal: Array<StructCard> = array![];
                         if let Option::Some(card_to_reveal) = table.m_deck.pop_front() {
@@ -390,7 +337,19 @@ mod table_management_system {
                     };
                 },
                 // Flip 1 card.
-                EnumGameState::Turn | EnumGameState::River => {
+                EnumGameState::Turn => {
+                    assert!(table.m_community_cards.len() == 3, "Street was not at flop");
+                    if let Option::Some(card_to_reveal) = table.m_deck.pop_front() {
+                        world.emit_event(@EventDecryptCCRequested {
+                            m_table_id: table_id,
+                            m_cards: array![card_to_reveal].span(),
+                            m_timestamp: starknet::get_block_timestamp()
+                        });
+                    }
+                },
+                // Flip last card.
+                EnumGameState::River => {
+                    assert!(table.m_community_cards.len() == 4, "Street was not at turn");
                     if let Option::Some(card_to_reveal) = table.m_deck.pop_front() {
                         world.emit_event(@EventDecryptCCRequested {
                             m_table_id: table_id,
@@ -401,6 +360,7 @@ mod table_management_system {
                 },
                 // Showdown.
                 EnumGameState::Showdown => {
+                    assert!(table.m_community_cards.len() == 5, "Street was not at river");
                     world.emit_event(@EventShowdownRequested {
                         m_table_id: table_id,
                         m_timestamp: starknet::get_block_timestamp()
@@ -416,11 +376,26 @@ mod table_management_system {
                             m_timestamp: starknet::get_block_timestamp()
                         });
                     };
-        
-                    // Determine the winner.
-                    self.showdown(table_id);
                 },
                 _ => {}
+            }
+
+            // Create sidepots if there are any all-in players.
+            let mut player_bets: Array<u32> = array![];
+            let mut has_all_in = false;
+            
+            // Collect all current bets and check for all-in players.
+            for player in table.m_players.span() {
+                let player_component: ComponentPlayer = world.read_model((table_id, *player));
+                player_bets.append(player_component.m_current_bet);
+                if player_component.m_table_chips == 0 && player_component.m_state == EnumPlayerState::Active {
+                    has_all_in = true;
+                }
+            };
+
+            // Create sidepots if there are all-in players.
+            if has_all_in {
+                InternalImpl::_create_sidepots(ref world, table_id, table.m_players.clone(), player_bets);
             }
 
             world.write_model(@table);
@@ -449,7 +424,7 @@ mod table_management_system {
                 "Only the table manager can skip the turn"
             );
             let mut world = self.world(@"dominion");
-            let mut player_component: ComponentPlayer = world.read_model(player);
+            let mut player_component: ComponentPlayer = world.read_model((table_id, player));
             assert!(player_component.m_state == EnumPlayerState::Active, "Player is not active");
 
             let mut table: ComponentTable = world.read_model(table_id);
@@ -677,105 +652,81 @@ mod table_management_system {
         }
 
         fn _remove_sitting_out_players(
-            ref world: dojo::world::WorldStorage, ref contract: ContractState, table_id: u32
+            ref world: dojo::world::WorldStorage, ref contract: ContractState, ref table: ComponentTable
         ) {
-            let mut table: ComponentTable = world.read_model(table_id);
-            for i in 0
-                ..table
-                    .m_players
-                    .len() {
-                        let mut player: ComponentPlayer = world.read_model(*table.m_players[i]);
-                        if player.m_state == EnumPlayerState::Left {
-                            contract.kick_player(table_id, *table.m_players[i]);
-                        }
-                    };
-
-            world.write_model(@table);
+            for i in 0..table.m_players.len() {
+                let mut player: ComponentPlayer = world.read_model((table.m_table_id, *table.m_players[i]));
+                if player.m_state == EnumPlayerState::Left {
+                    contract.kick_player(table.m_table_id, *table.m_players[i]);
+                }
+            };
         }
 
-        fn _update_positions(ref world: dojo::world::WorldStorage, table_id: u32) {
-            let mut table: ComponentTable = world.read_model(table_id);
+        fn _update_positions(ref world: dojo::world::WorldStorage, ref table: ComponentTable) {
+            assert!(table.m_players.len() >= 2, "Table must have at least 2 players");
 
             // Find out if there's a dealer.
-            let mut dealer_found: bool = false;
-            for i in 0
-                ..table
-                    .m_players
-                    .len() {
-                        let mut player: ComponentPlayer = world.read_model(*table.m_players[i]);
-                        if player.m_state != EnumPlayerState::Left
-                            && player.m_state != EnumPlayerState::Waiting {
-                            if player.m_position == EnumPosition::Dealer {
-                                dealer_found = true;
-                                break;
-                            }
-                        }
-                    };
+            let mut dealer_found: Option<usize> = Option::None;
+            for i in 0..table.m_players.len() {
+                let mut player: ComponentPlayer = world.read_model((table.m_table_id, *table.m_players[i]));
+                if player.m_state != EnumPlayerState::Left && player.m_state != EnumPlayerState::Waiting {
+                    if player.m_is_dealer {
+                        dealer_found = Option::Some(i);
+                        break;
+                    }
+                }
+            };
 
-            let mut new_players: Array<ContractAddress> = array![];
-            for i in 0
-                ..table
-                    .m_players
-                    .len() {
-                        let mut player: ComponentPlayer = world.read_model(*table.m_players[i]);
-                        // If player is not sitting out or waiting, set their new position.
-                        if player.m_state != EnumPlayerState::Left
-                            && player.m_state != EnumPlayerState::Waiting {
-                            match player.m_position {
-                                EnumPosition::Dealer => {
-                                    // Set the new dealer and turn.
-                                    table
-                                        .m_current_dealer = i
-                                        .try_into()
-                                        .expect('Index out of bounds');
-                                    table
-                                        .m_current_turn = ((i + 2) % table.m_players.len())
-                                        .try_into()
-                                        .expect('Index out of bounds');
-                                    player.m_position = EnumPosition::SmallBlind;
-                                },
-                                EnumPosition::SmallBlind => {
-                                    table
-                                        .m_current_turn = ((i + 2) % table.m_players.len())
-                                        .try_into()
-                                        .expect('Index out of bounds');
-                                    player.m_position = EnumPosition::BigBlind;
-                                },
-                                _ => {
-                                    if !dealer_found {
-                                        // If there's no dealer, set the new dealer to this player.
-                                        player.m_position = EnumPosition::Dealer;
-                                        table
-                                            .m_current_dealer = i
-                                            .try_into()
-                                            .expect('Index out of bounds');
-                                        table
-                                            .m_current_turn = i
-                                            .try_into()
-                                            .expect('Index out of bounds');
-                                        break;
-                                    }
+            // Update dealer/small blind/big blind.
+            if dealer_found.is_none() {
+                // If there's no dealer, set the new dealer to this player.
+                dealer_found = Option::Some(0);
+                table.m_current_dealer = 0;
+                table.m_current_turn = 2 % table.m_players.len().try_into().unwrap();
+            } else {
+                // Update next turn positions.
+                table.m_current_dealer = ((dealer_found.unwrap() + 1) % table.m_players.len()).try_into().unwrap();
+                table.m_current_turn = ((table.m_current_dealer + 2) % table.m_players.len().try_into().unwrap());
+            }
 
-                                    if i + 1 < table.m_players.len() {
-                                        let mut next_player: ComponentPlayer = world
-                                            .read_model(*table.m_players[i + 1]);
-                                        player.m_position = next_player.m_position;
-                                        world.write_model(@player);
-                                    } else {
-                                        // Wrap around to the first player.
-                                        let mut next_player: ComponentPlayer = world
-                                            .read_model(*table.m_players[0]);
-                                        player.m_position = next_player.m_position;
-                                        world.write_model(@player);
-                                    }
-                                }
-                            };
-                        }
-                        new_players.append(*table.m_players[i]);
-                    };
+            // Update Roles.
+            let mut current_dealer: ComponentPlayer = world.read_model((table.m_table_id, *table.m_players[dealer_found.unwrap()]));
+            current_dealer.m_is_dealer = false;
+            current_dealer.m_state = EnumPlayerState::Active;
 
-            table.m_players = new_players;
-            world.write_model(@table);
+            let mut next_dealer: ComponentPlayer = world.read_model((table.m_table_id, *table.m_players[table.m_current_dealer.try_into().unwrap()]));
+            next_dealer.m_is_dealer = true;
+            next_dealer.m_state = EnumPlayerState::Active;
+
+            let mut next_small_blind: ComponentPlayer = world.read_model((table.m_table_id, *table.m_players[(table.m_current_dealer + 1).try_into().unwrap() % table.m_players.len()]));
+            next_small_blind.m_position = EnumPosition::SmallBlind;
+            next_small_blind.m_state = EnumPlayerState::Active;
+
+            let mut next_big_blind: ComponentPlayer = world.read_model((table.m_table_id, *table.m_players[table.m_current_turn.try_into().unwrap()]));
+            next_big_blind.m_is_dealer = table.m_current_turn == table.m_current_dealer;
+            next_big_blind.m_position = EnumPosition::BigBlind;
+            next_big_blind.m_state = EnumPlayerState::Active;
+
+            world.write_models(array![@current_dealer, @next_dealer, @next_small_blind, @next_big_blind].span());
+
+            // Update positions for everyone else.
+            for i in 0..table.m_players.len() {
+                // If we are not part of the three new assigned roles, set player position to none.
+                if i != ((dealer_found.unwrap() + 1) % table.m_players.len()) &&
+                        i != table.m_current_dealer.try_into().unwrap() &&
+                        i != table.m_current_turn.try_into().unwrap() {
+
+                    let mut player: ComponentPlayer = world.read_model((table.m_table_id, *table.m_players[i]));
+
+                    // Include players that are waiting, but not those who have left the table.
+                    if player.m_is_created && player.m_state != EnumPlayerState::Left {
+                        player.m_position = EnumPosition::None;
+                        player.m_state = EnumPlayerState::Active;
+                        world.write_model(@player);
+                    }
+                }
+            };
+
         }
 
         fn _determine_winners(
@@ -789,7 +740,7 @@ mod table_management_system {
     
             // Find winners among eligible players.
             for player in eligible_players.span() {
-                let player_component: ComponentPlayer = world.read_model(*player);
+                let player_component: ComponentPlayer = world.read_model((*table.m_table_id, *player));
                 if player_component.m_state == EnumPlayerState::Active {
                     let hand: ComponentHand = world.read_model(*player);
                     let hand_rank = hand

@@ -1,47 +1,3 @@
-////////////////////////////////////////////////////////////////////////////////////////////////////
-// ██████████                             ███              ███
-// ░░███░░░░███                           ░░░              ░░░
-//  ░███   ░░███  ██████  █████████████
-//  ████  ████████   ████   ██████
-//  ████████
-//  ░███    ░███
-//  ███░░███░░███░░███░░███ ░░███
-//  ░░███░░███ ░░███
-//  ███░░███░░███░░███
-//  ░███    ░███░███ ░███ ░███ ░███ ░███
-//  ░███  ░███ ░███  ░███ ░███ ░███ ░███
-//  ░███
-//  ░███    ███ ░███ ░███ ░███ ░███ ░███
-//  ░███  ░███ ░███  ░███ ░███ ░███ ░███
-//  ░███
-//  ██████████  ░░██████  █████░███
-//  █████ █████ ████ █████
-//  █████░░██████  ████ █████
-// ░░░░░░░░░░    ░░░░░░  ░░░░░ ░░░ ░░░░░
-// ░░░░░ ░░░░ ░░░░░ ░░░░░  ░░░░░░  ░░░░
-// ░░░░░
-//
-// Copyright (c) 2024 Dominion
-//
-// Permission is hereby granted, free of charge, to any person obtaining a
-// copy of this software and associated documentation files (the "Software"),
-// to deal in the Software without restriction, including without limitation
-// the rights to use, copy, modify, merge, publish, distribute, sublicense,
-// and/or sell copies of the Software, and to permit persons to whom the Software
-// is furnished to do so, subject to the following conditions:
-//
-// The above copyright notice and this permission notice shall be included
-// in all copies or substantial portions of the Software.
-//
-// THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS
-// OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
-// FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL
-// THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
-// LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
-// FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER
-// DEALINGS IN THE SOFTWARE.
-////////////////////////////////////////////////////////////////////////////////////////////////////
-
 use dominion::models::structs::StructCard;
 use starknet::ContractAddress;
 
@@ -58,7 +14,8 @@ trait IActions<TContractState> {
         ref self: TContractState,
         table_id: u32,
         decrypted_hand: Array<StructCard>,
-        request: ByteArray
+        request: ByteArray,
+        table_manager: ContractAddress
     );
 }
 
@@ -126,7 +83,7 @@ mod actions_system {
             let caller = get_caller_address();
 
             // Get table and player components
-            let mut player: ComponentPlayer = world.read_model(caller);
+            let mut player: ComponentPlayer = world.read_model((table_id, caller));
 
             // Create new player if first time joining
             if !player.m_is_created {
@@ -272,7 +229,10 @@ mod actions_system {
                 table.advance_turn();
                 if table.m_current_turn == 0 {
                     // If we were the last player doing our turn, advance the street.
+                    table.m_finished_street = true;
+                    world.write_model(@table);
                     table.advance_street();
+                    return;
                 }
                 world.write_model(@table);
                 return;
@@ -283,12 +243,15 @@ mod actions_system {
             assert!(table.check_turn(@get_caller_address()), "It is not your turn");
 
             table.m_pot += player_component.place_bet(amount);
+            world.write_model(@player_component);
             table.advance_turn();
             if table.m_current_turn == 0 {
                 // If we were the last player doing our turn, advance the street.
+                table.m_finished_street = true;
+                world.write_model(@table);
                 table.advance_street();
+                return;
             }
-            world.write_model(@player_component);
             world.write_model(@table);
         }
 
@@ -313,7 +276,10 @@ mod actions_system {
             table.advance_turn();
             if table.m_current_turn == 0 {
                 // If we were the last player doing our turn, advance the street.
+                table.m_finished_street = true;
+                world.write_model(@table);
                 table.advance_street();
+                return;
             }
             world.write_model(@table);
         }
@@ -330,7 +296,8 @@ mod actions_system {
             ref self: ContractState,
             table_id: u32,
             decrypted_hand: Array<StructCard>,
-            request: ByteArray
+            request: ByteArray,
+            table_manager: ContractAddress
         ) {
             let mut world = self.world(@"dominion");
             let caller = get_caller_address();
@@ -376,6 +343,29 @@ mod actions_system {
                         m_timestamp: get_block_timestamp(),
                     }
                 );
+
+            if InternalImpl::_all_players_revealed(@world, table_id) {
+                let mut table_manager: ITableManagementDispatcher = ITableManagementDispatcher {
+                    contract_address: table_manager
+                };
+                table_manager.advance_street(table_id);
+            }
+        }
+    }
+
+    #[generate_trait]
+    impl InternalImpl of InternalTrait {
+        fn _all_players_revealed(world: @dojo::world::WorldStorage, table_id: u32) -> bool {
+            let mut all_revealed: bool = true;
+            let table: ComponentTable = world.read_model(table_id);
+            for player in table.m_players.span() {
+                let player_component: ComponentPlayer = world.read_model(*player);
+                if player_component.m_state != EnumPlayerState::Revealed {
+                    all_revealed = false;
+                    break;
+                }
+            };
+            return all_revealed;
         }
     }
 }

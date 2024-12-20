@@ -109,7 +109,7 @@ mod cashier_system {
             );
 
             // Update player's chips
-            let mut player: ComponentPlayer = world.read_model(caller);
+            let mut player: ComponentPlayer = world.read_model((0, caller));
             if !player.m_is_created {
                 player = IPlayer::new(0, caller);
             }
