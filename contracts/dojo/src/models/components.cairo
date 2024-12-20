@@ -1,47 +1,3 @@
-////////////////////////////////////////////////////////////////////////////////////////////////////
-// ██████████                             ███              ███
-// ░░███░░░░███                           ░░░              ░░░
-//  ░███   ░░███  ██████  █████████████
-//  ████  ████████   ████   ██████
-//  ████████
-//  ░███    ░███
-//  ███░░███░░███░░███░░███ ░░███
-//  ░░███░░███ ░░███
-//  ███░░███░░███░░███
-//  ░███    ░███░███ ░███ ░███ ░███ ░███
-//  ░███  ░███ ░███  ░███ ░███ ░███ ░███
-//  ░███
-//  ░███    ███ ░███ ░███ ░███ ░███ ░███
-//  ░███  ░███ ░███  ░███ ░███ ░███ ░███
-//  ░███
-//  ████████  ░░██████  █████░███
-//  █████ █████ ████ █████
-//  █████░░██████  ████ █████
-// ░░░░░░░░░░    ░░░░░░  ░░░░░ ░░░ ░░░░░
-// ░░░░░ ░░░░ ░░░░░ ░░░░░  ░░░░░░  ░░░░
-// ░░░░░
-//
-// Copyright (c) 2024 Dominion
-//
-// Permission is hereby granted, free of charge, to any person obtaining a
-// copy of this software and associated documentation files (the "Software"),
-// to deal in the Software without restriction, including without limitation
-// the rights to use, copy, modify, merge, publish, distribute, sublicense,
-// and/or sell copies of the Software, and to permit persons to whom the Software
-// is furnished to do so, subject to the following conditions:
-//
-// The above copyright notice and this permission notice shall be included
-// in all copies or substantial portions of the Software.
-//
-// THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS
-// OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
-// FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL
-// THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
-// LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
-// FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER
-// DEALINGS IN THE SOFTWARE.
-////////////////////////////////////////////////////////////////////////////////////////////////////
-
 use starknet::ContractAddress;
 use dominion::models::structs::StructCard;
 use dominion::models::enums::{EnumPosition, EnumGameState, EnumPlayerState};
@@ -70,6 +26,7 @@ struct ComponentHand {
 #[dojo::model]
 struct ComponentPlayer {
     /// Which table the player is at.
+    #[key]
     m_table_id: u32,
     /// The contract address of the player.
     #[key]
@@ -87,6 +44,8 @@ struct ComponentPlayer {
     /// Indicates if the player has been created in the dojo world already (Need this to prevent
     /// re-creating the player).
     m_is_created: bool,
+    /// Keep track of who's dealer, since you can be dealer and big blind when there's only 2 players.
+    m_is_dealer: bool,
 }
 
 /// Component that represents a single table where the games will be played on.
@@ -125,7 +84,8 @@ struct ComponentTable {
     m_last_played_ts: u64,
     /// Number of sidepots in the table.
     m_num_sidepots: u8,
-    
+    /// Check if we finished the street before advancing to the next one.
+    m_finished_street: bool,
 }
 
 

@@ -1,48 +1,3 @@
-////////////////////////////////////////////////////////////////////////////////////////////////////
-// ██████████                             ███              ███
-// ░░███░░░░███                           ░░░              ░░░
-//  ░███   ░░███  ██████  █████████████
-//  ████  ████████   ████   ██████
-//  ████████
-//  ░███    ░███
-//  ███░░███░░███░░███░░███ ░░███
-//  ░░███░░███ ░░███
-//  ███░░███░░███░░███
-//  ░███    ░███░███ ░███ ░███ ░███ ░███
-//  ░███  ░███ ░███  ░███ ░███ ░███ ░███
-//  ░███
-//  ░███    ███ ░███ ░███ ░███ ░███ ░███
-//  ░███  ░███ ░███  ░███ ░███ ░███ ░███
-//  ░███
-//  ██████████████  ░░██████
-//  █████░███
-//  █████ █████ ████ █████
-//  █████░░██████  ████ █████
-// ░░░░░░░░░░    ░░░░░░  ░░░░░ ░░░ ░░░░░
-// ░░░░░ ░░░░ ░░░░░ ░░░░░  ░░░░░░  ░░░░
-// ░░░░░
-//
-// Copyright (c) 2024 Dominion
-//
-// Permission is hereby granted, free of charge, to any person obtaining a
-// copy of this software and associated documentation files (the "Software"),
-// to deal in the Software without restriction, including without limitation
-// the rights to use, copy, modify, merge, publish, distribute, sublicense,
-// and/or sell copies of the Software, and to permit persons to whom the Software
-// is furnished to do so, subject to the following conditions:
-//
-// The above copyright notice and this permission notice shall be included
-// in all copies or substantial portions of the Software.
-//
-// THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS
-// OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
-// FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL
-// THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
-// LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
-// FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER
-// DEALINGS IN THE SOFTWARE.
-////////////////////////////////////////////////////////////////////////////////////////////////////
-
 use starknet::ContractAddress;
 use core::traits::{BitOr, BitAnd};
 use core::fmt::{Display, Formatter, Error};
@@ -105,6 +60,9 @@ impl ComponentPlayerDisplay of Display<ComponentPlayer> {
         let str: ByteArray = format!("\n\tIs Created: {0}", *self.m_is_created);
         f.buffer.append(@str);
 
+        let str: ByteArray = format!("\n\tIs Dealer: {0}", *self.m_is_dealer);
+        f.buffer.append(@str);
+
         Result::Ok(())
     }
 }
@@ -162,6 +120,14 @@ impl EnumGameStateDisplay of Display<EnumGameState> {
                 let str: ByteArray = format!("WaitingForPlayers");
                 f.buffer.append(@str);
             },
+            EnumGameState::RoundStarted => {
+                let str: ByteArray = format!("RoundStarted");
+                f.buffer.append(@str);
+            },
+            EnumGameState::DeckEncrypted => {
+                let str: ByteArray = format!("DeckEncrypted");
+                f.buffer.append(@str);
+            },
             EnumGameState::PreFlop => {
                 let str: ByteArray = format!("PreFlop");
                 f.buffer.append(@str);
@@ -208,7 +174,6 @@ impl EnumPositionDisplay of Display<EnumPosition> {
         match self {
             EnumPosition::SmallBlind => f.buffer.append(@"SmallBlind"),
             EnumPosition::BigBlind => f.buffer.append(@"BigBlind"),
-            EnumPosition::Dealer => f.buffer.append(@"Dealer"),
             EnumPosition::None => f.buffer.append(@"None"),
         };
         Result::Ok(())
@@ -712,8 +677,7 @@ impl HandImpl of IHand {
         let mut unique_values: Array<EnumCardValue> = array![];
 
         // First get unique values
-        for card in all_cards
-            .span() {
+        for card in all_cards.span() {
                 if let Option::Some(value) = card.get_value() {
                     if !unique_values.contains(@value) {
                         unique_values.append(value);
@@ -1005,16 +969,17 @@ impl HandImpl of IHand {
 
 #[generate_trait]
 impl PlayerImpl of IPlayer {
-    fn new(table_id: u32, address: ContractAddress) -> ComponentPlayer {
+    fn new(table_id: u32, owner: ContractAddress) -> ComponentPlayer {
         ComponentPlayer {
             m_table_id: table_id,
-            m_owner: address,
+            m_owner: owner,
             m_table_chips: 0,
             m_total_chips: 0,
             m_position: EnumPosition::None,
             m_state: EnumPlayerState::Waiting,
             m_current_bet: 0,
             m_is_created: true,
+            m_is_dealer: false,
         }
     }
 
@@ -1103,6 +1068,7 @@ impl TableImpl of ITable {
             m_state: EnumGameState::WaitingForPlayers,
             m_last_played_ts: 0,
             m_num_sidepots: 0,
+            m_finished_street: false,
         };
         table._initialize_deck();
         return table;
@@ -1120,7 +1086,6 @@ impl TableImpl of ITable {
 
     fn shuffle_deck(ref self: ComponentTable, seed: felt252) {
         let mut shuffled_deck: Array<StructCard> = array![];
-        println!("Deck length: {}", self.m_deck.len());
         let mut deck = DeckTrait::new(seed, self.m_deck.len());
 
         while deck.remaining > 0 {
@@ -1144,6 +1109,7 @@ impl TableImpl of ITable {
 
     fn advance_street(ref self: ComponentTable) {
         self.m_state = match self.m_state {
+            EnumGameState::DeckEncrypted => EnumGameState::PreFlop,
             EnumGameState::PreFlop => EnumGameState::Flop,
             EnumGameState::Flop => EnumGameState::Turn,
             EnumGameState::Turn => EnumGameState::River,
@@ -1151,6 +1117,7 @@ impl TableImpl of ITable {
             EnumGameState::Showdown => EnumGameState::PreFlop,
             _ => self.m_state,
         };
+        self.m_finished_street = false;
     }
 
     fn advance_turn(ref self: ComponentTable) {
@@ -1299,6 +1266,7 @@ impl PlayerDefaultImpl of Default<ComponentPlayer> {
             m_state: EnumPlayerState::Waiting,
             m_current_bet: 0,
             m_is_created: false,
+            m_is_dealer: false,
         };
     }
 }
@@ -1320,6 +1288,7 @@ impl TableDefaultImpl of Default<ComponentTable> {
             m_state: EnumGameState::WaitingForPlayers,
             m_last_played_ts: 0,
             m_num_sidepots: 0,
+            m_finished_street: false,
         };
     }
 }
