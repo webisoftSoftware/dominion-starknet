@@ -57,7 +57,6 @@ struct ComponentTable {
     m_last_played_ts: u64,                   /// Timestamp of the last played action.
     m_num_sidepots: u8,                      /// Number of sidepots in the table.
     m_finished_street: bool,                 /// Check if we finished the street before advancing to the next one.
-    m_finished_street: bool,
 }
 
 
