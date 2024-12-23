@@ -444,7 +444,7 @@ mod table_management_system {
         fn showdown(ref self: ContractState, table_id: u32) {
             let mut world = self.world(@"dominion");
             let mut table: ComponentTable = world.read_model(table_id);
-            assert!(table.m_state == EnumGameState::Showdown, "Hand is not at showdown");
+            assert!(table.m_state == EnumGameState::Showdown, "Round is not at showdown");
             assert!(table.m_community_cards.len() == 5, "Community cards are not set");
 
             // Before calculating hand, make sure all players have revealed their hands.
@@ -486,7 +486,7 @@ mod table_management_system {
             assert!(
                 table.m_state == EnumGameState::Flop || table.m_state == EnumGameState::Turn
                     || table.m_state == EnumGameState::River,
-                "Community cards are not at the correct street"
+                "Game is not in a valid state to update the community cards"
             );
 
             table.m_community_cards.append_all(ref cards);

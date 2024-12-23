@@ -436,3 +436,12 @@ fn test_skip_turn_invalid_player_turn() {
 
     table_manager.skip_turn(1, starknet::contract_address_const::<0x1B>());
 }
+
+#[test]
+fn test_showdown_invalid_state() {
+    let mut world: dojo::world::WorldStorage = deploy_world();
+    let mut table_manager: ITableManagementDispatcher = deploy_table_manager(ref world);
+
+    table_manager.create_table(100, 200, 2000, 4000);
+    table_manager.showdown(1);
+}
