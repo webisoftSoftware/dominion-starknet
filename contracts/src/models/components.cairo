@@ -55,8 +55,9 @@ struct ComponentTable {
     m_max_buy_in: u32, /// Maximum buy-in amount.
     m_state: EnumGameState, /// Indicates the game's round state (Shutdown, WaitingForPlayers, PreFlop, Flop, Turn, River, Showdown).
     m_last_played_ts: u64, /// Timestamp of the last played action.
-    m_num_sidepots: u8, /// Number of sidepots in the table.
+    m_num_sidepots: u8, /// Number of sidepots in the table. // TODO: TBR after initial review in the block explorer
     m_finished_street: bool, /// Check if we finished the street before advancing to the next one.
+    m_rake_address: ContractAddress, /// The rake address
 }
 
 
@@ -69,9 +70,19 @@ struct ComponentSidepot {
     #[key]
     m_table_id: u32, /// The table ID
     #[key]
-    m_player: ContractAddress, /// The player address
-    #[key]
     m_sidepot_id: u8, /// The sidepot ID (can be an incrementing counter per table)
+    m_player: ContractAddress, /// The player address
     m_amount: u32, /// The amount in this sidepot
     m_min_bet: u32, /// The minimum bet required to be part of this sidepot
 }
+
+/// Component that represents a sidepot for a table.
+///
+/// One or multiple per round/per table.
+#[derive(Drop, Serde, Debug, Introspect)]
+#[dojo::model]
+struct ComponentRake {
+    #[key]
+    m_rake_address: ContractAddress, /// The deployer address
+    m_chip_amount: u32, /// The amount of chips collected in fees
+}  

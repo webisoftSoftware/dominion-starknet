@@ -7,7 +7,7 @@ use dominion::models::utils;
 use dominion::models::structs::StructCard;
 use dominion::models::enums::{
     EnumCardSuit, EnumCardValue, EnumGameState, EnumPlayerState, EnumPosition, EnumHandRank,
-    EnumError
+    EnumError, EnumRankMask
 };
 use dominion::models::components::{
     ComponentTable, ComponentPlayer, ComponentHand, ComponentSidepot
@@ -334,6 +334,158 @@ impl EnumHandRankInto of Into<@EnumHandRank, u32> {
     }
 }
 
+impl EnumCardSuitSnapshotInto of Into<@EnumCardSuit, u32> {
+    fn into(self: @EnumCardSuit) -> u32 {
+        match self {
+            EnumCardSuit::Spades => 1,
+            EnumCardSuit::Hearts => 2,
+            EnumCardSuit::Diamonds => 3,
+            EnumCardSuit::Clubs => 4,
+        }
+    }
+}
+
+impl EnumHandRankInto of Into<@EnumHandRank, u32> {
+    fn into(self: @EnumHandRank) -> u32 {
+        match self {
+            EnumHandRank::HighCard(values) |
+            EnumHandRank::Flush(values) => {
+                let mut sum: u32 = 0;
+                for value in values.span() {
+                    sum += value.into();
+                };
+                sum
+            },
+            EnumHandRank::Pair(value) => value.into(),
+            EnumHandRank::TwoPair((value1, value2)) => value1.into() + value2.into(),
+            EnumHandRank::ThreeOfAKind(value) => value.into(),
+            EnumHandRank::Straight(value) => value.into(),
+            EnumHandRank::FullHouse((value1, value2)) => value1.into() + value2.into(),
+            EnumHandRank::FourOfAKind(value) => value.into(),
+            EnumHandRank::StraightFlush => 9000,
+            EnumHandRank::RoyalFlush => 1000,
+        }
+    }
+}
+
+impl EnumRankMaskSnapshotInto of Into<@EnumRankMask, u32> {
+    fn into(self: @EnumRankMask) -> u32 {
+        match self {
+            EnumRankMask::None => 0,
+            EnumRankMask::Pair => 9,
+            EnumRankMask::TwoPair => 8,
+            EnumRankMask::ThreeOfAKind => 7,
+            EnumRankMask::Straight => 6,
+            EnumRankMask::Flush => 5,
+            EnumRankMask::FullHouse => 4,
+            EnumRankMask::FourOfAKind => 3,
+            EnumRankMask::StraightFlush => 2,
+            EnumRankMask::RoyalFlush => 1,
+        }
+    }
+}
+
+impl EnumRankMaskInto of Into<EnumRankMask, u32> {
+    fn into(self: EnumRankMask) -> u32 {
+        match self {
+            EnumRankMask::None => 0,
+            EnumRankMask::Pair => 9,
+            EnumRankMask::TwoPair => 8,
+            EnumRankMask::ThreeOfAKind => 7,
+            EnumRankMask::Straight => 6,
+            EnumRankMask::Flush => 5,
+            EnumRankMask::FullHouse => 4,
+            EnumRankMask::FourOfAKind => 3,
+            EnumRankMask::StraightFlush => 2,
+            EnumRankMask::RoyalFlush => 1,
+        }
+    }
+}
+
+/////////////////////////////////////////////////////////////////////////
+/////////////////////////////////////////////////////////////////////////
+///////////////////////////// PARTIALORD ////////////////////////////////
+/////////////////////////////////////////////////////////////////////////
+/////////////////////////////////////////////////////////////////////////
+
+impl EnumHandRankPartialOrd of PartialOrd<@EnumHandRank> {
+    fn le(lhs: @EnumHandRank, rhs: @EnumHandRank) -> bool {
+        let left_value: u32 = lhs.into();
+        let right_value: u32 = rhs.into();
+        left_value <= right_value
+    }
+
+    fn lt(lhs: @EnumHandRank, rhs: @EnumHandRank) -> bool {
+        let left_value: u32 = lhs.into();
+        let right_value: u32 = rhs.into();
+        left_value < right_value
+    }
+
+    fn ge(lhs: @EnumHandRank, rhs: @EnumHandRank) -> bool {
+        let left_value: u32 = lhs.into();
+        let right_value: u32 = rhs.into();
+        left_value >= right_value
+    }
+
+    fn gt(lhs: @EnumHandRank, rhs: @EnumHandRank) -> bool {
+        let left_value: u32 = lhs.into();
+        let right_value: u32 = rhs.into();
+        left_value > right_value
+    }
+}
+
+impl EnumRankMaskSnapshotPartialOrd of PartialOrd<@EnumRankMask> {
+    fn le(lhs: @EnumRankMask, rhs: @EnumRankMask) -> bool {
+        let left_value: u32 = lhs.into();
+        let right_value: u32 = rhs.into();
+        left_value <= right_value
+    }
+
+    fn lt(lhs: @EnumRankMask, rhs: @EnumRankMask) -> bool {
+        let left_value: u32 = lhs.into();
+        let right_value: u32 = rhs.into();
+        left_value < right_value
+    }
+
+    fn ge(lhs: @EnumRankMask, rhs: @EnumRankMask) -> bool {
+        let left_value: u32 = lhs.into();
+        let right_value: u32 = rhs.into();
+        left_value >= right_value
+    }
+
+    fn gt(lhs: @EnumRankMask, rhs: @EnumRankMask) -> bool {
+        let left_value: u32 = lhs.into();
+        let right_value: u32 = rhs.into();
+        left_value > right_value
+    }
+}
+
+impl EnumRankMaskPartialOrd of PartialOrd<EnumRankMask> {
+    fn le(lhs: EnumRankMask, rhs: EnumRankMask) -> bool {
+        let left_value: u32 = lhs.into();
+        let right_value: u32 = rhs.into();
+        left_value <= right_value
+    }
+
+    fn lt(lhs: EnumRankMask, rhs: EnumRankMask) -> bool {
+        let left_value: u32 = lhs.into();
+        let right_value: u32 = rhs.into();
+        left_value < right_value
+    }
+
+    fn ge(lhs: EnumRankMask, rhs: EnumRankMask) -> bool {
+        let left_value: u32 = lhs.into();
+        let right_value: u32 = rhs.into();
+        left_value >= right_value
+    }
+
+    fn gt(lhs: EnumRankMask, rhs: EnumRankMask) -> bool {
+        let left_value: u32 = lhs.into();
+        let right_value: u32 = rhs.into();
+        left_value > right_value
+    }
+}
+
 /////////////////////////////////////////////////////////////////////////
 /////////////////////////////////////////////////////////////////////////
 ///////////////////////////// PARTIALORD ////////////////////////////////
@@ -461,6 +613,24 @@ impl CardImpl of ICard {
 }
 
 #[generate_trait]
+impl EnumRankMaskImpl of IEnumRankMask {
+    fn increment_depth(ref self: EnumRankMask) {
+        match @self {
+            EnumRankMask::RoyalFlush => self = EnumRankMask::StraightFlush,
+            EnumRankMask::StraightFlush => self = EnumRankMask::FourOfAKind,
+            EnumRankMask::FourOfAKind => self = EnumRankMask::FullHouse,
+            EnumRankMask::FullHouse => self = EnumRankMask::Flush,
+            EnumRankMask::Flush => self = EnumRankMask::Straight,
+            EnumRankMask::Straight => self = EnumRankMask::ThreeOfAKind,
+            EnumRankMask::ThreeOfAKind => self = EnumRankMask::TwoPair,
+            EnumRankMask::TwoPair => self = EnumRankMask::Pair,
+            EnumRankMask::Pair => self = EnumRankMask::None,
+            _ => self = EnumRankMask::None,
+        }
+    }
+}
+
+#[generate_trait]
 impl HandImpl of IHand {
     fn new(address: ContractAddress, commitment_hash: ByteArray) -> ComponentHand {
         let mut commitment_hash_num: Array<u32> = array![];
@@ -481,24 +651,39 @@ impl HandImpl of IHand {
     }
 
     fn evaluate_hand(
-        self: @ComponentHand, board: @Array<StructCard>
+        self: @ComponentHand, board: @Array<StructCard>, from_depth: EnumRankMask
     ) -> Result<EnumHandRank, EnumError> {
         // First analyze the hand.
-        let rank_result: Result<EnumHandRank, EnumError> = self._evaluate_rank(board);
+        let rank_result: Result<EnumHandRank, EnumError> = self._evaluate_rank(board, from_depth);
         return rank_result;
     }
 
     fn _has_royal_flush(self: @ComponentHand, board: @Array<StructCard>) -> bool {
         // We can first check if we have a flush, and then check if it's royal.
-        // This avoids doing two full passes through the cards.
         if let Option::Some(flush_values) = self._has_flush(board) {
-            // Check if flush_values contains 10,J,Q,K,A in sequence.
-            return flush_values.len() >= 5
-                && *flush_values[0] == EnumCardValue::Ten
-                && *flush_values[1] == EnumCardValue::Jack
-                && *flush_values[2] == EnumCardValue::Queen
-                && *flush_values[3] == EnumCardValue::King
-                && *flush_values[4] == EnumCardValue::Ace;
+            // Check if flush_values contains A,K,Q,J,10 in any order
+            let mut has_ace = false;
+            let mut has_king = false;
+            let mut has_queen = false;
+            let mut has_jack = false;
+            let mut has_ten = false;
+
+            for value in flush_values.span() {
+                match value {
+                    EnumCardValue::Ace => has_ace = true,
+                    EnumCardValue::King => has_king = true,
+                    EnumCardValue::Queen => has_queen = true,
+                    EnumCardValue::Jack => has_jack = true,
+                    EnumCardValue::Ten => has_ten = true,
+                    _ => {}
+                };
+            };
+
+            println!("Player {} has royal flush? {}, cards: {:?}",
+             starknet::contract_address_to_felt252(*self.m_owner),
+             has_ace && has_king && has_queen && has_jack && has_ten,
+             flush_values);
+            return has_ace && has_king && has_queen && has_jack && has_ten;
         }
         return false;
     }
@@ -523,7 +708,7 @@ impl HandImpl of IHand {
                     ..flush_values
                         .len() {
                             let curr_value: u32 = flush_values[i].into();
-                            if curr_value == prev_value - 1 {
+                            if curr_value == prev_value + 1 {
                                 consecutive_count += 1;
                                 if consecutive_count >= 5 {
                                     break;
@@ -594,7 +779,6 @@ impl HandImpl of IHand {
 
         let mut three_of_kind: Option<EnumCardValue> = Option::None;
         let mut pair: Option<EnumCardValue> = Option::None;
-
         // First find three of a kind.
         for card in all_cards
             .span() {
@@ -699,9 +883,10 @@ impl HandImpl of IHand {
             ..sorted_unique_values
                 .len() {
                     let curr_value: u32 = sorted_unique_values[i].into();
-                    if curr_value == prev_value - 1 {
+                    if curr_value == prev_value + 1 {
                         consecutive_count += 1;
                         if consecutive_count >= 5 {
+                            highest_value = *sorted_unique_values[i];
                             break;
                         }
                     } else {
@@ -865,7 +1050,7 @@ impl HandImpl of IHand {
     }
 
     fn _evaluate_rank(
-        self: @ComponentHand, board: @Array<StructCard>
+        self: @ComponentHand, board: @Array<StructCard>, from_depth: EnumRankMask
     ) -> Result<EnumHandRank, EnumError> {
         // Combine both checks.
         if self.m_cards.len() != 2 || board.len() > 5 {
@@ -916,50 +1101,53 @@ impl HandImpl of IHand {
 
         // Now we can use these counts to skip impossible hands.
         if max_suit_count >= 5 {
-            if self._has_royal_flush(board) {
+            if from_depth == EnumRankMask::RoyalFlush && self._has_royal_flush(board) {
                 return Result::Ok(EnumHandRank::RoyalFlush);
             }
-            if self._has_straight_flush(board) {
+            if (from_depth <= EnumRankMask::StraightFlush)
+                && self._has_straight_flush(board) {
                 return Result::Ok(EnumHandRank::StraightFlush);
             }
         }
 
-        if max_value_count == 4 {
+        if max_value_count == 4 && (from_depth <= EnumRankMask::FourOfAKind) {
             if let Option::Some(value) = self._has_four_of_a_kind(board) {
                 return Result::Ok(EnumHandRank::FourOfAKind(value));
             }
         }
 
-        if max_value_count == 3 && pair_count >= 1 {
+        if max_value_count == 3 && pair_count >= 1 && (from_depth <= EnumRankMask::FullHouse) {
             if let Option::Some((three, pair)) = self._has_full_house(board) {
                 return Result::Ok(EnumHandRank::FullHouse((three, pair)));
             }
         }
 
-        if max_suit_count >= 5 {
+        if max_suit_count >= 5 && (from_depth <= EnumRankMask::Flush) {
             if let Option::Some(values) = self._has_flush(board) {
                 return Result::Ok(EnumHandRank::Flush(values));
             }
         }
 
         // Check for straight (can't easily rule this out from counts alone).
-        if let Option::Some(high_card) = self._has_straight(board) {
-            return Result::Ok(EnumHandRank::Straight(high_card));
+        if (from_depth <= EnumRankMask::Straight) {
+            if let Option::Some(high_card) = self._has_straight(board) {
+                return Result::Ok(EnumHandRank::Straight(high_card));
+            }
         }
 
-        if max_value_count == 3 {
+        if max_value_count == 3 && (from_depth <= EnumRankMask::ThreeOfAKind) {
             if let Option::Some(value) = self._has_three_of_a_kind(board) {
                 return Result::Ok(EnumHandRank::ThreeOfAKind(value));
             }
         }
 
-        if pair_count >= 2 {
+        if pair_count >= 2 && (from_depth <= EnumRankMask::TwoPair) {
             if let Option::Some((high, low)) = self._has_two_pair(board) {
                 return Result::Ok(EnumHandRank::TwoPair((high, low)));
             }
         }
 
-        if pair_count == 1 {
+        if pair_count == 1 && (from_depth <= EnumRankMask::Pair) {
             if let Option::Some(value) = self._has_pair(board) {
                 return Result::Ok(EnumHandRank::Pair(value));
             }

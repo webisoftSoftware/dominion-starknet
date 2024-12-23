@@ -34,13 +34,10 @@ trait ITableManagement<TContractState> {
 mod table_management_system {
     use starknet::{ContractAddress, get_caller_address, TxInfo, get_tx_info};
     use dojo::{model::ModelStorage, world::IWorldDispatcher};
-    use dominion::models::components::{
-        ComponentTable, ComponentPlayer, ComponentHand, ComponentSidepot
-    };
-    use dominion::models::enums::{EnumGameState, EnumPlayerState, EnumPosition, EnumHandRank};
-    use dominion::models::traits::{
-        ITable, IPlayer, IHand, EnumHandRankPartialOrd, ISidepot, ComponentPlayerDisplay
-    };
+    use dominion::models::components::{ComponentTable, ComponentPlayer, ComponentHand, ComponentSidepot, ComponentRake};
+    use dominion::models::enums::{EnumGameState, EnumPlayerState, EnumPosition, EnumHandRank, EnumRankMask};
+    use dominion::models::traits::{ITable, IPlayer, IHand, EnumHandRankPartialOrd, ISidepot, ComponentPlayerDisplay,
+         EnumRankMaskPartialOrd, IEnumRankMask};
     use dominion::models::utils;
     use dominion::models::structs::StructCard;
     use dojo::event::{EventStorage};
@@ -173,7 +170,8 @@ mod table_management_system {
             small_blind: u32,
             big_blind: u32,
             min_buy_in: u32,
-            max_buy_in: u32
+            max_buy_in: u32,
+            rake_fee: u32
         ) {
             assert!(
                 self.table_manager.read() == get_caller_address(),
@@ -188,6 +186,9 @@ mod table_management_system {
                 max_buy_in > min_buy_in, "Minimum buy-in cannot be greater than maximum buy-in"
             );
 
+            assert!(rake_fee > 0, "Rake fee cannot be less than 0");
+            assert!(rake_fee < 10, "Rake fee cannot be greater than 10");
+
             let table_id: u32 = self.counter.read();
             let mut world = self.world(@"dominion");
             let table: ComponentTable = world.read_model(table_id);
@@ -199,6 +200,8 @@ mod table_management_system {
             );
             new_table.m_state = EnumGameState::WaitingForPlayers;
             new_table._initialize_deck();
+            new_table.m_rake_fee = rake_fee;
+            new_table.m_rake_address = get_caller_address();
 
             // Save table to world state and increment counter
             world.write_model(@new_table);
@@ -504,31 +507,29 @@ mod table_management_system {
             assert!(table.m_community_cards.len() == 5, "Community cards are not set");
 
             // Before calculating hand, make sure all players have revealed their hands.
-            for player in table
-                .m_players
-                .span() {
-                    let player_component: ComponentPlayer = world.read_model(*player);
-                    assert!(
-                        player_component.m_state == EnumPlayerState::Revealed,
-                        "All Players must have revealed their hand"
-                    );
-                };
+            for player in table.m_players.span() {
+                let player_component: ComponentPlayer = world.read_model((table_id, *player));
+                assert!(
+                    player_component.m_state == EnumPlayerState::Revealed,
+                    "All Players must have revealed their hand"
+                );
+            };
 
             // Determine winners and distribute pot.
-            let (winners, pot_share_count) = InternalImpl::_determine_winners(
-                ref world, @table, @table.m_players
-            );
-            let pot_share = table.m_pot / pot_share_count;
+            let (winners, ranks) = InternalImpl::_determine_winners(ref world, @table, @table.m_players);
+            println!("Winners: {:?}, table pot: {}, pot_share_count: {}", winners, table.m_pot);
 
-            // At this point:
-            // - Winners_dict contains all winning players (winners_dict.get(player.into()) ==
-            // true).
-            // - Pot_share_count contains the number of winners to split the pot between.
-            // - Current_best_rank contains the winning hand rank.
-            for winner in winners
-                .span() {
-                    InternalImpl::_distribute_chips(ref world, *winner, pot_share);
-                };
+            InternalImpl::_distribute_sidepots(ref world, table_id, winners);
+            
+
+            // // At this point:
+            // // - Winners_dict contains all winning players (winners_dict.get(player.into()) ==
+            // // true).
+            // // - Pot_share_count contains the number of winners to split the pot between.
+            // // - Current_best_rank contains the winning hand rank.
+            // for winner in winners.span() {
+            //     InternalImpl::_distribute_chips(ref world, table_id, *winner, pot_share);
+            // };
 
             // Start the next round.
             self.start_round(table_id);
@@ -563,7 +564,7 @@ mod table_management_system {
 
             let mut world = self.world(@"dominion");
             let mut table: ComponentTable = world.read_model(table_id);
-            let mut player_model: ComponentPlayer = world.read_model(player);
+            let mut player_model: ComponentPlayer = world.read_model((table_id, player));
 
             // Reset player's table state and return chips
             table.m_pot += player_model.m_current_bet;
@@ -685,51 +686,55 @@ mod table_management_system {
             winners: Array<(ContractAddress, u32)> // (player address, hand strength)
         ) {
             let table: ComponentTable = world.read_model(table_id);
-            // Get all sidepots this winner is eligible for.
-            let eligible_sidepots: u8 = table.m_num_sidepots;
+            
+            // Process each sidepot from smallest to largest.
+            for pot_id in 0..table.m_num_sidepots {
+                let mut pot_winners: Array<ContractAddress> = array![];
+                let mut best_hand_strength: u32 = 0;
+                let sidepot: ComponentSidepot = world.read_model((table_id, pot_id));
+                
+                // Find winners for this specific sidepot.
+                for i in 0..winners.len() {
+                    let (winner_address, hand_strength) = winners[i];
+                    
+                    // Check if player is eligible for this sidepot.
+                    if sidepot.m_min_bet > 0 {
+                        if hand_strength > @best_hand_strength {
+                            pot_winners = array![*winner_address];
+                            best_hand_strength = *hand_strength;
+                        } else if hand_strength == @best_hand_strength {
+                            pot_winners.append(*winner_address);
+                        }
+                    }
+                };
+                
+                // Distribute this sidepot among eligible winners.
+                if !pot_winners.is_empty() {
+                    let house_rake_fee = sidepot.m_amount * table.m_rake_fee / 100;
+                    let rake: ComponentRake = world.read_model(table.m_rake_address);
+                    rake.m_chip_amount += house_rake_fee;
+                    world.write_model(@rake);
 
-            // Process each winner in order of hand strength
-            for i in 0
-                ..winners
-                    .len() {
-                        let (winner_address, _) = winners[i];
+                    let pot_share = sidepot.m_amount / pot_winners.len().into();
+                    for winner in pot_winners.span() {
+                        Self::_distribute_chips(ref world, table_id, *winner, pot_share - house_rake_fee);
+                    }
 
-                        // Award each eligible sidepot to the winner.
-                        for j in 0
-                            ..eligible_sidepots {
-                                let sidepot: ComponentSidepot = world
-                                    .read_model((table_id, *winner_address, j));
-
-                                // Update winner's chips.
-                                let mut winner: ComponentPlayer = world.read_model(*winner_address);
-                                winner.m_table_chips += sidepot.m_amount;
-                                world.write_model(@winner);
-
-                                // Remove this sidepot eligibility for all players.
-                                for k in 0
-                                    ..table
-                                        .m_players
-                                        .len() {
-                                            let player: ContractAddress = *table.m_players[k];
-                                            world
-                                                .erase_model(
-                                                    @ISidepot::new(
-                                                        table_id,
-                                                        sidepot.m_amount,
-                                                        player,
-                                                        sidepot.m_sidepot_id,
-                                                        sidepot.m_min_bet
-                                                    )
-                                                );
-                                        };
-                            };
-                    };
+                }
+                
+                // Clean up sidepot entries.
+                for player in table.m_players.span() {
+                    world.erase_model(
+                        @ISidepot::new(table_id, sidepot.m_amount, *player, pot_id, sidepot.m_min_bet)
+                    );
+                };
+            };
         }
 
         fn _distribute_chips(
-            ref world: dojo::world::WorldStorage, player: ContractAddress, amount: u32
+            ref world: dojo::world::WorldStorage, table_id: u32, player: ContractAddress, amount: u32
         ) {
-            let mut player_component: ComponentPlayer = world.read_model(player);
+            let mut player_component: ComponentPlayer = world.read_model((table_id, player));
             player_component.m_table_chips += amount;
             world.write_model(@player_component);
         }
@@ -857,46 +862,70 @@ mod table_management_system {
             ref world: dojo::world::WorldStorage,
             table: @ComponentTable,
             eligible_players: @Array<ContractAddress>
-        ) -> (Array<ContractAddress>, u32) {
+        ) -> Array<(ContractAddress, u32)> {
             let mut winners: Array<ContractAddress> = array![];
             let mut current_best_rank: Option<EnumHandRank> = Option::None;
-            let mut pot_share_count: u32 = 0;
+
+            // Collect all current bets and check for all-in players
+            for player in eligible_players.span() {
+                let player_component: ComponentPlayer = world.read_model((*table.m_table_id, *player));
+                player_bets.append(player_component.m_current_bet);
+                if player_component.m_table_chips == 0 && player_component.m_state == EnumPlayerState::Active {
+                    has_all_in = true;
+                }
+            };
+
+            // Create sidepots if there are all-in players
+            if has_all_in {
+                InternalImpl::_create_sidepots(
+                    ref world, 
+                    *table.m_table_id, 
+                    (*eligible_players).clone(), 
+                    player_bets
+                );
+            }
 
             // Find winners among eligible players.
-            for player in eligible_players
-                .span() {
-                    let player_component: ComponentPlayer = world
-                        .read_model((*table.m_table_id, *player));
-                    if player_component.m_state == EnumPlayerState::Active {
-                        let hand: ComponentHand = world.read_model(*player);
-                        let hand_rank = hand
-                            .evaluate_hand(table.m_community_cards)
-                            .expect('Hand evaluation failed');
+            for player in eligible_players.span() {
+                let player_component: ComponentPlayer = world.read_model((*table.m_table_id, *player));
+                assert!(player_component.m_state == EnumPlayerState::Revealed, "Player is not revealed");
+                let hand: ComponentHand = world.read_model(*player);
+                let mut rank_mask: EnumRankMask = EnumRankMask::RoyalFlush;
+                let mut hand_rank = hand
+                    .evaluate_hand(table.m_community_cards, rank_mask)
+                    .expect('Hand evaluation failed');
 
-                        match @current_best_rank {
-                            Option::None => {
-                                winners.append(*player);
-                                current_best_rank = Option::Some(hand_rank);
-                                pot_share_count = 1;
-                            },
-                            Option::Some(best_rank) => {
-                                let comparison = utils::tie_breaker(@hand_rank, best_rank);
-                                if comparison > 0 {
-                                    // New best hand found- clear previous winners.
-                                    winners = array![*player];
-                                    current_best_rank = Option::Some(hand_rank);
-                                    pot_share_count = 1;
-                                } else if comparison == 0 {
-                                    // Tied for best hand- add to winners.
-                                    winners.append(*player);
-                                    pot_share_count += 1;
-                                }
-                            }
+                match @current_best_rank {
+                    Option::None => {
+                        current_best_rank = Option::Some(hand_rank);
+                    },
+                    Option::Some(best_rank) => {
+                        let mut comparison = utils::tie_breaker(@hand_rank, best_rank);
+                        while comparison == 0 && rank_mask != EnumRankMask::None {
+                            println!("Tied for best hand for player {}: {:?}",
+                            starknet::contract_address_to_felt252(*player), hand_rank);
+                            rank_mask.increment_depth();
+                            hand_rank = hand
+                                .evaluate_hand(table.m_community_cards, rank_mask)
+                                .expect('Hand evaluation failed');
+                            comparison = utils::tie_breaker(@hand_rank, best_rank);
                         };
+
+                        if comparison > 0 {
+                            println!("New best hand found for player {}: {:?}",
+                         starknet::contract_address_to_felt252(*player), hand_rank);
+                            // New best hand found- clear previous winners.
+                            winners = array![*player];
+                            current_best_rank = Option::Some(hand_rank);
+                        } else if comparison == 0 {
+                            // Tied for best hand- add to winners.
+                            winners.append(*player);
+                        }
                     }
                 };
-
-            return (winners, pot_share_count);
+            };
+    
+            return winners;
         }
     }
 }
