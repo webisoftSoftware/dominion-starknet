@@ -452,3 +452,257 @@ fn test_showdown_invalid_state() {
     table_manager.create_table(100, 200, 2000, 4000);
     table_manager.showdown(1);
 }
+
+#[test]
+#[should_panic(expected: ("All Players must have revealed their hand", 'ENTRYPOINT_FAILED'))]
+fn test_showdown_not_all_players_revealed() {
+    // Create a table with 2 players.
+    let player_1: ComponentPlayer = IPlayer::new(1, starknet::contract_address_const::<0x1A>());
+    let player_2: ComponentPlayer = IPlayer::new(1, starknet::contract_address_const::<0x1B>());
+
+    let mut world: dojo::world::WorldStorage = deploy_world();
+    let mut table_manager: ITableManagementDispatcher = deploy_table_manager(ref world);
+
+    table_manager.create_table(100, 200, 2000, 4000);
+
+    // Meet the minimum requirements for showdown.
+    let mut table: ComponentTable = world.read_model(1);
+    table.m_players.append(player_1.m_owner);
+    table.m_players.append(player_2.m_owner);
+    table.m_state = EnumGameState::Showdown;
+    table.m_community_cards.append(ICard::new(EnumCardValue::Ace, EnumCardSuit::Clubs));
+    table.m_community_cards.append(ICard::new(EnumCardValue::King, EnumCardSuit::Hearts));
+    table.m_community_cards.append(ICard::new(EnumCardValue::Queen, EnumCardSuit::Spades));
+    table.m_community_cards.append(ICard::new(EnumCardValue::Jack, EnumCardSuit::Diamonds));
+    table.m_community_cards.append(ICard::new(EnumCardValue::Ten, EnumCardSuit::Clubs));
+    world.write_model_test(@table);
+
+    // Create players.
+    let player_1 = IPlayer::new(1, starknet::contract_address_const::<0x1A>());
+    world.write_model_test(@player_1);
+
+    let player_2 = IPlayer::new(1, starknet::contract_address_const::<0x1B>());
+    world.write_model_test(@player_2);
+
+    starknet::testing::set_contract_address(starknet::contract_address_const::<0x1A>());
+    table_manager.showdown(1);
+}
+
+#[test]
+fn test_showdown_simple() {
+    // Create a table with 2 players.
+    let player_1: ComponentPlayer = IPlayer::new(1, starknet::contract_address_const::<0x1A>());
+    let player_2: ComponentPlayer = IPlayer::new(1, starknet::contract_address_const::<0x1B>());
+
+    let mut world: dojo::world::WorldStorage = deploy_world();
+    let mut table_manager: ITableManagementDispatcher = deploy_table_manager(ref world);
+
+    table_manager.create_table(100, 200, 2000, 4000);
+
+    // Meet the minimum requirements for showdown.
+    let mut table: ComponentTable = world.read_model(1);
+    table.m_players.append(player_1.m_owner);
+    table.m_players.append(player_2.m_owner);
+    table.m_state = EnumGameState::Showdown;
+    table.m_community_cards.append(ICard::new(EnumCardValue::Ace, EnumCardSuit::Clubs));
+    table.m_community_cards.append(ICard::new(EnumCardValue::King, EnumCardSuit::Hearts));
+    table.m_community_cards.append(ICard::new(EnumCardValue::Queen, EnumCardSuit::Spades));
+    table.m_community_cards.append(ICard::new(EnumCardValue::Jack, EnumCardSuit::Diamonds));
+    table.m_community_cards.append(ICard::new(EnumCardValue::Ten, EnumCardSuit::Clubs));
+    table.m_pot = 200;
+    world.write_model_test(@table);
+
+    // Create players.
+    let mut player_1 = IPlayer::new(1, starknet::contract_address_const::<0x1A>());
+    player_1.m_state = EnumPlayerState::Revealed;
+    player_1.m_table_chips = 300;
+    world.write_model_test(@player_1);
+
+    let mut player_2 = IPlayer::new(1, starknet::contract_address_const::<0x1B>());
+    player_2.m_state = EnumPlayerState::Revealed;
+    player_2.m_table_chips = 300;
+    world.write_model_test(@player_2);
+
+    // Assign hands.
+    let mut player_1_hand: ComponentHand = world.read_model(*table.m_players[0]);
+    player_1_hand.m_cards.append(ICard::new(EnumCardValue::Ace, EnumCardSuit::Clubs));
+    player_1_hand.m_cards.append(ICard::new(EnumCardValue::King, EnumCardSuit::Hearts));
+    world.write_model_test(@player_1_hand);
+
+    let mut player_2_hand: ComponentHand = world.read_model(*table.m_players[1]);
+    player_2_hand.m_cards.append(ICard::new(EnumCardValue::Queen, EnumCardSuit::Spades));
+    player_2_hand.m_cards.append(ICard::new(EnumCardValue::Jack, EnumCardSuit::Diamonds));
+    world.write_model_test(@player_2_hand);
+
+    starknet::testing::set_contract_address(starknet::contract_address_const::<0x1A>());
+    table_manager.showdown(1);
+
+    let mut table: ComponentTable = world.read_model(1);
+    assert!(table.m_pot == 0, "Pot should be 0");
+    assert!(table.m_community_cards.len() == 0, "Community cards should be cleared");
+    assert!(table.m_state == EnumGameState::RoundStarted, "Next round should have started");
+
+    let mut player_1: ComponentPlayer = world.read_model((1, *table.m_players[0]));
+    assert!(player_1.m_state == EnumPlayerState::Active, "Player 1 should be in Active state");
+    assert!(player_1.m_table_chips == 500, "Player 1 should have won 200 chips at the table");
+
+    let mut player_2: ComponentPlayer = world.read_model((1, *table.m_players[1]));
+    assert!(player_2.m_state == EnumPlayerState::Active, "Player 2 should be in Active state");
+    assert!(player_2.m_table_chips == 300, "Player 2 should have lost 200 chips at the table");
+}
+
+#[test]
+fn test_showdown_tie() {
+    // Create a table with 2 players who will tie
+    let player_1: ComponentPlayer = IPlayer::new(1, starknet::contract_address_const::<0x1A>());
+    let player_2: ComponentPlayer = IPlayer::new(1, starknet::contract_address_const::<0x1B>());
+
+    let mut world: dojo::world::WorldStorage = deploy_world();
+    let mut table_manager: ITableManagementDispatcher = deploy_table_manager(ref world);
+
+    table_manager.create_table(100, 200, 2000, 4000);
+
+    // Set up table with community cards that will result in a tie
+    let mut table: ComponentTable = world.read_model(1);
+    table.m_players.append(player_1.m_owner);
+    table.m_players.append(player_2.m_owner);
+    table.m_state = EnumGameState::Showdown;
+    table.m_community_cards.append(ICard::new(EnumCardValue::Ace, EnumCardSuit::Clubs));
+    table.m_community_cards.append(ICard::new(EnumCardValue::Ace, EnumCardSuit::Hearts));
+    table.m_community_cards.append(ICard::new(EnumCardValue::King, EnumCardSuit::Spades));
+    table.m_community_cards.append(ICard::new(EnumCardValue::King, EnumCardSuit::Diamonds));
+    table.m_community_cards.append(ICard::new(EnumCardValue::Two, EnumCardSuit::Clubs));
+    table.m_pot = 200;
+    world.write_model_test(@table);
+
+    // Create players with same starting chips
+    let mut player_1 = IPlayer::new(1, starknet::contract_address_const::<0x1A>());
+    player_1.m_state = EnumPlayerState::Revealed;
+    player_1.m_table_chips = 300;
+    world.write_model_test(@player_1);
+
+    let mut player_2 = IPlayer::new(1, starknet::contract_address_const::<0x1B>());
+    player_2.m_state = EnumPlayerState::Revealed;
+    player_2.m_table_chips = 300;
+    world.write_model_test(@player_2);
+
+    // Both players have same hand rank (two pair: Aces and Kings)
+    let mut player_1_hand: ComponentHand = world.read_model(*table.m_players[0]);
+    player_1_hand.m_cards.append(ICard::new(EnumCardValue::Queen, EnumCardSuit::Hearts));
+    player_1_hand.m_cards.append(ICard::new(EnumCardValue::Queen, EnumCardSuit::Diamonds));
+    world.write_model_test(@player_1_hand);
+
+    let mut player_2_hand: ComponentHand = world.read_model(*table.m_players[1]);
+    player_2_hand.m_cards.append(ICard::new(EnumCardValue::Queen, EnumCardSuit::Spades));
+    player_2_hand.m_cards.append(ICard::new(EnumCardValue::Queen, EnumCardSuit::Clubs));
+    world.write_model_test(@player_2_hand);
+
+    starknet::testing::set_contract_address(starknet::contract_address_const::<0x1A>());
+    table_manager.showdown(1);
+
+    let table: ComponentTable = world.read_model(1);
+    assert!(table.m_pot == 0, "Pot should be 0");
+    assert!(table.m_community_cards.len() == 0, "Community cards should be cleared");
+    assert!(table.m_state == EnumGameState::RoundStarted, "Next round should have started");
+
+    // Both players should split the pot evenly
+    let player_1: ComponentPlayer = world.read_model((1, *table.m_players[0]));
+    assert!(player_1.m_table_chips == 400, "Player 1 should have won 100 chips at the table");
+
+    let player_2: ComponentPlayer = world.read_model((1, *table.m_players[1]));
+    assert!(player_2.m_table_chips == 400, "Player 2 should have won 100 chips at the table");
+}
+
+#[test]
+fn test_showdown_complex() {
+    // Create a table with 4 players.
+    let player_1: ComponentPlayer = IPlayer::new(1, starknet::contract_address_const::<0x1A>());
+    let player_2: ComponentPlayer = IPlayer::new(1, starknet::contract_address_const::<0x1B>());
+    let player_3: ComponentPlayer = IPlayer::new(1, starknet::contract_address_const::<0x1C>());
+    let player_4: ComponentPlayer = IPlayer::new(1, starknet::contract_address_const::<0x1D>());
+
+    let mut world: dojo::world::WorldStorage = deploy_world();
+    let mut table_manager: ITableManagementDispatcher = deploy_table_manager(ref world);
+
+    table_manager.create_table(100, 200, 2000, 4000);
+
+    // Set up table with community cards.
+    let mut table: ComponentTable = world.read_model(1);
+    table.m_players.append(player_1.m_owner);
+    table.m_players.append(player_2.m_owner);
+    table.m_players.append(player_3.m_owner);
+    table.m_players.append(player_4.m_owner);
+    table.m_state = EnumGameState::Showdown;
+    table.m_community_cards.append(ICard::new(EnumCardValue::Ten, EnumCardSuit::Hearts));
+    table.m_community_cards.append(ICard::new(EnumCardValue::Jack, EnumCardSuit::Hearts));
+    table.m_community_cards.append(ICard::new(EnumCardValue::Queen, EnumCardSuit::Hearts));
+    table.m_community_cards.append(ICard::new(EnumCardValue::Two, EnumCardSuit::Diamonds));
+    table.m_community_cards.append(ICard::new(EnumCardValue::Three, EnumCardSuit::Clubs));
+    table.m_pot = 1000;
+    world.write_model_test(@table);
+
+    // Create players with different chip stacks.
+    let mut player_1 = IPlayer::new(1, starknet::contract_address_const::<0x1A>());
+    player_1.m_state = EnumPlayerState::Revealed;
+    player_1.m_table_chips = 500;
+    world.write_model_test(@player_1);
+
+    let mut player_2 = IPlayer::new(1, starknet::contract_address_const::<0x1B>());
+    player_2.m_state = EnumPlayerState::Revealed;
+    player_2.m_table_chips = 500;
+    world.write_model_test(@player_2);
+
+    let mut player_3 = IPlayer::new(1, starknet::contract_address_const::<0x1C>());
+    player_3.m_state = EnumPlayerState::Revealed;
+    player_3.m_table_chips = 500;
+    world.write_model_test(@player_3);
+
+    let mut player_4 = IPlayer::new(1, starknet::contract_address_const::<0x1D>());
+    player_4.m_state = EnumPlayerState::Revealed;
+    player_4.m_table_chips = 500;
+    world.write_model_test(@player_4);
+
+    // Assign different hands to create a clear winner.
+    let mut player_1_hand: ComponentHand = world.read_model(*table.m_players[0]);
+    player_1_hand.m_cards.append(ICard::new(EnumCardValue::King, EnumCardSuit::Hearts));
+    player_1_hand.m_cards.append(ICard::new(EnumCardValue::Ace, EnumCardSuit::Hearts));
+    world.write_model_test(@player_1_hand);
+
+    let mut player_2_hand: ComponentHand = world.read_model(*table.m_players[1]);
+    player_2_hand.m_cards.append(ICard::new(EnumCardValue::Ace, EnumCardSuit::Diamonds));
+    player_2_hand.m_cards.append(ICard::new(EnumCardValue::King, EnumCardSuit::Diamonds));
+    world.write_model_test(@player_2_hand);
+
+    let mut player_3_hand: ComponentHand = world.read_model(*table.m_players[2]);
+    player_3_hand.m_cards.append(ICard::new(EnumCardValue::Eight, EnumCardSuit::Clubs));
+    player_3_hand.m_cards.append(ICard::new(EnumCardValue::Nine, EnumCardSuit::Spades));
+    world.write_model_test(@player_3_hand);
+
+    let mut player_4_hand: ComponentHand = world.read_model(*table.m_players[3]);
+    player_4_hand.m_cards.append(ICard::new(EnumCardValue::Four, EnumCardSuit::Diamonds));
+    player_4_hand.m_cards.append(ICard::new(EnumCardValue::Five, EnumCardSuit::Spades));
+    world.write_model_test(@player_4_hand);
+
+    starknet::testing::set_contract_address(starknet::contract_address_const::<0x1A>());
+    table_manager.showdown(1);
+
+    let table: ComponentTable = world.read_model(1);
+    assert!(table.m_pot == 0, "Pot should be 0");
+    assert!(table.m_community_cards.len() == 0, "Community cards should be cleared");
+    assert!(table.m_state == EnumGameState::RoundStarted, "Next round should have started");
+
+    // Player 1 should win with Royal Flush.
+    let player_1: ComponentPlayer = world.read_model((1, *table.m_players[0]));
+    println!("Player 1 chips: {}", player_1.m_table_chips);
+    assert!(player_1.m_table_chips == 1500, "Player 1 should have won the entire pot");
+
+    // Other players should not receive any chips.
+    let player_2: ComponentPlayer = world.read_model((1, *table.m_players[1]));
+    assert!(player_2.m_table_chips == 500, "Player 2 should not have won any chips");
+
+    let player_3: ComponentPlayer = world.read_model((1, *table.m_players[2]));
+    assert!(player_3.m_table_chips == 500, "Player 3 should not have won any chips");
+
+    let player_4: ComponentPlayer = world.read_model((1, *table.m_players[3]));
+    assert!(player_4.m_table_chips == 500, "Player 4 should not have won any chips");
+}

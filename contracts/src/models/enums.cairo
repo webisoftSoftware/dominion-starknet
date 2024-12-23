@@ -47,6 +47,20 @@ pub enum EnumHandRank {
 }
 
 #[derive(Drop, Serde, Copy, Debug, PartialEq, Introspect)]
+pub enum EnumRankMask {
+    None,
+    Pair,
+    TwoPair,
+    ThreeOfAKind,
+    Straight,
+    Flush,
+    FullHouse,
+    FourOfAKind,
+    StraightFlush,
+    RoyalFlush
+}
+
+#[derive(Drop, Serde, Copy, Debug, PartialEq, Introspect)]
 pub enum EnumCardValue {
     Two,
     Three,
