@@ -1039,50 +1039,50 @@ impl HandImpl of IHand {
             if from_depth == EnumRankMask::RoyalFlush && self._has_royal_flush(board) {
                 return Result::Ok(EnumHandRank::RoyalFlush);
             }
-            if (from_depth >= EnumRankMask::StraightFlush)
+            if (from_depth <= EnumRankMask::StraightFlush)
                 && self._has_straight_flush(board) {
                 return Result::Ok(EnumHandRank::StraightFlush);
             }
         }
 
-        if max_value_count == 4 && (from_depth >= EnumRankMask::FourOfAKind) {
+        if max_value_count == 4 && (from_depth <= EnumRankMask::FourOfAKind) {
             if let Option::Some(value) = self._has_four_of_a_kind(board) {
                 return Result::Ok(EnumHandRank::FourOfAKind(value));
             }
         }
 
-        if max_value_count == 3 && pair_count >= 1 && (from_depth >= EnumRankMask::FullHouse) {
+        if max_value_count == 3 && pair_count >= 1 && (from_depth <= EnumRankMask::FullHouse) {
             if let Option::Some((three, pair)) = self._has_full_house(board) {
                 return Result::Ok(EnumHandRank::FullHouse((three, pair)));
             }
         }
 
-        if max_suit_count >= 5 && (from_depth >= EnumRankMask::Flush) {
+        if max_suit_count >= 5 && (from_depth <= EnumRankMask::Flush) {
             if let Option::Some(values) = self._has_flush(board) {
                 return Result::Ok(EnumHandRank::Flush(values));
             }
         }
 
         // Check for straight (can't easily rule this out from counts alone).
-        if (from_depth >= EnumRankMask::Straight) {
+        if (from_depth <= EnumRankMask::Straight) {
             if let Option::Some(high_card) = self._has_straight(board) {
                 return Result::Ok(EnumHandRank::Straight(high_card));
             }
         }
 
-        if max_value_count == 3 && (from_depth >= EnumRankMask::ThreeOfAKind) {
+        if max_value_count == 3 && (from_depth <= EnumRankMask::ThreeOfAKind) {
             if let Option::Some(value) = self._has_three_of_a_kind(board) {
                 return Result::Ok(EnumHandRank::ThreeOfAKind(value));
             }
         }
 
-        if pair_count >= 2 && (from_depth >= EnumRankMask::TwoPair) {
+        if pair_count >= 2 && (from_depth <= EnumRankMask::TwoPair) {
             if let Option::Some((high, low)) = self._has_two_pair(board) {
                 return Result::Ok(EnumHandRank::TwoPair((high, low)));
             }
         }
 
-        if pair_count == 1 && (from_depth >= EnumRankMask::Pair) {
+        if pair_count == 1 && (from_depth <= EnumRankMask::Pair) {
             if let Option::Some(value) = self._has_pair(board) {
                 return Result::Ok(EnumHandRank::Pair(value));
             }
