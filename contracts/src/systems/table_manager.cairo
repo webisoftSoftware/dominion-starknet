@@ -21,7 +21,8 @@ trait ITableManagement<TContractState> {
     fn kick_player(ref self: TContractState, table_id: u32, player: ContractAddress);
 
     fn create_table(
-        ref self: TContractState, small_blind: u32, big_blind: u32, min_buy_in: u32, max_buy_in: u32
+        ref self: TContractState, small_blind: u32, big_blind: u32, min_buy_in: u32,
+         max_buy_in: u32, rake_fee: u32
     );
 
     fn shutdown_table(ref self: TContractState, table_id: u32);
@@ -516,10 +517,9 @@ mod table_management_system {
             };
 
             // Determine winners and distribute pot.
-            let (winners, ranks) = InternalImpl::_determine_winners(ref world, @table, @table.m_players);
-            println!("Winners: {:?}, table pot: {}, pot_share_count: {}", winners, table.m_pot);
+            let winners = InternalImpl::_determine_winners(ref world, @table, @table.m_players);
 
-            InternalImpl::_distribute_sidepots(ref world, table_id, winners);
+            // InternalImpl::_distribute_sidepots(ref world, table_id, winners);
             
 
             // // At this point:
@@ -527,9 +527,9 @@ mod table_management_system {
             // // true).
             // // - Pot_share_count contains the number of winners to split the pot between.
             // // - Current_best_rank contains the winning hand rank.
-            // for winner in winners.span() {
-            //     InternalImpl::_distribute_chips(ref world, table_id, *winner, pot_share);
-            // };
+            for winner in winners.span() {
+                InternalImpl::_distribute_chips(ref world, table_id, *winner, winners.len().into());
+            };
 
             // Start the next round.
             self.start_round(table_id);
@@ -668,7 +668,6 @@ mod table_management_system {
                                             table_id,
                                             pot_amount,
                                             player,
-                                            sidepot_id,
                                             contribution_for_pot
                                         )
                                     );
@@ -711,7 +710,7 @@ mod table_management_system {
                 // Distribute this sidepot among eligible winners.
                 if !pot_winners.is_empty() {
                     let house_rake_fee = sidepot.m_amount * table.m_rake_fee / 100;
-                    let rake: ComponentRake = world.read_model(table.m_rake_address);
+                    let mut rake: ComponentRake = world.read_model(table.m_rake_address);
                     rake.m_chip_amount += house_rake_fee;
                     world.write_model(@rake);
 
@@ -725,7 +724,7 @@ mod table_management_system {
                 // Clean up sidepot entries.
                 for player in table.m_players.span() {
                     world.erase_model(
-                        @ISidepot::new(table_id, sidepot.m_amount, *player, pot_id, sidepot.m_min_bet)
+                        @ISidepot::new(table_id, sidepot.m_amount, *player, sidepot.m_min_bet)
                     );
                 };
             };
@@ -862,10 +861,11 @@ mod table_management_system {
             ref world: dojo::world::WorldStorage,
             table: @ComponentTable,
             eligible_players: @Array<ContractAddress>
-        ) -> Array<(ContractAddress, u32)> {
+        ) -> Array<ContractAddress> {
             let mut winners: Array<ContractAddress> = array![];
             let mut current_best_rank: Option<EnumHandRank> = Option::None;
-
+            let mut player_bets: Array<u32> = array![];
+            let mut has_all_in: bool = false;
             // Collect all current bets and check for all-in players
             for player in eligible_players.span() {
                 let player_component: ComponentPlayer = world.read_model((*table.m_table_id, *player));
@@ -877,10 +877,10 @@ mod table_management_system {
 
             // Create sidepots if there are all-in players
             if has_all_in {
-                InternalImpl::_create_sidepots(
+                Self::_create_sidepots(
                     ref world, 
                     *table.m_table_id, 
-                    (*eligible_players).clone(), 
+                    eligible_players.clone(), 
                     player_bets
                 );
             }
@@ -902,8 +902,6 @@ mod table_management_system {
                     Option::Some(best_rank) => {
                         let mut comparison = utils::tie_breaker(@hand_rank, best_rank);
                         while comparison == 0 && rank_mask != EnumRankMask::None {
-                            println!("Tied for best hand for player {}: {:?}",
-                            starknet::contract_address_to_felt252(*player), hand_rank);
                             rank_mask.increment_depth();
                             hand_rank = hand
                                 .evaluate_hand(table.m_community_cards, rank_mask)
@@ -912,8 +910,6 @@ mod table_management_system {
                         };
 
                         if comparison > 0 {
-                            println!("New best hand found for player {}: {:?}",
-                         starknet::contract_address_to_felt252(*player), hand_rank);
                             // New best hand found- clear previous winners.
                             winners = array![*player];
                             current_best_rank = Option::Some(hand_rank);

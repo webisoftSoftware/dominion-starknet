@@ -24,7 +24,7 @@ mod actions_system {
     use starknet::{ContractAddress, get_caller_address, get_block_timestamp, TxInfo, get_tx_info};
     use dojo::{model::ModelStorage, world::IWorldDispatcher};
     use dojo::event::{EventStorage};
-    use dominion::models::components::{ComponentTable, ComponentPlayer, ComponentHand};
+    use dominion::models::components::{ComponentTable, ComponentPlayer, ComponentHand, ComponentSidepot};
     use dominion::models::enums::{EnumPlayerState, EnumGameState};
     use dominion::models::traits::{IPlayer, ITable};
     use dominion::models::structs::StructCard;
@@ -244,12 +244,23 @@ mod actions_system {
                 world.write_model(@table);
                 return;
             }
+            
 
             let mut player_component: ComponentPlayer = world.read_model(get_caller_address());
             assert!(player_component.m_state == EnumPlayerState::Active, "Player is not active");
             assert!(table.check_turn(@get_caller_address()), "It is not your turn");
 
             table.m_pot += player_component.place_bet(amount);
+            if player_component.m_state == EnumPlayerState::AllIn {
+                // Player is all-in.
+                let mut sidepot: ComponentSidepot = world.read_model((table_id, get_caller_address()));
+                // If this is a new sidepot.
+                if sidepot.m_min_bet == 0 {
+                    sidepot.m_min_bet = amount;
+                }
+                sidepot.m_amount += amount;
+                world.write_model(@sidepot);
+            }
             world.write_model(@player_component);
             table.advance_turn();
             if table.m_current_turn == 0 {
