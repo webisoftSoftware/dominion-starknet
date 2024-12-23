@@ -57,6 +57,7 @@ struct ComponentTable {
     m_last_played_ts: u64, /// Timestamp of the last played action.
     m_num_sidepots: u8, /// Number of sidepots in the table. // TODO: TBR after initial review in the block explorer
     m_finished_street: bool, /// Check if we finished the street before advancing to the next one.
+    m_rake_address: ContractAddress, /// The rake address
 }
 
 
@@ -74,3 +75,14 @@ struct ComponentSidepot {
     m_amount: u32, /// The amount in this sidepot
     m_min_bet: u32, /// The minimum bet required to be part of this sidepot
 }
+
+/// Component that represents a sidepot for a table.
+///
+/// One or multiple per round/per table.
+#[derive(Drop, Serde, Debug, Introspect)]
+#[dojo::model]
+struct ComponentRake {
+    #[key]
+    m_rake_address: ContractAddress, /// The deployer address
+    m_chip_amount: u32, /// The amount of chips collected in fees
+}  

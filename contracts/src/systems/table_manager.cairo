@@ -34,7 +34,7 @@ trait ITableManagement<TContractState> {
 mod table_management_system {
     use starknet::{ContractAddress, get_caller_address, TxInfo, get_tx_info};
     use dojo::{model::ModelStorage, world::IWorldDispatcher};
-    use dominion::models::components::{ComponentTable, ComponentPlayer, ComponentHand, ComponentSidepot};
+    use dominion::models::components::{ComponentTable, ComponentPlayer, ComponentHand, ComponentSidepot, ComponentRake};
     use dominion::models::enums::{EnumGameState, EnumPlayerState, EnumPosition, EnumHandRank, EnumRankMask};
     use dominion::models::traits::{ITable, IPlayer, IHand, EnumHandRankPartialOrd, ISidepot, ComponentPlayerDisplay,
          EnumRankMaskPartialOrd, IEnumRankMask};
@@ -170,7 +170,8 @@ mod table_management_system {
             small_blind: u32,
             big_blind: u32,
             min_buy_in: u32,
-            max_buy_in: u32
+            max_buy_in: u32,
+            rake_fee: u32
         ) {
             assert!(
                 self.table_manager.read() == get_caller_address(),
@@ -185,6 +186,9 @@ mod table_management_system {
                 max_buy_in > min_buy_in, "Minimum buy-in cannot be greater than maximum buy-in"
             );
 
+            assert!(rake_fee > 0, "Rake fee cannot be less than 0");
+            assert!(rake_fee < 10, "Rake fee cannot be greater than 10");
+
             let table_id: u32 = self.counter.read();
             let mut world = self.world(@"dominion");
             let table: ComponentTable = world.read_model(table_id);
@@ -196,6 +200,8 @@ mod table_management_system {
             );
             new_table.m_state = EnumGameState::WaitingForPlayers;
             new_table._initialize_deck();
+            new_table.m_rake_fee = rake_fee;
+            new_table.m_rake_address = get_caller_address();
 
             // Save table to world state and increment counter
             world.write_model(@new_table);
@@ -704,10 +710,16 @@ mod table_management_system {
                 
                 // Distribute this sidepot among eligible winners.
                 if !pot_winners.is_empty() {
+                    let house_rake_fee = sidepot.m_amount * table.m_rake_fee / 100;
+                    let rake: ComponentRake = world.read_model(table.m_rake_address);
+                    rake.m_chip_amount += house_rake_fee;
+                    world.write_model(@rake);
+
                     let pot_share = sidepot.m_amount / pot_winners.len().into();
                     for winner in pot_winners.span() {
-                        Self::_distribute_chips(ref world, table_id, *winner, pot_share);
+                        Self::_distribute_chips(ref world, table_id, *winner, pot_share - house_rake_fee);
                     }
+
                 }
                 
                 // Clean up sidepot entries.
