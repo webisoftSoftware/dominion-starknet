@@ -2,16 +2,13 @@
 name = "dominion"
 description = "Dominion Poker Game powered by Dojo"
 website = "https://dominion.fun/"
-seed = "dominion"
+seed = "dominion2"
 
 [world.socials]
 x = "https://x.com/dominionhub"
 discord = "#"
 github = "https://github.com/dominionhub"
 telegram = "https://t.me/+QvEMoi3rjek5Mjdh"
-
-[namespace]
-default = "dominion"
 
 [env]
 rpc_url = "http://localhost:5050/"
@@ -20,5 +17,14 @@ account_address = "0x127fd5f1fe78a71f8bcd1fec63e3fe2f0486b6ecd5c86a0466c3a21fa5c
 private_key = "0xc5b2fcab997346f3ea1c00b002ecf6f382c5f9c9659a3894eb783c5320f912"
 # world_address = "0x06171ed98331e849d6084bf2b3e3186a7ddf35574dd68cab4691053ee8ab69d7"
 
+[namespace]
+default = "dm"
+
+[init_call_args]
+# Add init params for constructors.
+
 [writers]
-"dominion" = ["dominion-action_system", "dominion-table_system", "dominion-cashier_system", "dominion-game_master_system"]
+"dm" = ["dm-actions_system", "dm-cashier_system", "dm-table_management_system"]
+
+[owners]
+"dm" = ["dm-actions_system", "dm-cashier_system", "dm-table_management_system"]
