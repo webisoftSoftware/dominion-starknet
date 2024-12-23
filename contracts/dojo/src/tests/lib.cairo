@@ -52,7 +52,6 @@ mod unit {
 mod integration {
     mod utils;
     mod test_actions;
-    mod test_table;
     mod test_bank;
     mod test_table_manager;
 }

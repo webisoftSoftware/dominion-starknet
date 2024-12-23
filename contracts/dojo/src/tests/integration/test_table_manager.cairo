@@ -438,6 +438,7 @@ fn test_skip_turn_invalid_player_turn() {
 }
 
 #[test]
+#[should_panic(expected: ("Round is not at showdown", 'ENTRYPOINT_FAILED'))]
 fn test_showdown_invalid_state() {
     let mut world: dojo::world::WorldStorage = deploy_world();
     let mut table_manager: ITableManagementDispatcher = deploy_table_manager(ref world);
