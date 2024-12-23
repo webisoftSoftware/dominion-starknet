@@ -58,6 +58,7 @@ struct ComponentTable {
     m_num_sidepots: u8, /// Number of sidepots in the table. // TODO: TBR after initial review in the block explorer
     m_finished_street: bool, /// Check if we finished the street before advancing to the next one.
     m_rake_address: ContractAddress, /// The rake address
+    m_rake_fee: u32, /// The rake fee
 }
 
 
@@ -70,8 +71,7 @@ struct ComponentSidepot {
     #[key]
     m_table_id: u32, /// The table ID
     #[key]
-    m_sidepot_id: u8, /// The sidepot ID (can be an incrementing counter per table)
-    m_player: ContractAddress, /// The player address
+    m_player: ContractAddress, /// The players in this sidepot
     m_amount: u32, /// The amount in this sidepot
     m_min_bet: u32, /// The minimum bet required to be part of this sidepot
 }

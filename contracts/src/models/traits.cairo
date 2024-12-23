@@ -334,40 +334,6 @@ impl EnumHandRankInto of Into<@EnumHandRank, u32> {
     }
 }
 
-impl EnumCardSuitSnapshotInto of Into<@EnumCardSuit, u32> {
-    fn into(self: @EnumCardSuit) -> u32 {
-        match self {
-            EnumCardSuit::Spades => 1,
-            EnumCardSuit::Hearts => 2,
-            EnumCardSuit::Diamonds => 3,
-            EnumCardSuit::Clubs => 4,
-        }
-    }
-}
-
-impl EnumHandRankInto of Into<@EnumHandRank, u32> {
-    fn into(self: @EnumHandRank) -> u32 {
-        match self {
-            EnumHandRank::HighCard(values) |
-            EnumHandRank::Flush(values) => {
-                let mut sum: u32 = 0;
-                for value in values.span() {
-                    sum += value.into();
-                };
-                sum
-            },
-            EnumHandRank::Pair(value) => value.into(),
-            EnumHandRank::TwoPair((value1, value2)) => value1.into() + value2.into(),
-            EnumHandRank::ThreeOfAKind(value) => value.into(),
-            EnumHandRank::Straight(value) => value.into(),
-            EnumHandRank::FullHouse((value1, value2)) => value1.into() + value2.into(),
-            EnumHandRank::FourOfAKind(value) => value.into(),
-            EnumHandRank::StraightFlush => 9000,
-            EnumHandRank::RoyalFlush => 1000,
-        }
-    }
-}
-
 impl EnumRankMaskSnapshotInto of Into<@EnumRankMask, u32> {
     fn into(self: @EnumRankMask) -> u32 {
         match self {
@@ -480,38 +446,6 @@ impl EnumRankMaskPartialOrd of PartialOrd<EnumRankMask> {
     }
 
     fn gt(lhs: EnumRankMask, rhs: EnumRankMask) -> bool {
-        let left_value: u32 = lhs.into();
-        let right_value: u32 = rhs.into();
-        left_value > right_value
-    }
-}
-
-/////////////////////////////////////////////////////////////////////////
-/////////////////////////////////////////////////////////////////////////
-///////////////////////////// PARTIALORD ////////////////////////////////
-/////////////////////////////////////////////////////////////////////////
-/////////////////////////////////////////////////////////////////////////
-
-impl EnumHandRankPartialOrd of PartialOrd<@EnumHandRank> {
-    fn le(lhs: @EnumHandRank, rhs: @EnumHandRank) -> bool {
-        let left_value: u32 = lhs.into();
-        let right_value: u32 = rhs.into();
-        left_value <= right_value
-    }
-
-    fn lt(lhs: @EnumHandRank, rhs: @EnumHandRank) -> bool {
-        let left_value: u32 = lhs.into();
-        let right_value: u32 = rhs.into();
-        left_value < right_value
-    }
-
-    fn ge(lhs: @EnumHandRank, rhs: @EnumHandRank) -> bool {
-        let left_value: u32 = lhs.into();
-        let right_value: u32 = rhs.into();
-        left_value >= right_value
-    }
-
-    fn gt(lhs: @EnumHandRank, rhs: @EnumHandRank) -> bool {
         let left_value: u32 = lhs.into();
         let right_value: u32 = rhs.into();
         left_value > right_value
@@ -679,10 +613,6 @@ impl HandImpl of IHand {
                 };
             };
 
-            println!("Player {} has royal flush? {}, cards: {:?}",
-             starknet::contract_address_to_felt252(*self.m_owner),
-             has_ace && has_king && has_queen && has_jack && has_ten,
-             flush_values);
             return has_ace && has_king && has_queen && has_jack && has_ten;
         }
         return false;
@@ -1221,13 +1151,12 @@ impl PlayerImpl of IPlayer {
 #[generate_trait]
 impl SidepotImpl of ISidepot {
     fn new(
-        table_id: u32, amount: u32, player: ContractAddress, sidepot_id: u8, min_bet: u32
+        table_id: u32, amount: u32, player: ContractAddress, min_bet: u32
     ) -> ComponentSidepot nopanic {
         return ComponentSidepot {
             m_table_id: table_id,
             m_amount: amount,
             m_player: player,
-            m_sidepot_id: sidepot_id,
             m_min_bet: min_bet,
         };
     }
@@ -1262,6 +1191,8 @@ impl TableImpl of ITable {
             m_last_played_ts: 0,
             m_num_sidepots: 0,
             m_finished_street: false,
+            m_rake_address: starknet::contract_address_const::<0x0>(),
+            m_rake_fee: 0,
         };
         table._initialize_deck();
         return table;
@@ -1482,6 +1413,8 @@ impl TableDefaultImpl of Default<ComponentTable> {
             m_last_played_ts: 0,
             m_num_sidepots: 0,
             m_finished_street: false,
+            m_rake_address: starknet::contract_address_const::<0x0>(),
+            m_rake_fee: 0,
         };
     }
 }
