@@ -328,6 +328,40 @@ impl EnumHandRankInto of Into<@EnumHandRank, u32> {
             EnumHandRank::Straight(value) => value.into(),
             EnumHandRank::FullHouse((value1, value2)) => value1.into() + value2.into(),
             EnumHandRank::FourOfAKind(value) => value.into(),
+            EnumHandRank::StraightFlush => 9,
+            EnumHandRank::RoyalFlush => 10,
+        }
+    }
+}
+
+impl EnumCardSuitSnapshotInto of Into<@EnumCardSuit, u32> {
+    fn into(self: @EnumCardSuit) -> u32 {
+        match self {
+            EnumCardSuit::Spades => 1,
+            EnumCardSuit::Hearts => 2,
+            EnumCardSuit::Diamonds => 3,
+            EnumCardSuit::Clubs => 4,
+        }
+    }
+}
+
+impl EnumHandRankInto of Into<@EnumHandRank, u32> {
+    fn into(self: @EnumHandRank) -> u32 {
+        match self {
+            EnumHandRank::HighCard(values) |
+            EnumHandRank::Flush(values) => {
+                let mut sum: u32 = 0;
+                for value in values.span() {
+                    sum += value.into();
+                };
+                sum
+            },
+            EnumHandRank::Pair(value) => value.into(),
+            EnumHandRank::TwoPair((value1, value2)) => value1.into() + value2.into(),
+            EnumHandRank::ThreeOfAKind(value) => value.into(),
+            EnumHandRank::Straight(value) => value.into(),
+            EnumHandRank::FullHouse((value1, value2)) => value1.into() + value2.into(),
+            EnumHandRank::FourOfAKind(value) => value.into(),
             EnumHandRank::StraightFlush => 9000,
             EnumHandRank::RoyalFlush => 1000,
         }
@@ -446,6 +480,38 @@ impl EnumRankMaskPartialOrd of PartialOrd<EnumRankMask> {
     }
 
     fn gt(lhs: EnumRankMask, rhs: EnumRankMask) -> bool {
+        let left_value: u32 = lhs.into();
+        let right_value: u32 = rhs.into();
+        left_value > right_value
+    }
+}
+
+/////////////////////////////////////////////////////////////////////////
+/////////////////////////////////////////////////////////////////////////
+///////////////////////////// PARTIALORD ////////////////////////////////
+/////////////////////////////////////////////////////////////////////////
+/////////////////////////////////////////////////////////////////////////
+
+impl EnumHandRankPartialOrd of PartialOrd<@EnumHandRank> {
+    fn le(lhs: @EnumHandRank, rhs: @EnumHandRank) -> bool {
+        let left_value: u32 = lhs.into();
+        let right_value: u32 = rhs.into();
+        left_value <= right_value
+    }
+
+    fn lt(lhs: @EnumHandRank, rhs: @EnumHandRank) -> bool {
+        let left_value: u32 = lhs.into();
+        let right_value: u32 = rhs.into();
+        left_value < right_value
+    }
+
+    fn ge(lhs: @EnumHandRank, rhs: @EnumHandRank) -> bool {
+        let left_value: u32 = lhs.into();
+        let right_value: u32 = rhs.into();
+        left_value >= right_value
+    }
+
+    fn gt(lhs: @EnumHandRank, rhs: @EnumHandRank) -> bool {
         let left_value: u32 = lhs.into();
         let right_value: u32 = rhs.into();
         left_value > right_value
@@ -713,7 +779,6 @@ impl HandImpl of IHand {
 
         let mut three_of_kind: Option<EnumCardValue> = Option::None;
         let mut pair: Option<EnumCardValue> = Option::None;
-
         // First find three of a kind.
         for card in all_cards
             .span() {
