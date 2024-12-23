@@ -1,7 +1,7 @@
 use starknet::ContractAddress;
 
 #[starknet::interface]
-trait IBank<TContractState> {
+trait ICashier<TContractState> {
     fn deposit_erc20(ref self: TContractState, amount: u256);
     fn cashout_erc20(ref self: TContractState, chips_amount: u32);
     fn transfer_chips(ref self: TContractState, to: ContractAddress, amount: u32);
@@ -16,7 +16,7 @@ trait IERC20<TContractState> {
 }
 
 #[dojo::contract]
-mod bank_system {
+mod cashier_system {
     use starknet::{ContractAddress, get_caller_address, get_contract_address};
     use dominion::models::traits::IPlayer;
     use dojo::{model::ModelStorage, world::IWorldDispatcher};
@@ -24,21 +24,22 @@ mod bank_system {
     use super::{IERC20Dispatcher, IERC20DispatcherTrait};
 
     // Constants
-    const ETH_TO_CHIPS_RATIO: u256 = 10000000000000; // 100,000 chips per ETH
-    const PAYMASTER_FEE_PERCENTAGE: u32 = 5; // 5% goes to paymaster
-    const WITHDRAWAL_FEE_PERCENTAGE: u32 = 2; // 2% withdrawal fee
+    const ETH_TO_CHIPS_RATIO: u256 =
+        10000000000000; // 100,000 chips per ETH // TODO: Change this to 1,000,000 chips per ETH
+    const PAYMASTER_FEE_PERCENTAGE: u32 = 0; // Turned off for now
+    const WITHDRAWAL_FEE_PERCENTAGE: u32 = 0; // 2% withdrawal fee
 
     const ETH_CONTRACT_ADDRESS: felt252 =
         0x049d36570d4e46f48e99674bd3fcc84644ddd6b96f7c741b1562b82f9e004dc7; // Sepolia ETH on StarkNet
     const PAYMASTER_ADDRESS: felt252 =
-        0x049d36570d4e46f48e99674bd3fcc84644ddd6b96f7c741b1562b82f9e004dc7; // TODO: Set this
+        0x0000000000000000000000000000000000000000000000000000000000000000; // TODO: Set this
     const TREASURY_ADDRESS: felt252 =
-        0x049d36570d4e46f48e99674bd3fcc84644ddd6b96f7c741b1562b82f9e004dc7; // TODO: Set this
+        0x0000000000000000000000000000000000000000000000000000000000000000; // TODO: Set this
     const VAULT_ADDRESS: felt252 =
-        0x049d36570d4e46f48e99674bd3fcc84644ddd6b96f7c741b1562b82f9e004dc7; // TODO: Set this
+        0x0000000000000000000000000000000000000000000000000000000000000000; // TODO: Set this
 
     #[abi(embed_v0)]
-    impl BankImpl of super::IBank<ContractState> {
+    impl BankImpl of super::ICashier<ContractState> {
         fn deposit_erc20(ref self: ContractState, amount: u256) {
             let mut world = self.world(@"dominion");
             let caller = get_caller_address();
@@ -53,9 +54,11 @@ mod bank_system {
             let chips_amount: u32 = (net_amount / ETH_TO_CHIPS_RATIO).try_into().unwrap();
 
             // Transfer ETH to paymaster
-            InternalImpl::_transfer_eth_to(
-                paymaster_amount, starknet::contract_address_const::<PAYMASTER_ADDRESS>()
-            );
+            if PAYMASTER_FEE_PERCENTAGE > 0 {
+                InternalImpl::_transfer_eth_to(
+                    paymaster_amount, starknet::contract_address_const::<PAYMASTER_ADDRESS>()
+                );
+            }
 
             // Transfer net ETH to vault
             InternalImpl::_transfer_eth_to(
@@ -63,7 +66,7 @@ mod bank_system {
             );
 
             // Update player's chips
-            let mut player: ComponentPlayer = world.read_model(caller);
+            let mut player: ComponentPlayer = world.read_model((0, caller));
             if !player.m_is_created {
                 player = IPlayer::new(0, caller);
             }
@@ -87,11 +90,14 @@ mod bank_system {
             let net_eth_amount: u256 = eth_amount - fee_amount;
 
             // Transfer fee to treasury
-            InternalImpl::_transfer_eth_to(
-                fee_amount, starknet::contract_address_const::<TREASURY_ADDRESS>()
-            );
+            if WITHDRAWAL_FEE_PERCENTAGE > 0 {
+                InternalImpl::_transfer_eth_to(
+                    fee_amount, starknet::contract_address_const::<TREASURY_ADDRESS>()
+                );
+            }
 
             // Transfer net ETH to caller
+            // TODO: Approve ETH contract to transfer ETH to caller from Vault's wallet
             InternalImpl::_transfer_eth_to(net_eth_amount, caller);
 
             // Update player's chips
@@ -127,19 +133,15 @@ mod bank_system {
                 contract_address: starknet::contract_address_const::<ETH_CONTRACT_ADDRESS>()
             };
 
-            // Call approve
-            let approve_result = erc20.approve(get_contract_address(), // spender
-             amount // amount
-            );
-
             // Call transferFrom
+            // TODO: Approve contract to transfer ETH first.
             let transfer_result = erc20
                 .transfer_from(get_caller_address(), // from
                  to, // to
                  amount // amount
                 );
 
-            assert!(approve_result && transfer_result, "ERC20 transfer failed");
+            assert!(transfer_result, "ERC20 transfer failed");
         }
     }
 }

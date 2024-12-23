@@ -3,6 +3,8 @@
 */target
 */manifest_dev
 */Scarb.lock
+contracts/dojo/target
+contracts/dojo/Scarb.lock
 
 # testing
 */coverage

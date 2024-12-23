@@ -6,15 +6,15 @@ use crate::models::traits::{
     EnumGameStateDisplay, EnumHandRankInto, ComponentPlayerEq, ComponentTableEq,
     ComponentPlayerDisplay, EnumCardValueInto, ComponentTableDisplay, ComponentHandDisplay,
     StructCardDisplay, ComponentHandEq, StructCardEq, HandDefaultImpl, TableDefaultImpl,
-    PlayerDefaultImpl
+    PlayerDefaultImpl, ICard
 };
 use crate::models::structs::{StructCard};
 use crate::models::components::{ComponentHand, ComponentTable, ComponentPlayer};
 
 #[test]
 fn test_eq() {
-    let card1: StructCard = StructCard { m_value: EnumCardValue::Two, m_suit: EnumCardSuit::Clubs };
-    let card2: StructCard = StructCard { m_value: EnumCardValue::Two, m_suit: EnumCardSuit::Clubs };
+    let card1: StructCard = ICard::new(EnumCardValue::Two, EnumCardSuit::Clubs);
+    let card2: StructCard = ICard::new(EnumCardValue::Two, EnumCardSuit::Clubs);
     assert_eq!(card1, card2);
 
     let mut player1: ComponentPlayer = Default::default();
@@ -45,21 +45,19 @@ fn test_display() {
                 m_position: EnumPosition::None,
                 m_state: EnumPlayerState::Active,
                 m_current_bet: 0,
-                m_is_created: false
+                m_is_created: false,
+                m_is_dealer: false
             }
         ),
-        "Player: 0\n\tTotal Chips: 100\n\tTable Chips: 0\n\tPosition: None\n\tState: Active\n\tCurrent Bet: 0\n\tIs Created: false"
+        "Player: 0\n\tTotal Chips: 100\n\tTable Chips: 0\n\tPosition: None\n\tState: Active\n\tCurrent Bet: 0\n\tIs Created: false\n\tIs Dealer: false"
     );
     assert_eq!(
         format!("{}", TableDefaultImpl::default()),
         "Table 0:\n\tPlayers:\n\tCurrent Turn Index: 0\n\tSmall Blind: 0\n\tBig Blind: 0\n\tMin Buy In: 0\n\tMax Buy In: 0\n\tPot: 0\n\tState: WaitingForPlayers\n\tLast Played: 0"
     );
     assert_eq!(format!("{}", HandDefaultImpl::default()), "Hand 0:\n\tCards:");
-    assert_eq!(
-        format!("{}", StructCard { m_value: EnumCardValue::Two, m_suit: EnumCardSuit::Clubs }),
-        "Card: 2\n\tSuit: C"
-    );
-    assert_eq!(format!("{}", EnumHandRank::HighCard), "HighCard");
+    assert_eq!(format!("{}", ICard::new(EnumCardValue::Two, EnumCardSuit::Clubs)), "2C");
+    assert_eq!(format!("{}", EnumHandRank::HighCard(array![EnumCardValue::Two])), "HighCard");
     assert_eq!(format!("{}", EnumCardSuit::Clubs), "C");
     assert_eq!(format!("{}", EnumCardValue::Two), "2");
     assert_eq!(format!("{}", EnumPlayerState::Active), "Active");
@@ -67,9 +65,9 @@ fn test_display() {
 
 #[test]
 fn test_into() {
-    let high_card: u32 = EnumHandRank::HighCard.into();
+    let high_card: u32 = (@EnumHandRank::HighCard(array![EnumCardValue::Ace])).into();
     let two: u32 = EnumCardValue::Two.into();
 
-    assert_eq!(high_card, 1);
+    assert_eq!(high_card, 14);
     assert_eq!(two, 2);
 }

@@ -1,4 +1,4 @@
 mod test_actions;
-mod test_table;
-mod test_game_master;
-mod test_bank;
+mod test_table_manager;
+mod test_cashier;
+mod utils;

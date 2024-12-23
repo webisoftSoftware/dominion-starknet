@@ -1,4 +1,3 @@
 mod actions;
 mod bank;
-mod table;
-mod game_master;
+mod table_management;
