@@ -32,7 +32,7 @@ fn test_table_manager_create_table() {
 
     let mut table_manager: ITableManagementDispatcher = deploy_table_manager(ref world);
 
-    table_manager.create_table(100, 200, 2000, 4000);
+    table_manager.create_table(100, 200, 2000, 4000, 5);
     let table: ComponentTable = world.read_model(1);
 
     assert_eq!(table.m_state, EnumGameState::WaitingForPlayers);
@@ -44,7 +44,7 @@ fn test_table_manager_shutdown_table() {
 
     let mut table_manager: ITableManagementDispatcher = deploy_table_manager(ref world);
 
-    table_manager.create_table(100, 200, 2000, 4000);
+    table_manager.create_table(100, 200, 2000, 4000, 5);
     let table: ComponentTable = world.read_model(1);
 
     assert_eq!(table.m_state, EnumGameState::WaitingForPlayers);
@@ -61,7 +61,7 @@ fn test_table_deck() {
 
     let mut table_manager: ITableManagementDispatcher = deploy_table_manager(ref world);
 
-    table_manager.create_table(100, 200, 2000, 4000);
+    table_manager.create_table(100, 200, 2000, 4000, 5);
     let table: ComponentTable = world.read_model(1);
 
     assert_eq!(table.m_deck.len(), 52);
@@ -73,7 +73,7 @@ fn test_shuffle_deck() {
 
     let mut table_manager: ITableManagementDispatcher = deploy_table_manager(ref world);
 
-    table_manager.create_table(100, 200, 2000, 4000);
+    table_manager.create_table(100, 200, 2000, 4000, 5);
 
     let mut table: ComponentTable = world.read_model(1);
     let initial_deck = table.m_deck.clone();
@@ -92,7 +92,7 @@ fn test_table_manager_start_round_invalid_state() {
 
     let mut table_manager: ITableManagementDispatcher = deploy_table_manager(ref world);
 
-    table_manager.create_table(100, 200, 2000, 4000);
+    table_manager.create_table(100, 200, 2000, 4000, 5);
     let mut table: ComponentTable = world.read_model(1);
     table.m_state = EnumGameState::PreFlop;
     world.write_model_test(@table);
@@ -107,7 +107,7 @@ fn test_table_manager_start_round_not_enough_players() {
 
     let mut table_manager: ITableManagementDispatcher = deploy_table_manager(ref world);
 
-    table_manager.create_table(100, 200, 2000, 4000);
+    table_manager.create_table(100, 200, 2000, 4000, 5);
     table_manager.start_round(1);
 }
 
@@ -120,7 +120,7 @@ fn test_table_manager_start_round_player_states() {
 
     let mut table_manager: ITableManagementDispatcher = deploy_table_manager(ref world);
 
-    table_manager.create_table(100, 200, 2000, 4000);
+    table_manager.create_table(100, 200, 2000, 4000, 5);
 
     let mut table: ComponentTable = world.read_model(1);
     table.m_players.append(player_1.m_owner);
@@ -146,7 +146,7 @@ fn test_table_manager_update_deck_invalid_caller() {
 
     let mut table_manager: ITableManagementDispatcher = deploy_table_manager(ref world);
 
-    table_manager.create_table(100, 200, 2000, 4000);
+    table_manager.create_table(100, 200, 2000, 4000, 5);
 
     starknet::testing::set_contract_address(starknet::contract_address_const::<0x1A>());
     table_manager.post_encrypt_deck(1, array![]);
@@ -159,7 +159,7 @@ fn test_table_manager_update_deck_invalid_state() {
 
     let mut table_manager: ITableManagementDispatcher = deploy_table_manager(ref world);
 
-    table_manager.create_table(100, 200, 2000, 4000);
+    table_manager.create_table(100, 200, 2000, 4000, 5);
 
     let mut table: ComponentTable = world.read_model(1);
     table.m_state = EnumGameState::WaitingForPlayers;
@@ -175,7 +175,7 @@ fn test_table_manager_update_deck_invalid_deck_length() {
 
     let mut table_manager: ITableManagementDispatcher = deploy_table_manager(ref world);
 
-    table_manager.create_table(100, 200, 2000, 4000);
+    table_manager.create_table(100, 200, 2000, 4000, 5);
 
     table_manager.post_encrypt_deck(1, array![ICard::new(EnumCardValue::Ace, EnumCardSuit::Clubs)]);
 }
@@ -188,7 +188,7 @@ fn test_table_manager_distribute_cards() {
 
     let mut table_manager: ITableManagementDispatcher = deploy_table_manager(ref world);
 
-    table_manager.create_table(100, 200, 2000, 4000);
+        table_manager.create_table(100, 200, 2000, 4000, 5);
 
     let mut table: ComponentTable = world.read_model(1);
     table.m_players.append(player_1.m_owner);
@@ -227,7 +227,7 @@ fn test_advance_street_not_all_players_played() {
 
     let mut table_manager: ITableManagementDispatcher = deploy_table_manager(ref world);
 
-    table_manager.create_table(100, 200, 2000, 4000);
+        table_manager.create_table(100, 200, 2000, 4000, 5);
 
     let mut table: ComponentTable = world.read_model(1);
     table.m_players.append(player_1.m_owner);
@@ -252,7 +252,7 @@ fn test_advance_street_deck_not_encrypted() {
 
     let mut table_manager: ITableManagementDispatcher = deploy_table_manager(ref world);
 
-    table_manager.create_table(100, 200, 2000, 4000);
+        table_manager.create_table(100, 200, 2000, 4000, 5);
 
     let mut table: ComponentTable = world.read_model(1);
     table.m_players.append(player_1.m_owner);
@@ -277,7 +277,7 @@ fn test_advance_street_invalid_pre_flop() {
 
     let mut table_manager: ITableManagementDispatcher = deploy_table_manager(ref world);
 
-    table_manager.create_table(100, 200, 2000, 4000);
+        table_manager.create_table(100, 200, 2000, 4000, 5);
 
     let mut table: ComponentTable = world.read_model(1);
     table.m_players.append(player_1.m_owner);
@@ -308,7 +308,7 @@ fn test_invalid_street_invalid_flop() {
 
     let mut table_manager: ITableManagementDispatcher = deploy_table_manager(ref world);
 
-    table_manager.create_table(100, 200, 2000, 4000);
+        table_manager.create_table(100, 200, 2000, 4000, 5);
 
     let mut table: ComponentTable = world.read_model(1);
     table.m_players.append(player_1.m_owner);
@@ -342,7 +342,7 @@ fn test_invalid_street_invalid_turn() {
 
     let mut table_manager: ITableManagementDispatcher = deploy_table_manager(ref world);
 
-    table_manager.create_table(100, 200, 2000, 4000);
+        table_manager.create_table(100, 200, 2000, 4000, 5);
 
     let mut table: ComponentTable = world.read_model(1);
     table.m_players.append(player_1.m_owner);
@@ -376,7 +376,7 @@ fn test_invalid_street_invalid_river() {
 
     let mut table_manager: ITableManagementDispatcher = deploy_table_manager(ref world);
 
-    table_manager.create_table(100, 200, 2000, 4000);
+        table_manager.create_table(100, 200, 2000, 4000, 5);
 
     let mut table: ComponentTable = world.read_model(1);
     table.m_players.append(player_1.m_owner);
@@ -408,7 +408,7 @@ fn test_post_auth_hash_invalid_state() {
     let mut world: dojo::world::WorldStorage = deploy_world();
     let mut table_manager: ITableManagementDispatcher = deploy_table_manager(ref world);
 
-    table_manager.create_table(100, 200, 2000, 4000);
+        table_manager.create_table(100, 200, 2000, 4000, 5);
     let mut table: ComponentTable = world.read_model(1);
     table.m_state = EnumGameState::Shutdown;
     world.write_model_test(@table);
@@ -425,7 +425,7 @@ fn test_skip_turn_invalid_player_turn() {
 
     let mut table_manager: ITableManagementDispatcher = deploy_table_manager(ref world);
 
-    table_manager.create_table(100, 200, 2000, 4000);
+        table_manager.create_table(100, 200, 2000, 4000, 5);
 
     let mut table: ComponentTable = world.read_model(1);
     table.m_players.append(player_1.m_owner);
@@ -449,7 +449,7 @@ fn test_showdown_invalid_state() {
     let mut world: dojo::world::WorldStorage = deploy_world();
     let mut table_manager: ITableManagementDispatcher = deploy_table_manager(ref world);
 
-    table_manager.create_table(100, 200, 2000, 4000);
+        table_manager.create_table(100, 200, 2000, 4000, 5);
     table_manager.showdown(1);
 }
 
@@ -463,7 +463,7 @@ fn test_showdown_not_all_players_revealed() {
     let mut world: dojo::world::WorldStorage = deploy_world();
     let mut table_manager: ITableManagementDispatcher = deploy_table_manager(ref world);
 
-    table_manager.create_table(100, 200, 2000, 4000);
+        table_manager.create_table(100, 200, 2000, 4000, 5);
 
     // Meet the minimum requirements for showdown.
     let mut table: ComponentTable = world.read_model(1);
@@ -497,7 +497,7 @@ fn test_showdown_simple() {
     let mut world: dojo::world::WorldStorage = deploy_world();
     let mut table_manager: ITableManagementDispatcher = deploy_table_manager(ref world);
 
-    table_manager.create_table(100, 200, 2000, 4000);
+        table_manager.create_table(100, 200, 2000, 4000, 5);
 
     // Meet the minimum requirements for showdown.
     let mut table: ComponentTable = world.read_model(1);
@@ -560,7 +560,7 @@ fn test_showdown_tie() {
     let mut world: dojo::world::WorldStorage = deploy_world();
     let mut table_manager: ITableManagementDispatcher = deploy_table_manager(ref world);
 
-    table_manager.create_table(100, 200, 2000, 4000);
+        table_manager.create_table(100, 200, 2000, 4000, 5);
 
     // Set up table with community cards that will result in a tie
     let mut table: ComponentTable = world.read_model(1);
@@ -624,7 +624,7 @@ fn test_showdown_complex() {
     let mut world: dojo::world::WorldStorage = deploy_world();
     let mut table_manager: ITableManagementDispatcher = deploy_table_manager(ref world);
 
-    table_manager.create_table(100, 200, 2000, 4000);
+        table_manager.create_table(100, 200, 2000, 4000, 5);
 
     // Set up table with community cards.
     let mut table: ComponentTable = world.read_model(1);
