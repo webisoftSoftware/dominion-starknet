@@ -4,7 +4,10 @@ use dominion::{
         e_EventTableCreated, e_EventTableShutdown, e_EventEncryptDeckRequested,
         e_EventDecryptHandRequested, e_EventRequestBet, e_EventStreetAdvanced,
         e_EventAuthHashRequested
-    }
+    },
+    systems::actions::actions_system::{
+        e_EventPlayerJoined, e_EventAllPlayersReady, e_EventPlayerLeft
+    },
 };
 
 use crate::systems::actions::actions_system;
@@ -41,6 +44,9 @@ pub fn namespace_def() -> NamespaceDef {
             TestResource::Event(e_EventRequestBet::TEST_CLASS_HASH),
             TestResource::Event(e_EventStreetAdvanced::TEST_CLASS_HASH),
             TestResource::Event(e_EventAuthHashRequested::TEST_CLASS_HASH),
+            TestResource::Event(e_EventPlayerJoined::TEST_CLASS_HASH),
+            TestResource::Event(e_EventAllPlayersReady::TEST_CLASS_HASH),
+            TestResource::Event(e_EventPlayerLeft::TEST_CLASS_HASH),
         ].span()
     };
 
