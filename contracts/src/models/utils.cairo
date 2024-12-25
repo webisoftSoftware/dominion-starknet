@@ -2,7 +2,7 @@ use starknet::ContractAddress;
 use dominion::models::structs::StructCard;
 use dominion::models::enums::{EnumCardValue, EnumHandRank};
 use dominion::models::traits::{
-    EnumCardValueInto, EnumCardValueSnapshotInto, EnumCardSuitInto, EnumHandRankInto,
+    EnumCardValueInto, EnumCardValueSnapshotInto, EnumCardSuitInto, EnumHandRankSnapshotInto,
     StructCardDisplay, ICard
 };
 

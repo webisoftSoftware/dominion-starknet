@@ -6,7 +6,7 @@ use dominion::models::enums::{EnumPosition, EnumGameState, EnumPlayerState};
 /// Component that represents two cards that the player holds in their hand during a game.
 ///
 /// 1 (2 cards) per player.
-#[derive(Drop, Serde, Debug, Introspect)]
+#[derive(Drop, Serde, Debug)]
 #[dojo::model]
 struct ComponentHand {
     #[key]
@@ -19,7 +19,7 @@ struct ComponentHand {
 /// A player can only join ONE table at a time.
 ///
 /// Max 6 per table.
-#[derive(Drop, Serde, Debug, Introspect)]
+#[derive(Drop, Serde, Debug)]
 #[dojo::model]
 struct ComponentPlayer {
     #[key]
@@ -38,7 +38,7 @@ struct ComponentPlayer {
 /// Component that represents a single table where the games will be played on.
 ///
 /// A handful per world.
-#[derive(Drop, Serde, Debug, Introspect)]
+#[derive(Drop, Serde, Debug)]
 #[dojo::model]
 struct ComponentTable {
     #[key]
@@ -65,24 +65,25 @@ struct ComponentTable {
 /// Component that represents a sidepot for a table.
 ///
 /// One or multiple per round/per table.
-#[derive(Drop, Serde, Debug, Introspect)]
+#[derive(Drop, Serde, Debug)]
 #[dojo::model]
 struct ComponentSidepot {
     #[key]
-    m_table_id: u32, /// The table ID
+    m_table_id: u32,                                    /// The table ID.
     #[key]
-    m_player: ContractAddress, /// The players in this sidepot
-    m_amount: u32, /// The amount in this sidepot
-    m_min_bet: u32, /// The minimum bet required to be part of this sidepot
+    m_sidepot_id: u8,                                   /// The sidepot ID.
+    m_min_bet: u32,                                     /// The minimum bet required to be part of this sidepot.
+    m_amount: u32,                                      /// The amount in this sidepot.
+    m_eligible_players: Array<ContractAddress>,         /// The eligible players in this sidepot.
 }
 
 /// Component that represents a sidepot for a table.
 ///
 /// One or multiple per round/per table.
-#[derive(Drop, Serde, Debug, Introspect)]
+#[derive(Drop, Serde, Debug)]
 #[dojo::model]
 struct ComponentRake {
     #[key]
-    m_rake_address: ContractAddress, /// The deployer address
-    m_chip_amount: u32, /// The amount of chips collected in fees
+    m_rake_address: ContractAddress,                    /// The deployer address.
+    m_chip_amount: u32,                                 /// The amount of chips collected in fees.
 }  
