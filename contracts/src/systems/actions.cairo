@@ -3,19 +3,18 @@ use starknet::ContractAddress;
 
 #[starknet::interface]
 trait IActions<TContractState> {
-    fn bet(ref self: TContractState, table_id: u32, amount: u32, table_manager: ContractAddress);
-    fn fold(ref self: TContractState, table_id: u32, table_manager: ContractAddress);
+    fn bet(ref self: TContractState, table_id: u32, amount: u32);
+    fn fold(ref self: TContractState, table_id: u32);
     fn post_commit_hash(ref self: TContractState, table_id: u32, commitment_hash: Array<u32>);
     fn top_up_table_chips(ref self: TContractState, table_id: u32, chips_amount: u32);
-    fn set_ready(ref self: TContractState, table_id: u32, table_manager: ContractAddress);
+    fn set_ready(ref self: TContractState, table_id: u32);
     fn join_table(ref self: TContractState, table_id: u32, chips_amount: u32);
     fn leave_table(ref self: TContractState, table_id: u32);
     fn reveal_hand(
         ref self: TContractState,
         table_id: u32,
         decrypted_hand: Array<StructCard>,
-        request: ByteArray,
-        table_manager: ContractAddress
+        request: ByteArray
     );
 }
 
@@ -25,7 +24,7 @@ mod actions_system {
     use dojo::{model::ModelStorage, world::IWorldDispatcher};
     use dojo::event::{EventStorage};
     use dominion::models::components::{ComponentTable, ComponentPlayer, ComponentHand, ComponentSidepot};
-    use dominion::models::enums::{EnumPlayerState, EnumGameState};
+    use dominion::models::enums::{EnumPlayerState, EnumGameState, EnumPosition};
     use dominion::models::traits::{IPlayer, ITable};
     use dominion::models::structs::StructCard;
     use alexandria_data_structures::array_ext::ArrayTraitExt;
@@ -33,6 +32,7 @@ mod actions_system {
     use dominion::systems::table_manager::{
         ITableManagementDispatcher, ITableManagementDispatcherTrait
     };
+    use dominion::systems::table_manager::table_management_system;
 
     #[derive(Clone, Drop, Serde, Debug)]
     #[dojo::event]
@@ -77,39 +77,48 @@ mod actions_system {
 
     #[abi(embed_v0)]
     impl ActionsImpl of super::IActions<ContractState> {
-        // Allows a player to join a table with specified chips amount
+        /// Allows a player to join a table with specified chips amount.
+        ///
+        /// If the player is not at the table, a new player is created.
+        /// If the player is already at the table, their chips are updated.
+        /// If the player is already at the table and has not joined yet, their chips are updated.
+        ///
+        /// @param table_id The ID of the table to join.
+        /// @param chips_amount The amount of chips to join the table with.
+        /// @returns Nothing.
+        /// Can Panic? Yes, if the table is not created or shutdown, or if the player is already active.
         fn join_table(ref self: ContractState, table_id: u32, chips_amount: u32) {
             let mut world = self.world(@"dominion");
             let caller = get_caller_address();
-
-            // Get table and player components
             let mut player: ComponentPlayer = world.read_model((table_id, caller));
-
+            
             // Create new player if first time joining
             if !player.m_is_created {
                 player = IPlayer::new(table_id, caller);
             }
-
-            // Validate table capacity and chip amounts
+            
+            // Validate table capacity and chip amounts.
             let mut table: ComponentTable = world.read_model(table_id);
+            assert!(table.m_state != EnumGameState::Shutdown, "Table is not created or shutdown");
             assert!(table.m_players.len() < 6, "Table is full");
+            assert!(!table.m_players.contains(@caller), "Player is already at the table");
             assert!(player.m_total_chips >= chips_amount, "Insufficient chips");
-            assert!(table.m_min_buy_in < chips_amount, "Amount is less than min buy in");
-            assert!(table.m_max_buy_in > chips_amount, "Amount is more than max buy in");
+            assert!(table.m_min_buy_in <= chips_amount, "Amount is less than min buy in");
+            assert!(table.m_max_buy_in >= chips_amount, "Amount is more than max buy in");
 
-            // Update player state for joining table
+            // Update player state for joining table.
             player.m_table_id = table_id;
             player.m_total_chips -= chips_amount;
             player.m_table_chips += chips_amount;
 
-            // Set player state based on game state
+            // Set player state based on game state.
             if table.m_state == EnumGameState::WaitingForPlayers {
                 player.m_state = EnumPlayerState::Active;
             } else {
                 player.m_state = EnumPlayerState::Waiting;
             }
 
-            // Reset player's current bet
+            // Reset player's current bet if they previously joined the table.
             player.m_current_bet = 0;
 
             // Update world state
@@ -127,79 +136,94 @@ mod actions_system {
             world.write_model(@table);
         }
 
-        fn set_ready(ref self: ContractState, table_id: u32, table_manager: ContractAddress) {
+        /// Sets a player's state to ready.
+        ///
+        /// This is used to start a round automatically when all players are ready.
+        ///
+        /// @param table_id The ID of the table to set ready.
+        /// @returns Nothing.
+        /// Can Panic? Yes, if the table is not waiting for players, or if the player is not at the table.
+        fn set_ready(ref self: ContractState, table_id: u32) {
             let mut world = self.world(@"dominion");
             let caller = get_caller_address();
+            let table: ComponentTable = world.read_model(table_id);
+            assert!(table.m_state == EnumGameState::WaitingForPlayers, "Table is not waiting for players");
 
-            let mut player: ComponentPlayer = world.read_model(caller);
+            let mut player: ComponentPlayer = world.read_model((table_id, caller));
             assert!(player.m_table_id == table_id, "Player is not at this table");
-            assert!(player.m_state != EnumPlayerState::Active, "Player is active");
+            assert!(player.m_state != EnumPlayerState::Ready, "Player is already ready");
 
             player.m_state = EnumPlayerState::Ready;
             world.write_model(@player);
 
-            let table: ComponentTable = world.read_model(table_id);
             let mut player_statuses: Array<bool> = array![];
 
             // Check if all players are ready.
-            for i in 0
-                ..table
-                    .m_players
-                    .len() {
-                        if *table.m_players[i] == caller {
-                            continue;
-                        }
+            for i in 0..table.m_players.len() {
+                if *table.m_players[i] == caller {
+                    player_statuses.append(true);
+                    continue;
+                }
 
-                        let player: ComponentPlayer = world.read_model(*table.m_players[i]);
-                        if player.m_state != EnumPlayerState::Ready {
-                            break;
-                        }
-                        player_statuses.append(true);
-                    };
+                let player: ComponentPlayer = world.read_model((table_id, *table.m_players[i]));
+                if player.m_state != EnumPlayerState::Ready {
+                    break;
+                }
+                player_statuses.append(true);
+            };
 
             // All players are ready.
             if (player_statuses.len() == table.m_players.len() && table.m_players.len() > 1) {
-                world
-                    .emit_event(
-                        @EventAllPlayersReady {
-                            m_table_id: table_id,
-                            m_players: table.m_players,
-                            m_timestamp: get_block_timestamp()
-                        }
-                    );
-                let mut table_manager: ITableManagementDispatcher = ITableManagementDispatcher {
-                    contract_address: table_manager
-                };
-                table_manager.start_round(table_id);
+                world.emit_event(
+                    @EventAllPlayersReady {
+                        m_table_id: table_id,
+                        m_players: table.m_players,
+                        m_timestamp: get_block_timestamp()
+                    }
+                );
+                table_management_system::InternalImpl::_start_round(ref world, table_id);
             }
         }
 
-        // Allows a player to leave a table and collect their chips
+        /// Allows a player to leave a table and collect their chips
+        /// The player retrieves their chips and adds them to their total chips.
+        /// If the player is the dealer/big blind/small blind, roles are updated.
+        ///
+        /// @param table_id The ID of the table to leave.
+        /// @returns Nothing.
+        /// Can Panic? Yes, if the player is not at the table.
         fn leave_table(ref self: ContractState, table_id: u32) {
             let mut world = self.world(@"dominion");
             let caller = get_caller_address();
 
-            let mut player: ComponentPlayer = world.read_model(caller);
-            let mut table: ComponentTable = world.read_model(player.m_table_id);
+            let mut table: ComponentTable = world.read_model(table_id);
+            assert!(table.m_state != EnumGameState::Shutdown, "Table is not created or shutdown");
+
+            let mut player: ComponentPlayer = world.read_model((table_id, caller));
+            assert!(table.m_players.contains(@caller), "Player is not at the table");
 
             // Reset player's table state and return chips
-            player.m_table_id = 0;
             table.m_pot += player.m_current_bet;
             player.m_total_chips += player.m_table_chips;
             player.m_table_chips = 0;
             player.m_state = EnumPlayerState::Left;
 
             world.write_model(@player);
-            world.write_model(@table);
 
-            world
-                .emit_event(
-                    @EventPlayerLeft {
-                        m_table_id: table_id,
-                        m_player: caller,
-                        m_timestamp: starknet::get_block_timestamp()
-                    }
-                );
+            // Update table roles if player was dealer/big blind/small blind.
+            if player.m_is_dealer || player.m_position == EnumPosition::BigBlind ||
+                player.m_position == EnumPosition::SmallBlind {
+                table_management_system::InternalImpl::_update_roles(ref world, ref table);
+            }
+
+            world.write_model(@table);
+            world.emit_event(
+                @EventPlayerLeft {
+                    m_table_id: table_id,
+                    m_player: caller,
+                    m_timestamp: starknet::get_block_timestamp()
+                }
+            );
         }
 
         // Allows a player to add more chips to their stack at the table
@@ -221,91 +245,91 @@ mod actions_system {
             world.write_model(@player);
         }
 
-        fn bet(
-            ref self: ContractState, table_id: u32, amount: u32, table_manager: ContractAddress
-        ) {
+        fn bet(ref self: ContractState, table_id: u32, amount: u32) {
             let mut world = self.world(@"dominion");
             let mut table: ComponentTable = world.read_model(table_id);
-            assert!(
-                table.m_state != EnumGameState::Shutdown
-                    && table.m_state != EnumGameState::WaitingForPlayers,
-                "Game is not in a betting phase"
-            );
-            if amount == 0 {
-                // Player has checked.
-                table.advance_turn();
-                if table.m_current_turn == 0 {
-                    // If we were the last player doing our turn, advance the street.
-                    table.m_finished_street = true;
-                    world.write_model(@table);
-                    table.advance_street();
-                    return;
-                }
-                world.write_model(@table);
-                return;
+            match table.m_state {
+                EnumGameState::Shutdown | EnumGameState::WaitingForPlayers | EnumGameState::DeckEncrypted => {
+                    assert!(false, "Game is not in a betting phase");
+                },
+                _ => {}
             }
-            
+            let mut player_component: ComponentPlayer = world.read_model((table_id, get_caller_address()));
+            assert!(table.check_turn(@player_component.m_owner), "It is not your turn");
 
-            let mut player_component: ComponentPlayer = world.read_model(get_caller_address());
-            assert!(player_component.m_state == EnumPlayerState::Active, "Player is not active");
-            assert!(table.check_turn(@get_caller_address()), "It is not your turn");
+            match player_component.m_state {
+                EnumPlayerState::NotCreated | EnumPlayerState::Waiting | EnumPlayerState::Revealed |
+                EnumPlayerState::Folded | EnumPlayerState::Left => {
+                    panic!("Player is not active");
+                },
+                _ => {}
+            }
 
-            table.m_pot += player_component.place_bet(amount);
-            if player_component.m_state == EnumPlayerState::AllIn {
-                // Player is all-in.
-                let mut sidepot: ComponentSidepot = world.read_model((table_id, get_caller_address()));
-                // If this is a new sidepot.
-                if sidepot.m_min_bet == 0 {
-                    sidepot.m_min_bet = amount;
-                }
-                sidepot.m_amount += amount;
-                world.write_model(@sidepot);
-            }
-            world.write_model(@player_component);
-            table.advance_turn();
-            if table.m_current_turn == 0 {
-                // If we were the last player doing our turn, advance the street.
-                table.m_finished_street = true;
-                world.write_model(@table);
-                table.advance_street();
-                return;
-            }
-            world.write_model(@table);
+            match amount {
+                0 => InternalImpl::_check(ref world, table_id, player_component.m_owner, amount, true),
+                _ => InternalImpl::_place_bet(ref world, table_id, player_component.m_owner, amount, true),
+            };
+
+            // If we were the last player doing our turn, advance the street.
+            // if table.m_current_turn == 0 {
+            //     table.m_finished_street = true;
+            //     world.write_model(@table);
+            //     table_management_system::InternalImpl::_advance_street(ref world, table_id);
+            //     return;
+            // }
+            // world.write_model(@table);
         }
 
-        fn fold(ref self: ContractState, table_id: u32, table_manager: ContractAddress) {
+        fn fold(ref self: ContractState, table_id: u32) {
             let mut world = self.world(@"dominion");
 
             let mut table: ComponentTable = world.read_model(table_id);
-            assert!(
-                table.m_state != EnumGameState::Shutdown
-                    && table.m_state != EnumGameState::WaitingForPlayers,
-                "Game is not in a betting phase"
-            );
+            match table.m_state {
+                EnumGameState::Shutdown | EnumGameState::WaitingForPlayers | EnumGameState::DeckEncrypted => {
+                    assert!(false, "Game is not in a betting phase");
+                },
+                _ => {}
+            };
 
-            let mut player_component: ComponentPlayer = world.read_model(get_caller_address());
-            assert!(player_component.m_state == EnumPlayerState::Active, "Player is not active");
+            let mut player_component: ComponentPlayer = world.read_model((table_id, get_caller_address()));
             assert!(table.check_turn(@get_caller_address()), "It is not your turn");
 
-            if player_component.m_table_chips > 0 {
-                table.m_pot += player_component.fold();
-            }
-            world.write_model(@player_component);
-            table.advance_turn();
-            if table.m_current_turn == 0 {
-                // If we were the last player doing our turn, advance the street.
-                table.m_finished_street = true;
-                world.write_model(@table);
-                table.advance_street();
-                return;
-            }
-            world.write_model(@table);
+            match player_component.m_state {
+                EnumPlayerState::NotCreated | EnumPlayerState::Waiting | EnumPlayerState::Revealed |
+                EnumPlayerState::Left => {
+                    panic!("Player is not active");
+                },
+                EnumPlayerState::Folded => {
+                    panic!("Player has already folded");
+                },
+                _ => {}
+            };
+
+            InternalImpl::_fold(ref world, table_id, player_component.m_owner, true);
+
+            // if table.m_current_turn == 0 {
+            //     // If we were the last player doing our turn, advance the street.
+            //     table.m_finished_street = true;
+            //     world.write_model(@table);
+            //     table_management_system::InternalImpl::_advance_street(ref world, table_id);
+            //     return;
+            // }
+            // world.write_model(@table);
         }
 
         fn post_commit_hash(ref self: ContractState, table_id: u32, commitment_hash: Array<u32>) {
             let mut world = self.world(@"dominion");
 
-            let mut hand: ComponentHand = world.read_model(get_caller_address());
+            let player_component: ComponentPlayer = world.read_model((table_id, get_caller_address()));
+            match player_component.m_state {
+                EnumPlayerState::NotCreated | EnumPlayerState::Waiting | EnumPlayerState::Revealed |
+                EnumPlayerState::Folded | EnumPlayerState::Left => {
+                    panic!("Player is not active");
+                },
+                _ => {}
+            };
+
+            let mut hand: ComponentHand = world.read_model((table_id, get_caller_address()));
             hand.m_commitment_hash = commitment_hash;
             world.write_model(@hand);
         }
@@ -314,18 +338,26 @@ mod actions_system {
             ref self: ContractState,
             table_id: u32,
             decrypted_hand: Array<StructCard>,
-            request: ByteArray,
-            table_manager: ContractAddress
+            request: ByteArray
         ) {
             let mut world = self.world(@"dominion");
             let caller = get_caller_address();
 
             let mut table: ComponentTable = world.read_model(table_id);
-            let mut player: ComponentPlayer = world.read_model(caller);
+            let mut player: ComponentPlayer = world.read_model((table_id, caller));
             assert!(table.m_state == EnumGameState::Showdown, "Table is not at showdown phase");
             assert!(player.m_table_id == table_id, "Player is not at this table");
 
-            assert!(player.m_state == EnumPlayerState::Active, "Player is not active");
+            match player.m_state {
+                EnumPlayerState::NotCreated | EnumPlayerState::Waiting |
+                EnumPlayerState::Folded | EnumPlayerState::Left => {
+                    panic!("Player is not active");
+                },
+                EnumPlayerState::Revealed => {
+                    panic!("Player has already revealed hand");
+                },
+                _ => {}
+            };
 
             let mut hand: ComponentHand = world.read_model(caller);
 
@@ -363,10 +395,7 @@ mod actions_system {
                 );
 
             if InternalImpl::_all_players_revealed(@world, table_id) {
-                let mut table_manager: ITableManagementDispatcher = ITableManagementDispatcher {
-                    contract_address: table_manager
-                };
-                table_manager.advance_street(table_id);
+                table_management_system::InternalImpl::_showdown(ref world, table_id);
             }
         }
     }
@@ -379,13 +408,82 @@ mod actions_system {
             for player in table
                 .m_players
                 .span() {
-                    let player_component: ComponentPlayer = world.read_model(*player);
+                    let player_component: ComponentPlayer = world.read_model((table_id, *player));
                     if player_component.m_state != EnumPlayerState::Revealed {
                         all_revealed = false;
                         break;
                     }
                 };
             return all_revealed;
+        }
+
+        fn _check(ref world: dojo::world::WorldStorage, table_id: u32, player_addr: ContractAddress,
+             current_bet: u32, advance_turn: bool) {
+            assert!(current_bet == 0, "Amount must be 0 to check");
+            let mut table: ComponentTable = world.read_model(table_id);
+            let mut player: ComponentPlayer = world.read_model((table_id, player_addr));
+            player.m_state = EnumPlayerState::Checked;
+
+            if advance_turn {
+                table.advance_turn();
+            }
+            world.write_model(@player);
+            world.write_model(@table);
+        }
+
+        fn _place_bet(ref world: dojo::world::WorldStorage, table_id: u32, player_addr: ContractAddress,
+             current_bet: u32, advance_turn: bool) {
+            assert!(current_bet > 0, "Amount must be greater than 0 to place a bet");
+            let mut table: ComponentTable = world.read_model(table_id);
+            let mut player: ComponentPlayer = world.read_model((table_id, player_addr));
+
+            // Determine the player's state based on the current bet.
+            if player.m_position == EnumPosition::SmallBlind || player.m_position == EnumPosition::BigBlind {
+                player.m_state = EnumPlayerState::Active;
+            } else if current_bet == player.m_current_bet {
+                player.m_state = EnumPlayerState::Called;
+            } else if player.m_current_bet >= current_bet {
+                if player.m_table_chips == current_bet {
+                    player.m_state = EnumPlayerState::AllIn;
+                } else {
+                    player.m_state = EnumPlayerState::Raised(current_bet);
+                }
+            }
+
+            table.m_pot += player.place_bet(current_bet);
+            // Assign the player's bet to eligible sidepots.
+            table_management_system::InternalImpl::_assign_player_to_sidepot(
+                ref world,
+                table_id,
+                player.m_owner,
+                player.m_current_bet);
+
+            if advance_turn {
+                table.advance_turn();
+            }
+            world.write_model(@player);
+            world.write_model(@table);
+        }
+
+        fn _fold(ref world: dojo::world::WorldStorage, table_id: u32, player_addr: ContractAddress,
+             advance_turn: bool) {
+            let mut table: ComponentTable = world.read_model(table_id);
+            let mut player: ComponentPlayer = world.read_model((table_id, player_addr));
+
+            table.m_pot += player.fold();
+            // If the player was all-in, remove them from all sidepots.
+            if player.m_state == EnumPlayerState::AllIn {
+                table_management_system::InternalImpl::_remove_player_from_sidepots(
+                    ref world,
+                    table_id,
+                    player.m_owner);
+            }
+
+            if advance_turn {
+                table.advance_turn();
+            }
+            world.write_model(@player);
+            world.write_model(@table);
         }
     }
 }
