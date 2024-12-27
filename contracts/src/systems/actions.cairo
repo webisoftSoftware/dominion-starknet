@@ -270,14 +270,17 @@ mod actions_system {
                 _ => InternalImpl::_place_bet(ref world, table_id, player_component.m_owner, amount, true),
             };
 
-            // If we were the last player doing our turn, advance the street.
-            // if table.m_current_turn == 0 {
-            //     table.m_finished_street = true;
-            //     world.write_model(@table);
-            //     table_management_system::InternalImpl::_advance_street(ref world, table_id);
-            //     return;
-            // }
-            // world.write_model(@table);
+            // Check if the street is finished.
+            let mut players: Array<ComponentPlayer> = array![];
+            for player in table.m_players.span() {
+                players.append(world.read_model((table_id, *player)));
+            };
+
+            if InternalImpl::_is_street_finished(@table, @players) {
+                table.m_finished_street = true;
+                world.write_model(@table);
+                table_management_system::InternalImpl::_advance_street(ref world, table_id);
+            }
         }
 
         fn fold(ref self: ContractState, table_id: u32) {
@@ -307,14 +310,17 @@ mod actions_system {
 
             InternalImpl::_fold(ref world, table_id, player_component.m_owner, true);
 
-            // if table.m_current_turn == 0 {
-            //     // If we were the last player doing our turn, advance the street.
-            //     table.m_finished_street = true;
-            //     world.write_model(@table);
-            //     table_management_system::InternalImpl::_advance_street(ref world, table_id);
-            //     return;
-            // }
-            // world.write_model(@table);
+            // Check if the street is finished.
+            let mut players: Array<ComponentPlayer> = array![];
+            for player in table.m_players.span() {
+                players.append(world.read_model((table_id, *player)));
+            };
+
+            if InternalImpl::_is_street_finished(@table, @players) {
+                table.m_finished_street = true;
+                world.write_model(@table);
+                table_management_system::InternalImpl::_advance_street(ref world, table_id);
+            }
         }
 
         fn post_commit_hash(ref self: ContractState, table_id: u32, commitment_hash: Array<u32>) {
@@ -484,6 +490,56 @@ mod actions_system {
             }
             world.write_model(@player);
             world.write_model(@table);
+        }
+
+        /// Checks if the street is finished.
+        ///
+        /// @param players The players at the table.
+        /// @returns True if the street is finished, false otherwise.
+        /// Can Panic? No.
+        fn _is_street_finished(self: @ComponentTable, players: @Array<ComponentPlayer>) -> bool {
+            let mut highest_bet: u32 = 0;
+            let mut active_players: u32 = 0;
+            let mut matched_highest_bet: u32 = 0;
+
+            // Find highest bet and count active players.
+            for player in players.span() {
+                match player.m_state {
+                    EnumPlayerState::Active | 
+                    EnumPlayerState::Called | 
+                    EnumPlayerState::Checked |
+                    EnumPlayerState::Raised(_) => {
+                        active_players += 1;
+                        if *player.m_current_bet > highest_bet {
+                            highest_bet = *player.m_current_bet;
+                        }
+                    },
+                    _ => {},
+                }
+            };
+
+            // If only one active player, street is finished.
+            if active_players <= 1 {
+                return true;
+            }
+
+            // Count how many active players have matched the highest bet.
+            for player in players.span() {
+                match player.m_state {
+                    EnumPlayerState::Active | 
+                    EnumPlayerState::Called | 
+                    EnumPlayerState::Checked |
+                    EnumPlayerState::Raised(_) => {
+                        if *player.m_current_bet == highest_bet {
+                            matched_highest_bet += 1;
+                        }
+                    },
+                    _ => {},
+                }
+            };
+
+            // Street is finished if all active players have matched the highest bet.
+            return matched_highest_bet == active_players;
         }
     }
 }
