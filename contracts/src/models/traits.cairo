@@ -162,6 +162,9 @@ impl EnumPlayerStateDisplay of Display<EnumPlayerState> {
             EnumPlayerState::Waiting => f.buffer.append(@"Waiting"),
             EnumPlayerState::Ready => f.buffer.append(@"Ready"),
             EnumPlayerState::Active => f.buffer.append(@"Active"),
+            EnumPlayerState::Called => f.buffer.append(@"Called"),
+            EnumPlayerState::Checked => f.buffer.append(@"Checked"),
+            EnumPlayerState::Raised(amount) => f.buffer.append(@format!("Raised: {}", amount)),
             EnumPlayerState::Folded => f.buffer.append(@"Folded"),
             EnumPlayerState::AllIn => f.buffer.append(@"AllIn"),
             EnumPlayerState::Left => f.buffer.append(@"Left"),
@@ -311,7 +314,7 @@ impl EnumCardSuitSnapshotInto of Into<@EnumCardSuit, u32> {
     }
 }
 
-impl EnumHandRankInto of Into<@EnumHandRank, u32> {
+impl EnumHandRankSnapshotInto of Into<@EnumHandRank, u32> {
     fn into(self: @EnumHandRank) -> u32 {
         match self {
             EnumHandRank::HighCard(values) |
@@ -334,19 +337,8 @@ impl EnumHandRankInto of Into<@EnumHandRank, u32> {
     }
 }
 
-impl EnumCardSuitSnapshotInto of Into<@EnumCardSuit, u32> {
-    fn into(self: @EnumCardSuit) -> u32 {
-        match self {
-            EnumCardSuit::Spades => 1,
-            EnumCardSuit::Hearts => 2,
-            EnumCardSuit::Diamonds => 3,
-            EnumCardSuit::Clubs => 4,
-        }
-    }
-}
-
-impl EnumHandRankInto of Into<@EnumHandRank, u32> {
-    fn into(self: @EnumHandRank) -> u32 {
+impl EnumHandRankInto of Into<EnumHandRank, u32> {
+    fn into(self: EnumHandRank) -> u32 {
         match self {
             EnumHandRank::HighCard(values) |
             EnumHandRank::Flush(values) => {
@@ -362,8 +354,8 @@ impl EnumHandRankInto of Into<@EnumHandRank, u32> {
             EnumHandRank::Straight(value) => value.into(),
             EnumHandRank::FullHouse((value1, value2)) => value1.into() + value2.into(),
             EnumHandRank::FourOfAKind(value) => value.into(),
-            EnumHandRank::StraightFlush => 9000,
-            EnumHandRank::RoyalFlush => 1000,
+            EnumHandRank::StraightFlush => 9,
+            EnumHandRank::RoyalFlush => 10,
         }
     }
 }
@@ -480,38 +472,6 @@ impl EnumRankMaskPartialOrd of PartialOrd<EnumRankMask> {
     }
 
     fn gt(lhs: EnumRankMask, rhs: EnumRankMask) -> bool {
-        let left_value: u32 = lhs.into();
-        let right_value: u32 = rhs.into();
-        left_value > right_value
-    }
-}
-
-/////////////////////////////////////////////////////////////////////////
-/////////////////////////////////////////////////////////////////////////
-///////////////////////////// PARTIALORD ////////////////////////////////
-/////////////////////////////////////////////////////////////////////////
-/////////////////////////////////////////////////////////////////////////
-
-impl EnumHandRankPartialOrd of PartialOrd<@EnumHandRank> {
-    fn le(lhs: @EnumHandRank, rhs: @EnumHandRank) -> bool {
-        let left_value: u32 = lhs.into();
-        let right_value: u32 = rhs.into();
-        left_value <= right_value
-    }
-
-    fn lt(lhs: @EnumHandRank, rhs: @EnumHandRank) -> bool {
-        let left_value: u32 = lhs.into();
-        let right_value: u32 = rhs.into();
-        left_value < right_value
-    }
-
-    fn ge(lhs: @EnumHandRank, rhs: @EnumHandRank) -> bool {
-        let left_value: u32 = lhs.into();
-        let right_value: u32 = rhs.into();
-        left_value >= right_value
-    }
-
-    fn gt(lhs: @EnumHandRank, rhs: @EnumHandRank) -> bool {
         let left_value: u32 = lhs.into();
         let right_value: u32 = rhs.into();
         left_value > right_value
@@ -679,10 +639,6 @@ impl HandImpl of IHand {
                 };
             };
 
-            println!("Player {} has royal flush? {}, cards: {:?}",
-             starknet::contract_address_to_felt252(*self.m_owner),
-             has_ace && has_king && has_queen && has_jack && has_ten,
-             flush_values);
             return has_ace && has_king && has_queen && has_jack && has_ten;
         }
         return false;
@@ -1185,10 +1141,6 @@ impl PlayerImpl of IPlayer {
         assert!(self.m_state != EnumPlayerState::NotCreated, "Player is not created");
         assert!(self.m_table_chips >= added_amount, "Insufficient chips");
 
-        if self.m_table_chips == added_amount {
-            self.m_state = EnumPlayerState::AllIn;
-        }
-
         self.m_table_chips -= added_amount;
         self.m_current_bet += added_amount;
         return added_amount;
@@ -1196,22 +1148,12 @@ impl PlayerImpl of IPlayer {
 
     fn fold(ref self: ComponentPlayer) -> u32 {
         assert!(self.m_state != EnumPlayerState::NotCreated, "Player is not created");
-        assert!(self.m_state == EnumPlayerState::Active, "Player is not active");
 
         self.m_state = EnumPlayerState::Folded;
-        return self.m_current_bet;
+        let player_bet: u32 = self.m_current_bet;
+        self.m_current_bet = 0;
+        return player_bet;
     }
-
-    // fn all_in(ref self: ComponentPlayer) -> u32 {
-    //     assert!(self.m_state != EnumPlayerState::NotCreated, "Player is not created");
-    //     assert!(self.m_state == EnumPlayerState::Active, "Player is not active");
-
-    //     let added_amount: u32 = self.m_table_chips;
-    //     self.m_current_bet += added_amount;
-    //     self.m_table_chips = 0;
-    //     self.m_state = EnumPlayerState::AllIn;
-    //     return added_amount;
-    // }
 
     fn _is_created(self: @ComponentPlayer) -> bool {
         return *self.m_is_created;
@@ -1221,13 +1163,13 @@ impl PlayerImpl of IPlayer {
 #[generate_trait]
 impl SidepotImpl of ISidepot {
     fn new(
-        table_id: u32, amount: u32, player: ContractAddress, sidepot_id: u8, min_bet: u32
+        table_id: u32, sidepot_id: u8, amount: u32, eligible_players: Array<ContractAddress>, min_bet: u32
     ) -> ComponentSidepot nopanic {
         return ComponentSidepot {
             m_table_id: table_id,
-            m_amount: amount,
-            m_player: player,
             m_sidepot_id: sidepot_id,
+            m_amount: amount,
+            m_eligible_players: eligible_players,
             m_min_bet: min_bet,
         };
     }
@@ -1262,14 +1204,14 @@ impl TableImpl of ITable {
             m_last_played_ts: 0,
             m_num_sidepots: 0,
             m_finished_street: false,
+            m_rake_address: starknet::contract_address_const::<0x0>(),
+            m_rake_fee: 0,
         };
         table._initialize_deck();
         return table;
     }
 
     fn check_turn(ref self: ComponentTable, player: @ContractAddress) -> bool {
-        assert!(self.m_players.contains(player), "Player is not at this table");
-
         let player_position: Option<usize> = self.find_player(player);
         assert!(player_position.is_some(), "Cannot find player");
 
@@ -1314,13 +1256,7 @@ impl TableImpl of ITable {
     }
 
     fn advance_turn(ref self: ComponentTable) {
-        self.m_current_turn += 1;
-        self
-            .m_current_turn = self
-            .m_current_turn % self
-            .m_players
-            .len()
-            .try_into()
+        self.m_current_turn = (self.m_current_turn + 1) % self.m_players.len().try_into()
             .expect('Cannot downcast turn');
         self.m_last_played_ts = starknet::get_block_timestamp();
     }
@@ -1482,6 +1418,8 @@ impl TableDefaultImpl of Default<ComponentTable> {
             m_last_played_ts: 0,
             m_num_sidepots: 0,
             m_finished_street: false,
+            m_rake_address: starknet::contract_address_const::<0x0>(),
+            m_rake_fee: 0,
         };
     }
 }

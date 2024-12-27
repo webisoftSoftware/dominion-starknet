@@ -3,7 +3,7 @@ use crate::models::enums::{
 };
 use crate::models::traits::{
     EnumCardValueDisplay, EnumCardSuitDisplay, EnumHandRankDisplay, EnumPlayerStateDisplay,
-    EnumGameStateDisplay, EnumHandRankInto, ComponentPlayerEq, ComponentTableEq,
+    EnumGameStateDisplay, EnumHandRankSnapshotInto, ComponentPlayerEq, ComponentTableEq,
     ComponentPlayerDisplay, EnumCardValueInto, ComponentTableDisplay, ComponentHandDisplay,
     StructCardDisplay, ComponentHandEq, StructCardEq, HandDefaultImpl, TableDefaultImpl,
     PlayerDefaultImpl, ICard

@@ -6,9 +6,6 @@ use dominion::models::structs::StructCard;
 #[starknet::interface]
 trait ITableManagement<TContractState> {
     // Table Manager Functions
-    fn start_round(ref self: TContractState, table_id: u32);
-    fn skip_turn(ref self: TContractState, table_id: u32, player: ContractAddress);
-    fn advance_street(ref self: TContractState, table_id: u32);
     fn post_auth_hash(ref self: TContractState, table_id: u32, auth_hash: ByteArray);
     fn post_encrypt_deck(
         ref self: TContractState, table_id: u32, encrypted_deck: Array<StructCard>
@@ -16,14 +13,13 @@ trait ITableManagement<TContractState> {
     fn post_decrypted_community_cards(
         ref self: TContractState, table_id: u32, cards: Array<StructCard>
     );
-    fn showdown(ref self: TContractState, table_id: u32);
     // Timeout Functions
+    fn skip_turn(ref self: TContractState, table_id: u32, player: ContractAddress);
     fn kick_player(ref self: TContractState, table_id: u32, player: ContractAddress);
-
     fn create_table(
-        ref self: TContractState, small_blind: u32, big_blind: u32, min_buy_in: u32, max_buy_in: u32
+        ref self: TContractState, small_blind: u32, big_blind: u32, min_buy_in: u32,
+         max_buy_in: u32, rake_fee: u32
     );
-
     fn shutdown_table(ref self: TContractState, table_id: u32);
     // Admin Functions
     fn change_table_manager(ref self: TContractState, new_table_manager: ContractAddress);
@@ -37,11 +33,12 @@ mod table_management_system {
     use dominion::models::components::{ComponentTable, ComponentPlayer, ComponentHand, ComponentSidepot, ComponentRake};
     use dominion::models::enums::{EnumGameState, EnumPlayerState, EnumPosition, EnumHandRank, EnumRankMask};
     use dominion::models::traits::{ITable, IPlayer, IHand, EnumHandRankPartialOrd, ISidepot, ComponentPlayerDisplay,
-         EnumRankMaskPartialOrd, IEnumRankMask};
+         EnumRankMaskPartialOrd, IEnumRankMask, EnumHandRankSnapshotInto};
     use dominion::models::utils;
     use dominion::models::structs::StructCard;
     use dojo::event::{EventStorage};
     use origami_random::deck::{Deck, DeckTrait};
+    use dominion::systems::actions::actions_system;
 
     use alexandria_data_structures::array_ext::ArrayTraitExt;
 
@@ -223,6 +220,7 @@ mod table_management_system {
 
             let mut world = self.world(@"dominion");
             let mut table: ComponentTable = world.read_model(table_id);
+            assert!(table.m_state != EnumGameState::Shutdown, "Table is already shutdown");
             table.m_state = EnumGameState::Shutdown;
             world.write_model(@table);
 
@@ -230,40 +228,6 @@ mod table_management_system {
                 .emit_event(
                     @EventTableShutdown {
                         m_table_id: table_id, m_timestamp: starknet::get_block_timestamp()
-                    }
-                );
-        }
-
-        fn start_round(ref self: ContractState, table_id: u32) {
-            let mut world = self.world(@"dominion");
-            let mut table: ComponentTable = world.read_model(table_id);
-
-            assert!(
-                table.m_state == EnumGameState::WaitingForPlayers
-                    || table.m_state == EnumGameState::Showdown,
-                "Game is not in a valid state to start a round"
-            );
-            assert!(table.m_players.len() >= MIN_PLAYERS, "Not enough players to start the round");
-
-            // Reset the table (Community cards and pot are cleared out).
-            table.reset_table();
-
-            // Update order and dealer chip position (Small Blind, Big Blind, etc.).
-            InternalImpl::_update_positions(ref world, ref table);
-
-            // Remove players sitting out.
-            InternalImpl::_remove_sitting_out_players(ref world, ref self, ref table);
-
-            // let mut table: ComponentTable = world.read_model(table_id);
-            table.m_state = EnumGameState::RoundStarted;
-            world.write_model(@table);
-
-            world
-                .emit_event(
-                    @EventEncryptDeckRequested {
-                        m_table_id: table_id,
-                        m_deck: table.m_deck.span(),
-                        m_timestamp: starknet::get_block_timestamp()
                     }
                 );
         }
@@ -324,143 +288,6 @@ mod table_management_system {
             world.write_model(@table);
         }
 
-        fn advance_street(ref self: ContractState, table_id: u32) {
-            let mut world = self.world(@"dominion");
-            let mut table: ComponentTable = world.read_model(table_id);
-
-            assert!(
-                table.m_state != EnumGameState::WaitingForPlayers
-                    && table.m_state != EnumGameState::Shutdown
-                    && table.m_state != EnumGameState::RoundStarted,
-                "Round has not started or deck is not encrypted"
-            );
-            assert!(
-                table.m_finished_street || table.m_state == EnumGameState::DeckEncrypted,
-                "Not all players have played their turn"
-            );
-
-            // Advance table state to the next street.
-            table.advance_street();
-
-            match table.m_state {
-                // Betting round.
-                EnumGameState::PreFlop => {
-                    assert!(table.m_community_cards.is_empty(), "Street was not just started");
-                    world
-                        .emit_event(
-                            @EventRequestBet {
-                                m_table_id: table_id, m_timestamp: starknet::get_block_timestamp()
-                            }
-                        );
-                },
-                // Flip 3 cards.
-                EnumGameState::Flop => {
-                    assert!(table.m_community_cards.is_empty(), "Street was not at pre-flop");
-                    for _ in 0
-                        ..3_u8 {
-                            let mut cards_to_reveal: Array<StructCard> = array![];
-                            if let Option::Some(card_to_reveal) = table.m_deck.pop_front() {
-                                cards_to_reveal.append(card_to_reveal);
-                            }
-                            world
-                                .emit_event(
-                                    @EventDecryptCCRequested {
-                                        m_table_id: table_id,
-                                        m_cards: cards_to_reveal.span(),
-                                        m_timestamp: starknet::get_block_timestamp()
-                                    }
-                                );
-                        };
-                },
-                // Flip 1 card.
-                EnumGameState::Turn => {
-                    assert!(table.m_community_cards.len() == 3, "Street was not at flop");
-                    if let Option::Some(card_to_reveal) = table.m_deck.pop_front() {
-                        world
-                            .emit_event(
-                                @EventDecryptCCRequested {
-                                    m_table_id: table_id,
-                                    m_cards: array![card_to_reveal].span(),
-                                    m_timestamp: starknet::get_block_timestamp()
-                                }
-                            );
-                    }
-                },
-                // Flip last card.
-                EnumGameState::River => {
-                    assert!(table.m_community_cards.len() == 4, "Street was not at turn");
-                    if let Option::Some(card_to_reveal) = table.m_deck.pop_front() {
-                        world
-                            .emit_event(
-                                @EventDecryptCCRequested {
-                                    m_table_id: table_id,
-                                    m_cards: array![card_to_reveal].span(),
-                                    m_timestamp: starknet::get_block_timestamp()
-                                }
-                            );
-                    }
-                },
-                // Showdown.
-                EnumGameState::Showdown => {
-                    assert!(table.m_community_cards.len() == 5, "Street was not at river");
-                    world
-                        .emit_event(
-                            @EventShowdownRequested {
-                                m_table_id: table_id, m_timestamp: starknet::get_block_timestamp()
-                            }
-                        );
-
-                    // Request each player to reveal their hand.
-                    for player in table
-                        .m_players
-                        .span() {
-                            let player_hand: ComponentHand = world.read_model(*player);
-                            world
-                                .emit_event(
-                                    @EventRevealShowdownRequested {
-                                        m_table_id: table_id,
-                                        m_player: *player,
-                                        m_hand: player_hand.m_cards.span(),
-                                        m_timestamp: starknet::get_block_timestamp()
-                                    }
-                                );
-                        };
-                },
-                _ => {}
-            }
-
-            // Create sidepots if there are any all-in players.
-            let mut player_bets: Array<u32> = array![];
-            let mut has_all_in = false;
-
-            // Collect all current bets and check for all-in players.
-            for player in table
-                .m_players
-                .span() {
-                    let player_component: ComponentPlayer = world.read_model((table_id, *player));
-                    player_bets.append(player_component.m_current_bet);
-                    if player_component.m_table_chips == 0
-                        && player_component.m_state == EnumPlayerState::Active {
-                        has_all_in = true;
-                    }
-                };
-
-            // Create sidepots if there are all-in players.
-            if has_all_in {
-                InternalImpl::_create_sidepots(
-                    ref world, table_id, table.m_players.clone(), player_bets
-                );
-            }
-
-            world.write_model(@table);
-            world
-                .emit_event(
-                    @EventStreetAdvanced {
-                        m_table_id: table_id, m_timestamp: starknet::get_block_timestamp()
-                    }
-                );
-        }
-
         fn post_auth_hash(ref self: ContractState, table_id: u32, auth_hash: ByteArray) {
             let mut world = self.world(@"dominion");
             let mut table: ComponentTable = world.read_model(table_id);
@@ -484,55 +311,23 @@ mod table_management_system {
             );
             let mut world = self.world(@"dominion");
             let mut player_component: ComponentPlayer = world.read_model((table_id, player));
-            assert!(player_component.m_state == EnumPlayerState::Active, "Player is not active");
 
             let mut table: ComponentTable = world.read_model(table_id);
-            assert!(table.check_turn(@player), "Player is not the current turn");
-            assert!(
-                table.m_last_played_ts < starknet::get_block_timestamp() - 60,
-                "Player has not been inactive for at least 60 seconds"
-            );
+            assert!(table.check_turn(@player), "Cannot skip player's turn: Not player's turn");
+            let last_played_ts: u64 = table.m_last_played_ts;
+            // Avoid sub overflow.
+            if starknet::get_block_timestamp() >= 60 {
+                assert!(
+                    last_played_ts < starknet::get_block_timestamp() - 60,
+                    "Player has not been inactive for at least 60 seconds"
+                );
+            }
 
             // Skip turn.
             player_component.fold();
             table.advance_turn();
             world.write_model(@table);
             world.write_model(@player_component);
-        }
-
-        fn showdown(ref self: ContractState, table_id: u32) {
-            let mut world = self.world(@"dominion");
-            let mut table: ComponentTable = world.read_model(table_id);
-            assert!(table.m_state == EnumGameState::Showdown, "Round is not at showdown");
-            assert!(table.m_community_cards.len() == 5, "Community cards are not set");
-
-            // Before calculating hand, make sure all players have revealed their hands.
-            for player in table.m_players.span() {
-                let player_component: ComponentPlayer = world.read_model((table_id, *player));
-                assert!(
-                    player_component.m_state == EnumPlayerState::Revealed,
-                    "All Players must have revealed their hand"
-                );
-            };
-
-            // Determine winners and distribute pot.
-            let (winners, ranks) = InternalImpl::_determine_winners(ref world, @table, @table.m_players);
-            println!("Winners: {:?}, table pot: {}, pot_share_count: {}", winners, table.m_pot);
-
-            InternalImpl::_distribute_sidepots(ref world, table_id, winners);
-            
-
-            // // At this point:
-            // // - Winners_dict contains all winning players (winners_dict.get(player.into()) ==
-            // // true).
-            // // - Pot_share_count contains the number of winners to split the pot between.
-            // // - Current_best_rank contains the winning hand rank.
-            // for winner in winners.span() {
-            //     InternalImpl::_distribute_chips(ref world, table_id, *winner, pot_share);
-            // };
-
-            // Start the next round.
-            self.start_round(table_id);
         }
 
         fn post_decrypted_community_cards(
@@ -591,92 +386,249 @@ mod table_management_system {
         }
     }
 
-    const MAX_BET: u32 = 1000000000;
-
     #[generate_trait]
     impl InternalImpl of InternalTrait {
-        fn _create_sidepots(
+        fn _start_round(ref world: dojo::world::WorldStorage, table_id: u32) {
+            let mut table: ComponentTable = world.read_model(table_id);
+
+            assert!(
+                table.m_state == EnumGameState::WaitingForPlayers
+                    || table.m_state == EnumGameState::Showdown,
+                "Game is not in a valid state to start a round"
+            );
+            assert!(table.m_players.len() >= MIN_PLAYERS, "Not enough players to start the round");
+
+            // Reset the table (Community cards and pot are cleared out).
+            table.reset_table();
+
+            // Update order and dealer chip position (Small Blind, Big Blind, etc.).
+            Self::_update_roles(ref world, ref table);
+
+            // Remove players sitting out.
+            Self::_remove_sitting_out_players(ref world, ref table);
+
+            table.m_state = EnumGameState::RoundStarted;
+            world.write_model(@table);
+
+            // Make small blind and big blind bet automatically.
+            let small_blind_position = (table.m_current_dealer + 1) % table.m_players.len().try_into().unwrap();
+            let big_blind_position = (table.m_current_dealer + 2) % table.m_players.len().try_into().unwrap();
+
+            if let Option::Some(small_blind_player) = table.m_players.get(small_blind_position.into()) {
+                let mut small_blind_player: ComponentPlayer = world.read_model((table_id, *small_blind_player.unbox()));
+                actions_system::InternalImpl::_place_bet(ref world, table_id, small_blind_player.m_owner, table.m_small_blind, true);
+            }
+            if let Option::Some(big_blind_player) = table.m_players.get(big_blind_position.into()) {
+                let mut big_blind_player: ComponentPlayer = world.read_model((table_id, *big_blind_player.unbox()));
+                actions_system::InternalImpl::_place_bet(ref world, table_id, big_blind_player.m_owner, table.m_big_blind, true);
+            }
+
+            world.emit_event(
+                @EventEncryptDeckRequested {
+                    m_table_id: table_id,
+                    m_deck: table.m_deck.span(),
+                    m_timestamp: starknet::get_block_timestamp()
+                }
+            );
+        }
+
+        fn _advance_street(ref world: dojo::world::WorldStorage, table_id: u32) {
+            let mut table: ComponentTable = world.read_model(table_id);
+
+            assert!(
+                table.m_state != EnumGameState::WaitingForPlayers
+                    && table.m_state != EnumGameState::Shutdown
+                    && table.m_state != EnumGameState::RoundStarted,
+                "Round has not started or deck is not encrypted"
+            );
+            assert!(
+                table.m_finished_street || table.m_state == EnumGameState::DeckEncrypted,
+                "Not all players have played their turn"
+            );
+
+            // Advance table state to the next street.
+            table.advance_street();
+
+            match table.m_state {
+                // Betting round.
+                EnumGameState::PreFlop => {
+                    assert!(table.m_community_cards.is_empty(), "Street was not just started");
+                    world.emit_event(
+                        @EventRequestBet {
+                            m_table_id: table_id, m_timestamp: starknet::get_block_timestamp()
+                        }
+                    );
+                },
+                // Flip 3 cards.
+                EnumGameState::Flop => {
+                    assert!(table.m_community_cards.is_empty(), "Street was not at pre-flop");
+                    for _ in 0..3_u8 {
+                        let mut cards_to_reveal: Array<StructCard> = array![];
+                        if let Option::Some(card_to_reveal) = table.m_deck.pop_front() {
+                            cards_to_reveal.append(card_to_reveal);
+                        }
+                        world.emit_event(
+                            @EventDecryptCCRequested {
+                                m_table_id: table_id,
+                                m_cards: cards_to_reveal.span(),
+                                m_timestamp: starknet::get_block_timestamp()
+                            }
+                        );
+                    };
+                },
+                // Flip 1 card.
+                EnumGameState::Turn => {
+                    assert!(table.m_community_cards.len() == 3, "Street was not at flop");
+                    if let Option::Some(card_to_reveal) = table.m_deck.pop_front() {
+                        world.emit_event(
+                            @EventDecryptCCRequested {
+                                m_table_id: table_id,
+                                m_cards: array![card_to_reveal].span(),
+                                m_timestamp: starknet::get_block_timestamp()
+                            }
+                        );
+                    }
+                },
+                // Flip last card.
+                EnumGameState::River => {
+                    assert!(table.m_community_cards.len() == 4, "Street was not at turn");
+                    if let Option::Some(card_to_reveal) = table.m_deck.pop_front() {
+                        world.emit_event(
+                            @EventDecryptCCRequested {
+                                m_table_id: table_id,
+                                m_cards: array![card_to_reveal].span(),
+                                m_timestamp: starknet::get_block_timestamp()
+                            }
+                        );
+                    }
+                },
+                // Showdown.
+                EnumGameState::Showdown => {
+                    assert!(table.m_community_cards.len() == 5, "Street was not at river");
+                    world.emit_event(
+                        @EventShowdownRequested {
+                            m_table_id: table_id, m_timestamp: starknet::get_block_timestamp()
+                        }
+                    );
+
+                    // Request each player to reveal their hand.
+                    for player in table.m_players.span() {
+                        let player_hand: ComponentHand = world.read_model(*player);
+                        world.emit_event(
+                            @EventRevealShowdownRequested {
+                                m_table_id: table_id,
+                                m_player: *player,
+                                m_hand: player_hand.m_cards.span(),
+                                m_timestamp: starknet::get_block_timestamp()
+                            }
+                        );
+                    };
+                },
+                _ => {}
+            }
+
+            world.write_model(@table);
+            world.emit_event(
+                @EventStreetAdvanced {
+                    m_table_id: table_id, m_timestamp: starknet::get_block_timestamp()
+                }
+            );
+        }
+
+        fn _showdown(ref world: dojo::world::WorldStorage, table_id: u32) {
+            let mut table: ComponentTable = world.read_model(table_id);
+            assert!(table.m_state == EnumGameState::Showdown, "Round is not at showdown");
+            assert!(table.m_community_cards.len() == 5, "Community cards are not set");
+
+            // Determine winners.
+            let winners: Array<(ContractAddress, u32)> = Self::_determine_winners(ref world, @table, @table.m_players);
+
+            Self::_distribute_sidepots(ref world, table_id, winners);
+
+            // Start the next round.
+            Self::_start_round(ref world, table_id);
+        }
+
+        /// Assign a player to a sidepot. A player needs to meet the minimum bet of the sidepot to be added to it.
+        /// If the player does not meet the minimum bet of any sidepot, a new sidepot is created for them.
+        /// 
+        /// @param world: The world storage.
+        /// @param table_id: The table ID.
+        /// @param player: The player to assign to a sidepot.
+        /// @param amount: The amount the player has bet.
+        /// @returns: Nothing.
+        /// Can Panic? Yes.
+        fn _assign_player_to_sidepot(
             ref world: dojo::world::WorldStorage,
             table_id: u32,
-            players: Array<ContractAddress>,
-            bets: Array<u32>
+            player: ContractAddress,
+            amount: u32
         ) {
-            // Track the current sidepot ID for this table.
-            let mut sidepot_id = 0;
-            let mut remaining_players = players.clone();
-            let mut remaining_bets = bets.clone();
-            let mut processed_amounts: Array<u32> = array![];
+            let mut table: ComponentTable = world.read_model(table_id);
+            let sidepot_len: u8 = table.m_num_sidepots;
+            let mut is_player_bet_equal_to_any_sidepots: bool = false;
+            let mut remaining_amount: u32 = amount;
 
-            while !remaining_players.is_empty() {
-                // Find smallest non-zero bet among remaining players.
-                let mut min_bet: u32 = MAX_BET;
-                let mut active_players: u8 = 0;
-
-                for i in 0
-                    ..remaining_bets
-                        .len() {
-                            if *remaining_bets[i] > 0 {
-                                active_players += 1;
-                                if *remaining_bets[i] < min_bet {
-                                    min_bet = *remaining_bets[i];
-                                }
-                            }
-                        };
-
-                // Exit if no more active players or valid bets.
-                if active_players < 2 || min_bet == MAX_BET {
-                    break;
+            // Check all sidepots to see if the player can be added to one.
+            for i in 0..sidepot_len {
+                let mut sidepot: ComponentSidepot = world.read_model((table_id, i));
+                // If the player qualifies for this sidepot, add them to the sidepot.
+                if remaining_amount >= sidepot.m_min_bet {
+                    if remaining_amount == sidepot.m_min_bet {
+                        is_player_bet_equal_to_any_sidepots = true;
+                    }
+                    sidepot.m_eligible_players.append(player);
+                    sidepot.m_amount += sidepot.m_min_bet;
+                    world.write_model(@sidepot);
+                    remaining_amount -= sidepot.m_min_bet;
                 }
+            };
 
-                // Calculate pot amount for this level.
-                let mut pot_amount: u32 = 0;
-                let mut contribution_for_pot: u32 = min_bet;
+            // If the player was not added to any sidepot, create a new sidepot for them.
+            if remaining_amount >= table.m_small_blind {
+                let mut sidepot: ComponentSidepot = world.read_model((table_id, sidepot_len));
+                sidepot = ISidepot::new(table_id, sidepot_len, remaining_amount,
+                    array![player], remaining_amount);
+                world.write_model(@sidepot);
+                
+                table.m_num_sidepots += 1;
+                world.write_model(@table);
+            }
+        }
 
-                if !processed_amounts.is_empty() {
-                    // Subtract amounts already processed in previous pots.
-                    let mut total_processed: u32 = 0;
-                    for amount in processed_amounts.span() {
-                        total_processed += *amount;
-                    };
-                    contribution_for_pot = min_bet - total_processed;
+        /// Remove a player from all sidepots.
+        /// IF there are no players left in a sidepot, remove the sidepot.
+        /// 
+        /// @param world: The world storage.
+        /// @param table_id: The table ID.
+        /// @param player: The player to remove from all sidepots.
+        /// @returns: Nothing.
+        /// Can Panic? Yes.
+        fn _remove_player_from_sidepots(
+            ref world: dojo::world::WorldStorage,
+            table_id: u32,
+            player: ContractAddress
+        ) {
+            let mut table: ComponentTable = world.read_model(table_id);
+            for i in 0..table.m_num_sidepots {
+                let mut sidepot: ComponentSidepot = world.read_model((table_id, i));
+                if let Option::Some(index) = sidepot.m_eligible_players.position(@player) {
+                    if sidepot.m_eligible_players.len() == 1 {
+                        // If there's only one player left in the sidepot, remove the sidepot.
+                        world.erase_model(@sidepot);
+                        table.m_num_sidepots -= 1;
+                        world.write_model(@table);
+                    } else {
+                        let mut eligible_players: Array<ContractAddress> = array![];
+                        for j in 0..sidepot.m_eligible_players.len() {
+                            if j != index {
+                                eligible_players.append(sidepot.m_eligible_players[j].clone());
+                            }
+                        };
+                        sidepot.m_eligible_players = eligible_players;
+                        world.write_model(@sidepot);
+                    }
                 }
-
-                // Add contribution from each eligible player.
-                let mut new_remaining_bets: Array<u32> = array![];
-                for i in 0
-                    ..remaining_bets
-                        .len() {
-                            if *remaining_bets[i] >= min_bet {
-                                pot_amount += contribution_for_pot;
-                                // Create new bet amount with reduction
-                                new_remaining_bets.append(*remaining_bets[i] - min_bet);
-                            } else {
-                                new_remaining_bets.append(*remaining_bets[i]);
-                            }
-                        };
-                remaining_bets = new_remaining_bets;
-
-                // Create eligibility entries for all players who contributed.
-                for i in 0
-                    ..remaining_players
-                        .len() {
-                            let player: ContractAddress = *remaining_players[i];
-                            if *remaining_bets[i] >= min_bet {
-                                world
-                                    .write_model(
-                                        @ISidepot::new(
-                                            table_id,
-                                            pot_amount,
-                                            player,
-                                            sidepot_id,
-                                            contribution_for_pot
-                                        )
-                                    );
-                            }
-                        };
-
-                processed_amounts.append(min_bet);
-                sidepot_id += 1;
             };
         }
 
@@ -685,9 +637,9 @@ mod table_management_system {
             table_id: u32,
             winners: Array<(ContractAddress, u32)> // (player address, hand strength)
         ) {
-            let table: ComponentTable = world.read_model(table_id);
+            let mut table: ComponentTable = world.read_model(table_id);
             
-            // Process each sidepot from smallest to largest.
+            // Process each sidepot.
             for pot_id in 0..table.m_num_sidepots {
                 let mut pot_winners: Array<ContractAddress> = array![];
                 let mut best_hand_strength: u32 = 0;
@@ -698,7 +650,7 @@ mod table_management_system {
                     let (winner_address, hand_strength) = winners[i];
                     
                     // Check if player is eligible for this sidepot.
-                    if sidepot.m_min_bet > 0 {
+                    if sidepot.m_min_bet > 0 && sidepot.m_eligible_players.contains(winner_address) {
                         if hand_strength > @best_hand_strength {
                             pot_winners = array![*winner_address];
                             best_hand_strength = *hand_strength;
@@ -710,152 +662,129 @@ mod table_management_system {
                 
                 // Distribute this sidepot among eligible winners.
                 if !pot_winners.is_empty() {
+                    // Calculate rake once per pot
                     let house_rake_fee = sidepot.m_amount * table.m_rake_fee / 100;
-                    let rake: ComponentRake = world.read_model(table.m_rake_address);
+                    let amount_after_rake = sidepot.m_amount - house_rake_fee;
+                    let share_per_winner = amount_after_rake / pot_winners.len().into();
+
+                    let mut rake: ComponentRake = world.read_model(table.m_rake_address);
                     rake.m_chip_amount += house_rake_fee;
                     world.write_model(@rake);
 
-                    let pot_share = sidepot.m_amount / pot_winners.len().into();
                     for winner in pot_winners.span() {
-                        Self::_distribute_chips(ref world, table_id, *winner, pot_share - house_rake_fee);
-                    }
-
+                        let mut player_component: ComponentPlayer = world.read_model((table_id, *winner));
+                        // Keep house fee in mind.
+                        let amount_to_distribute: u32 = share_per_winner;
+                        player_component.m_table_chips += amount_to_distribute;
+                        world.write_model(@player_component);
+                    };
                 }
-                
-                // Clean up sidepot entries.
-                for player in table.m_players.span() {
-                    world.erase_model(
-                        @ISidepot::new(table_id, sidepot.m_amount, *player, pot_id, sidepot.m_min_bet)
-                    );
-                };
             };
-        }
 
-        fn _distribute_chips(
-            ref world: dojo::world::WorldStorage, table_id: u32, player: ContractAddress, amount: u32
-        ) {
-            let mut player_component: ComponentPlayer = world.read_model((table_id, player));
-            player_component.m_table_chips += amount;
-            world.write_model(@player_component);
+            // Clean up sidepot entries.
+            for i in 0..table.m_num_sidepots {
+                let sidepot: ComponentSidepot = world.read_model((table_id, i));
+                world.erase_model(@sidepot);
+            };
+
+            // Remove all sidepots.
+            table.m_num_sidepots = 0;
+            world.write_model(@table);
         }
 
         fn _remove_sitting_out_players(
             ref world: dojo::world::WorldStorage,
-            ref contract: ContractState,
             ref table: ComponentTable
         ) {
-            for i in 0
-                ..table
-                    .m_players
-                    .len() {
-                        let mut player: ComponentPlayer = world
-                            .read_model((table.m_table_id, *table.m_players[i]));
-                        if player.m_state == EnumPlayerState::Left {
-                            contract.kick_player(table.m_table_id, *table.m_players[i]);
-                        }
-                    };
+            for i in 0..table.m_players.len() {
+                let mut player: ComponentPlayer = world.read_model((table.m_table_id, *table.m_players[i]));
+                if player.m_state == EnumPlayerState::Left {
+                    // Reset player's table state and return chips
+                    table.m_pot += player.m_current_bet;
+                    player.m_table_id = 0;
+                    player.m_total_chips += player.m_table_chips;
+                    player.m_table_chips = 0;
+                    player.m_state = EnumPlayerState::Left;
+
+                    table.remove_player(table.m_players[i]);
+                    world.write_model(@table);
+                    world.write_model(@player);
+                }
+            };
         }
 
-        fn _update_positions(ref world: dojo::world::WorldStorage, ref table: ComponentTable) {
+        fn _update_roles(ref world: dojo::world::WorldStorage, ref table: ComponentTable) {
             assert!(table.m_players.len() >= 2, "Table must have at least 2 players");
 
-            // Find out if there's a dealer.
+            // Find out if there's a dealer (could have left the table).
             let mut dealer_found: Option<usize> = Option::None;
-            for i in 0
-                ..table
-                    .m_players
-                    .len() {
-                        let mut player: ComponentPlayer = world
-                            .read_model((table.m_table_id, *table.m_players[i]));
-                        if player.m_state != EnumPlayerState::Left
-                            && player.m_state != EnumPlayerState::Waiting {
-                            if player.m_is_dealer {
-                                dealer_found = Option::Some(i);
-                                break;
-                            }
-                        }
-                    };
+            for i in 0..table.m_players.len() {
+                let mut player: ComponentPlayer = world
+                    .read_model((table.m_table_id, *table.m_players[i]));
+                if player.m_state != EnumPlayerState::Left
+                    && player.m_state != EnumPlayerState::Waiting {
+                    if player.m_is_dealer {
+                        dealer_found = Option::Some(i);
+                        break;
+                    }
+                }
+            };
+            let mut dealer_position: u32 = 0;
+            let mut small_blind_position: u32 = 0;
+            let mut big_blind_position: u32 = 0;
 
             // Update dealer/small blind/big blind.
             if dealer_found.is_none() {
                 // If there's no dealer, set the new dealer to this player.
-                dealer_found = Option::Some(0);
+                dealer_position = 0;
+                small_blind_position = 1 % table.m_players.len();
+                big_blind_position = 2 % table.m_players.len();
+
                 table.m_current_dealer = 0;
-                table.m_current_turn = 2 % table.m_players.len().try_into().unwrap();
+                table.m_current_turn = small_blind_position.try_into().unwrap();
             } else {
                 // Update next turn positions.
-                table
-                    .m_current_dealer = ((dealer_found.unwrap() + 1) % table.m_players.len())
-                    .try_into()
-                    .unwrap();
-                table
-                    .m_current_turn =
-                        ((table.m_current_dealer + 2) % table.m_players.len().try_into().unwrap());
+                dealer_position = (dealer_found.unwrap() + 1) % table.m_players.len();
+                small_blind_position = (dealer_position + 1) % table.m_players.len();
+                big_blind_position = (small_blind_position + 1) % table.m_players.len();
+
+                table.m_current_dealer = dealer_position.try_into().unwrap();
+                table.m_current_turn = small_blind_position.try_into().unwrap();
             }
 
+
             // Update Roles.
-            let mut current_dealer: ComponentPlayer = world
-                .read_model((table.m_table_id, *table.m_players[dealer_found.unwrap()]));
-            current_dealer.m_is_dealer = false;
-            current_dealer.m_state = EnumPlayerState::Active;
+            let mut dealer: ComponentPlayer = world.read_model((table.m_table_id, *table.m_players[dealer_position]));
+            dealer.m_is_dealer = true;
+            dealer.m_state = EnumPlayerState::Active;
 
-            let mut next_dealer: ComponentPlayer = world
-                .read_model(
-                    (table.m_table_id, *table.m_players[table.m_current_dealer.try_into().unwrap()])
-                );
-            next_dealer.m_is_dealer = true;
-            next_dealer.m_state = EnumPlayerState::Active;
+            let mut small_blind: ComponentPlayer = world.read_model((table.m_table_id, *table.m_players[small_blind_position]));
+            small_blind.m_position = EnumPosition::SmallBlind;
+            small_blind.m_state = EnumPlayerState::Active;
 
-            let mut next_small_blind: ComponentPlayer = world
-                .read_model(
-                    (
-                        table.m_table_id,
-                        *table
-                            .m_players[(table.m_current_dealer + 1)
-                            .try_into()
-                            .unwrap() % table
-                            .m_players
-                            .len()]
-                    )
-                );
-            next_small_blind.m_position = EnumPosition::SmallBlind;
-            next_small_blind.m_state = EnumPlayerState::Active;
+            let mut big_blind: ComponentPlayer = world.read_model((table.m_table_id, *table.m_players[big_blind_position]));
+            big_blind.m_position = EnumPosition::BigBlind;
+            big_blind.m_state = EnumPlayerState::Active;
 
-            let mut next_big_blind: ComponentPlayer = world
-                .read_model(
-                    (table.m_table_id, *table.m_players[table.m_current_turn.try_into().unwrap()])
-                );
-            next_big_blind.m_is_dealer = table.m_current_turn == table.m_current_dealer;
-            next_big_blind.m_position = EnumPosition::BigBlind;
-            next_big_blind.m_state = EnumPlayerState::Active;
-
-            world
-                .write_models(
-                    array![@current_dealer, @next_dealer, @next_small_blind, @next_big_blind].span()
-                );
+            world.write_models(array![@dealer, @small_blind, @big_blind].span());
 
             // Update positions for everyone else.
-            for i in 0
-                ..table
-                    .m_players
-                    .len() {
-                        // If we are not part of the three new assigned roles, set player position
-                        // to none.
-                        if i != ((dealer_found.unwrap() + 1) % table.m_players.len())
-                            && i != table.m_current_dealer.try_into().unwrap()
-                            && i != table.m_current_turn.try_into().unwrap() {
-                            let mut player: ComponentPlayer = world
-                                .read_model((table.m_table_id, *table.m_players[i]));
+            for i in 0..table.m_players.len() {
+                // If we are not part of the three new assigned roles, set player position to none.
+                if i != dealer_position && i != small_blind_position && i != big_blind_position {
+                    let mut player: ComponentPlayer = world
+                        .read_model((table.m_table_id, *table.m_players[i]));
 
-                            // Include players that are waiting, but not those who have left the
-                            // table.
-                            if player.m_is_created && player.m_state != EnumPlayerState::Left {
-                                player.m_position = EnumPosition::None;
-                                player.m_state = EnumPlayerState::Active;
-                                world.write_model(@player);
-                            }
-                        }
-                    };
+                    // Include only players that are waiting to fill in or are ready if the game hasn't started yet,
+                    // since we might call this again mid-round and don't want to change the states of players mid-bets.
+                    if player.m_is_created && (player.m_state == EnumPlayerState::Waiting ||
+                        player.m_state == EnumPlayerState::Ready) {
+                        player.m_position = EnumPosition::None;
+                        player.m_state = EnumPlayerState::Active;
+                        world.write_model(@player);
+                    }
+                }
+            };
         }
 
         fn _determine_winners(
@@ -863,27 +792,8 @@ mod table_management_system {
             table: @ComponentTable,
             eligible_players: @Array<ContractAddress>
         ) -> Array<(ContractAddress, u32)> {
-            let mut winners: Array<ContractAddress> = array![];
+            let mut winners: Array<(ContractAddress, u32)> = array![];
             let mut current_best_rank: Option<EnumHandRank> = Option::None;
-
-            // Collect all current bets and check for all-in players
-            for player in eligible_players.span() {
-                let player_component: ComponentPlayer = world.read_model((*table.m_table_id, *player));
-                player_bets.append(player_component.m_current_bet);
-                if player_component.m_table_chips == 0 && player_component.m_state == EnumPlayerState::Active {
-                    has_all_in = true;
-                }
-            };
-
-            // Create sidepots if there are all-in players
-            if has_all_in {
-                InternalImpl::_create_sidepots(
-                    ref world, 
-                    *table.m_table_id, 
-                    (*eligible_players).clone(), 
-                    player_bets
-                );
-            }
 
             // Find winners among eligible players.
             for player in eligible_players.span() {
@@ -894,6 +804,7 @@ mod table_management_system {
                 let mut hand_rank = hand
                     .evaluate_hand(table.m_community_cards, rank_mask)
                     .expect('Hand evaluation failed');
+                let hand_rank_u32: u32 = (@hand_rank).into();
 
                 match @current_best_rank {
                     Option::None => {
@@ -902,8 +813,6 @@ mod table_management_system {
                     Option::Some(best_rank) => {
                         let mut comparison = utils::tie_breaker(@hand_rank, best_rank);
                         while comparison == 0 && rank_mask != EnumRankMask::None {
-                            println!("Tied for best hand for player {}: {:?}",
-                            starknet::contract_address_to_felt252(*player), hand_rank);
                             rank_mask.increment_depth();
                             hand_rank = hand
                                 .evaluate_hand(table.m_community_cards, rank_mask)
@@ -912,14 +821,12 @@ mod table_management_system {
                         };
 
                         if comparison > 0 {
-                            println!("New best hand found for player {}: {:?}",
-                         starknet::contract_address_to_felt252(*player), hand_rank);
                             // New best hand found- clear previous winners.
-                            winners = array![*player];
+                            winners = array![(*player, hand_rank_u32)];
                             current_best_rank = Option::Some(hand_rank);
                         } else if comparison == 0 {
                             // Tied for best hand- add to winners.
-                            winners.append(*player);
+                            winners.append((*player, hand_rank_u32));
                         }
                     }
                 };
