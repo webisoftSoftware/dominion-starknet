@@ -2,7 +2,7 @@
 name = "dominion"
 description = "Dominion Poker Game powered by Dojo"
 website = "https://dominion.fun/"
-seed = "dominion2"
+seed = "dominion-25454"
 
 [world.socials]
 x = "https://x.com/dominionhub"
@@ -14,18 +14,18 @@ telegram = "https://t.me/+QvEMoi3rjek5Mjdh"
 [env]
 rpc_url = "https://starknet-sepolia.public.blastapi.io/rpc/v0_7"
 # Default account for katana with seed = 0
-account_address = "0x127fd5f1fe78a71f8bcd1fec63e3fe2f0486b6ecd5c86a0466c3a21fa5cfcec"
-private_key = "0xc5b2fcab997346f3ea1c00b002ecf6f382c5f9c9659a3894eb783c5320f912"
+account_address = "0x03e8077Bca790B686a737B24e4c2d85976e7B3E68D0631A1ccE51A2bC05990Ba"
+private_key = "0x06dab7650a3e816bda01b8992407ef22105cb66b305068f6815341f14d467bd6"
 # world_address = "0x06171ed98331e849d6084bf2b3e3186a7ddf35574dd68cab4691053ee8ab69d7"
 
 [namespace]
-default = "dm"
+default = "dominion"
 
 [init_call_args]
 # Add init params for constructors.
 
 [writers]
-"dm" = ["dm-actions_system", "dm-cashier_system", "dm-table_management_system"]
+"dominion" = ["dominion-actions_system", "dominion-cashier_system", "dominion-table_management_system"]
 
 [owners]
-"dm" = ["dm-actions_system", "dm-cashier_system", "dm-table_management_system"]
+"dominion" = ["dominion-actions_system", "dominion-cashier_system", "dominion-table_management_system"]
