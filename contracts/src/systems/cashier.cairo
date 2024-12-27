@@ -99,7 +99,7 @@ mod cashier_system {
             let caller = get_caller_address();
 
             // Get player component
-            let mut player: ComponentPlayer = world.read_model(caller);
+            let mut player: ComponentPlayer = world.read_model((0, caller));
             assert!(player.m_total_chips >= chips_amount, "Insufficient chips");
 
             // Calculate ETH amount based on chips
@@ -130,8 +130,8 @@ mod cashier_system {
             let caller = get_caller_address();
 
             // Get sender and recipient components
-            let mut sender: ComponentPlayer = world.read_model(caller);
-            let mut recipient: ComponentPlayer = world.read_model(to);
+            let mut sender: ComponentPlayer = world.read_model((0, caller));
+            let mut recipient: ComponentPlayer = world.read_model((0, to));
 
             assert!(sender.m_total_chips >= amount, "Insufficient chips");
 
