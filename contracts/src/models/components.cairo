@@ -6,7 +6,7 @@ use dominion::models::enums::{EnumPosition, EnumGameState, EnumPlayerState};
 /// Component that represents two cards that the player holds in their hand during a game.
 ///
 /// 1 (2 cards) per player.
-#[derive(Drop, Serde, Debug)]
+#[derive(Drop, Clone, Serde, Debug)]
 #[dojo::model]
 struct ComponentHand {
     #[key]
@@ -59,6 +59,7 @@ struct ComponentTable {
     m_finished_street: bool, /// Check if we finished the street before advancing to the next one.
     m_rake_address: ContractAddress, /// The rake address
     m_rake_fee: u32, /// The rake fee
+    m_deck_encrypted: bool, /// Indicates if the deck has been encrypted.
 }
 
 

@@ -122,14 +122,6 @@ impl EnumGameStateDisplay of Display<EnumGameState> {
                 let str: ByteArray = format!("WaitingForPlayers");
                 f.buffer.append(@str);
             },
-            EnumGameState::RoundStarted => {
-                let str: ByteArray = format!("RoundStarted");
-                f.buffer.append(@str);
-            },
-            EnumGameState::DeckEncrypted => {
-                let str: ByteArray = format!("DeckEncrypted");
-                f.buffer.append(@str);
-            },
             EnumGameState::PreFlop => {
                 let str: ByteArray = format!("PreFlop");
                 f.buffer.append(@str);
@@ -317,22 +309,33 @@ impl EnumCardSuitSnapshotInto of Into<@EnumCardSuit, u32> {
 impl EnumHandRankSnapshotInto of Into<@EnumHandRank, u32> {
     fn into(self: @EnumHandRank) -> u32 {
         match self {
-            EnumHandRank::HighCard(values) |
-            EnumHandRank::Flush(values) => {
-                let mut sum: u32 = 0;
-                for value in values.span() {
-                    sum += value.into();
-                };
-                sum
-            },
-            EnumHandRank::Pair(value) => value.into(),
-            EnumHandRank::TwoPair((value1, value2)) => value1.into() + value2.into(),
-            EnumHandRank::ThreeOfAKind(value) => value.into(),
-            EnumHandRank::Straight(value) => value.into(),
-            EnumHandRank::FullHouse((value1, value2)) => value1.into() + value2.into(),
-            EnumHandRank::FourOfAKind(value) => value.into(),
+            EnumHandRank::HighCard(_) => 1,
+            EnumHandRank::Pair(_) => 2,
+            EnumHandRank::TwoPair((_, _)) => 3,
+            EnumHandRank::ThreeOfAKind(_) => 4,
+            EnumHandRank::Straight(_) => 5,
+            EnumHandRank::Flush(_) => 6,
+            EnumHandRank::FullHouse((_, _)) => 7,
+            EnumHandRank::FourOfAKind(_) => 8,
             EnumHandRank::StraightFlush => 9,
             EnumHandRank::RoyalFlush => 10,
+        }
+    }
+}
+
+impl EnumHandRankSnapshotIntoMask of Into<@EnumHandRank, EnumRankMask> {
+    fn into(self: @EnumHandRank) -> EnumRankMask {
+        match self {
+            EnumHandRank::HighCard(_) => EnumRankMask::None,
+            EnumHandRank::Pair(_) => EnumRankMask::Pair,
+            EnumHandRank::TwoPair((_, _)) => EnumRankMask::TwoPair,
+            EnumHandRank::ThreeOfAKind(_) => EnumRankMask::ThreeOfAKind,
+            EnumHandRank::Straight(_) => EnumRankMask::Straight,
+            EnumHandRank::Flush(_) => EnumRankMask::Flush,
+            EnumHandRank::FullHouse((_, _)) => EnumRankMask::FullHouse,
+            EnumHandRank::FourOfAKind(_) => EnumRankMask::FourOfAKind,
+            EnumHandRank::StraightFlush => EnumRankMask::StraightFlush,
+            EnumHandRank::RoyalFlush => EnumRankMask::RoyalFlush,
         }
     }
 }
@@ -340,20 +343,14 @@ impl EnumHandRankSnapshotInto of Into<@EnumHandRank, u32> {
 impl EnumHandRankInto of Into<EnumHandRank, u32> {
     fn into(self: EnumHandRank) -> u32 {
         match self {
-            EnumHandRank::HighCard(values) |
-            EnumHandRank::Flush(values) => {
-                let mut sum: u32 = 0;
-                for value in values.span() {
-                    sum += value.into();
-                };
-                sum
-            },
-            EnumHandRank::Pair(value) => value.into(),
-            EnumHandRank::TwoPair((value1, value2)) => value1.into() + value2.into(),
-            EnumHandRank::ThreeOfAKind(value) => value.into(),
-            EnumHandRank::Straight(value) => value.into(),
-            EnumHandRank::FullHouse((value1, value2)) => value1.into() + value2.into(),
-            EnumHandRank::FourOfAKind(value) => value.into(),
+            EnumHandRank::HighCard(_) => 1,
+            EnumHandRank::Pair(_) => 2,
+            EnumHandRank::TwoPair((_, _)) => 3,
+            EnumHandRank::ThreeOfAKind(_) => 4,
+            EnumHandRank::Straight(_) => 5,
+            EnumHandRank::Flush(_) => 6,
+            EnumHandRank::FullHouse((_, _)) => 7,
+            EnumHandRank::FourOfAKind(_) => 8,
             EnumHandRank::StraightFlush => 9,
             EnumHandRank::RoyalFlush => 10,
         }
@@ -819,14 +816,13 @@ impl HandImpl of IHand {
         let mut unique_values: Array<EnumCardValue> = array![];
 
         // First get unique values
-        for card in all_cards
-            .span() {
-                if let Option::Some(value) = card.get_value() {
-                    if !unique_values.contains(@value) {
-                        unique_values.append(value);
-                    }
+        for card in all_cards.span() {
+            if let Option::Some(value) = card.get_value() {
+                if !unique_values.contains(@value) {
+                    unique_values.append(value);
                 }
-            };
+            }
+        };
 
         let sorted_unique_values: Array<EnumCardValue> = utils::sort_values(@unique_values);
 
@@ -835,22 +831,20 @@ impl HandImpl of IHand {
         let mut prev_value: u32 = sorted_unique_values[0].into();
         let mut highest_value: EnumCardValue = *sorted_unique_values[0];
 
-        for i in 1
-            ..sorted_unique_values
-                .len() {
-                    let curr_value: u32 = sorted_unique_values[i].into();
-                    if curr_value == prev_value + 1 {
-                        consecutive_count += 1;
-                        if consecutive_count >= 5 {
-                            highest_value = *sorted_unique_values[i];
-                            break;
-                        }
-                    } else {
-                        consecutive_count = 1;
-                        highest_value = *sorted_unique_values[i];
-                    }
-                    prev_value = curr_value;
-                };
+        for i in 1..sorted_unique_values.len() {
+            let curr_value: u32 = sorted_unique_values[i].into();
+            if curr_value == prev_value + 1 {
+                consecutive_count += 1;
+                if consecutive_count >= 5 {
+                    highest_value = *sorted_unique_values[i];
+                    break;
+                }
+            } else {
+                consecutive_count = 1;
+                highest_value = *sorted_unique_values[i];
+            }
+            prev_value = curr_value;
+        };
 
         if consecutive_count >= 5 {
             return Option::Some(highest_value);
@@ -899,27 +893,26 @@ impl HandImpl of IHand {
         }
 
         // Comibne cards and sort.
-        let sorted_board: Array<StructCard> = utils::sort(board);
-        let all_cards: Array<StructCard> = self.m_cards.concat(@sorted_board);
+        let all_cards: Array<StructCard> = self.m_cards.concat(board);
+        let sorted_cards: Array<StructCard> = utils::sort(@all_cards);
         let mut same_kind_count: u8 = 1;
-        let mut prev_value: EnumCardValue = all_cards[0].get_value().unwrap();
+        let mut prev_value: EnumCardValue = sorted_cards[0].get_value().unwrap();
 
-        for card in all_cards
-            .span() {
-                if let Option::Some(card_value) = card.get_value() {
-                    if card_value == prev_value {
-                        same_kind_count += 1;
-                    }
-
-                    if same_kind_count >= 3 {
-                        three_of_a_kind = Option::Some(prev_value);
-                        break;
-                    }
-
-                    prev_value = card_value;
-                    same_kind_count = 1;
+        for card in 1..sorted_cards.len() {
+            if let Option::Some(card_value) = sorted_cards[card].get_value() {
+                if card_value == prev_value {
+                    same_kind_count += 1;
                 }
-            };
+
+                if same_kind_count >= 3 {
+                    three_of_a_kind = Option::Some(prev_value);
+                    break;
+                }
+
+                prev_value = card_value;
+                same_kind_count = 1;
+            }
+        };
 
         return three_of_a_kind;
     }
@@ -934,34 +927,32 @@ impl HandImpl of IHand {
             return Option::None;
         }
 
-        let sorted_board: Array<StructCard> = utils::sort(board);
-        let all_cards: Array<StructCard> = self.m_cards.concat(@sorted_board);
-        let mut prev_value: EnumCardValue = all_cards[0].get_value().unwrap();
+        let all_cards: Array<StructCard> = self.m_cards.concat(board);
+        let sorted_cards: Array<StructCard> = utils::sort(@all_cards);
+        let mut prev_value: EnumCardValue = sorted_cards[0].get_value().unwrap();
         let mut first_pair_value: Option<EnumCardValue> = Option::None;
         let mut second_pair_value: Option<EnumCardValue> = Option::None;
 
-        for i in 0
-            ..all_cards
-                .len() {
-                    if let Option::Some(card_value) = all_cards[i].get_value() {
-                        if card_value == prev_value {
-                            if first_pair_value.is_none() {
-                                first_pair_value = Option::Some(prev_value);
-                                continue;
-                            }
-                            if second_pair_value.is_none()
-                                && first_pair_value.unwrap() != prev_value {
-                                second_pair_value = Option::Some(prev_value);
-                                continue;
-                            }
-                        }
-
-                        prev_value = card_value;
-                        if first_pair_value.is_some() && second_pair_value.is_some() {
-                            break;
-                        }
+        for i in 1..sorted_cards.len() {
+            if let Option::Some(card_value) = sorted_cards[i].get_value() {
+                if card_value == prev_value {
+                    if first_pair_value.is_none() {
+                        first_pair_value = Option::Some(prev_value);
+                        continue;
                     }
-                };
+                    if second_pair_value.is_none()
+                        && first_pair_value.unwrap() != prev_value {
+                        second_pair_value = Option::Some(prev_value);
+                        continue;
+                    }
+                }
+
+                prev_value = card_value;
+                if first_pair_value.is_some() && second_pair_value.is_some() {
+                    break;
+                }
+            }
+        };
 
         if first_pair_value.is_none() || second_pair_value.is_none() {
             return Option::None;
@@ -982,24 +973,24 @@ impl HandImpl of IHand {
 
         let all_cards = self.m_cards.concat(board);
         let mut value_counts: Felt252Dict<u8> = utils::_count_values(@all_cards);
-
         let mut pairs: Array<EnumCardValue> = array![];
 
         // Get all possible pairs.
-        for card in all_cards
-            .span() {
-                if let Option::Some(value) = card.get_value() {
-                    let value_count: u32 = (@value).into();
-                    if value_counts.get(value_count.into()) == 2 && !pairs.contains(@value) {
-                        pairs.append(value);
-                    }
+        for card in all_cards.span() {
+            if let Option::Some(value) = card.get_value() {
+                let value_count: u32 = (@value).into();
+                if value_counts.get(value_count.into()) == 2 && !pairs.contains(@value) {
+                    pairs.append(value);
                 }
-            };
+            }
+        };
 
         if pairs.len() >= 2 {
             // Get highest pair.
             let sorted_pairs = utils::sort_values(@pairs);
             return Option::Some(sorted_pairs[sorted_pairs.len() - 1].clone());
+        } else if pairs.len() == 1 {
+            return Option::Some(pairs[0].clone());
         }
 
         return Option::None;
@@ -1031,29 +1022,28 @@ impl HandImpl of IHand {
         let mut max_suit_count: u8 = 0;
         let mut pair_count: u8 = 0;
 
-        for card in all_cards
-            .span() {
-                if let Option::Some(value) = card.get_value() {
-                    let value_count: u32 = (@value).into();
-                    let new_count = value_counts.get(value_count.into()) + 1;
-                    value_counts.insert(value_count.into(), new_count);
-                    if new_count > max_value_count {
-                        max_value_count = new_count;
-                    }
-                    if new_count == 2 {
-                        pair_count += 1;
-                    }
-                    values.append(value);
+        for card in all_cards.span() {
+            if let Option::Some(value) = card.get_value() {
+                let value_count: u32 = (@value).into();
+                let new_count = value_counts.get(value_count.into()) + 1;
+                value_counts.insert(value_count.into(), new_count);
+                if new_count > max_value_count {
+                    max_value_count = new_count;
                 }
-                if let Option::Some(suit) = card.get_suit() {
-                    let suit_count: u32 = (@suit).into();
-                    let new_count = suit_counts.get(suit_count.into()) + 1;
-                    suit_counts.insert(suit_count.into(), new_count);
-                    if new_count > max_suit_count {
-                        max_suit_count = new_count;
-                    }
+                if new_count == 2 {
+                    pair_count += 1;
                 }
-            };
+                values.append(value);
+            }
+            if let Option::Some(suit) = card.get_suit() {
+                let suit_count: u32 = (@suit).into();
+                let new_count = suit_counts.get(suit_count.into()) + 1;
+                suit_counts.insert(suit_count.into(), new_count);
+                if new_count > max_suit_count {
+                    max_suit_count = new_count;
+                }
+            }
+        };
 
         // Now we can use these counts to skip impossible hands.
         if max_suit_count >= 5 {
@@ -1063,7 +1053,7 @@ impl HandImpl of IHand {
             if (from_depth <= EnumRankMask::StraightFlush)
                 && self._has_straight_flush(board) {
                 return Result::Ok(EnumHandRank::StraightFlush);
-            }
+                }
         }
 
         if max_value_count == 4 && (from_depth <= EnumRankMask::FourOfAKind) {
@@ -1091,7 +1081,7 @@ impl HandImpl of IHand {
             }
         }
 
-        if max_value_count == 3 && (from_depth <= EnumRankMask::ThreeOfAKind) {
+        if max_value_count >= 3 && (from_depth <= EnumRankMask::ThreeOfAKind) {
             if let Option::Some(value) = self._has_three_of_a_kind(board) {
                 return Result::Ok(EnumHandRank::ThreeOfAKind(value));
             }
@@ -1103,7 +1093,7 @@ impl HandImpl of IHand {
             }
         }
 
-        if pair_count == 1 && (from_depth <= EnumRankMask::Pair) {
+        if pair_count >= 1 && from_depth <= EnumRankMask::Pair {
             if let Option::Some(value) = self._has_pair(board) {
                 return Result::Ok(EnumHandRank::Pair(value));
             }
@@ -1206,6 +1196,7 @@ impl TableImpl of ITable {
             m_finished_street: false,
             m_rake_address: starknet::contract_address_const::<0x0>(),
             m_rake_fee: 0,
+            m_deck_encrypted: false,
         };
         table._initialize_deck();
         return table;
@@ -1244,7 +1235,6 @@ impl TableImpl of ITable {
 
     fn advance_street(ref self: ComponentTable) {
         self.m_state = match self.m_state {
-            EnumGameState::DeckEncrypted => EnumGameState::PreFlop,
             EnumGameState::PreFlop => EnumGameState::Flop,
             EnumGameState::Flop => EnumGameState::Turn,
             EnumGameState::Turn => EnumGameState::River,
@@ -1303,6 +1293,7 @@ impl TableImpl of ITable {
 
     fn reset_table(ref self: ComponentTable) {
         self.m_pot = 0;
+        self.m_deck_encrypted = false;
         self.m_community_cards = array![];
     }
 
@@ -1401,6 +1392,7 @@ impl TableDefaultImpl of Default<ComponentTable> {
             m_finished_street: false,
             m_rake_address: starknet::contract_address_const::<0x0>(),
             m_rake_fee: 0,
+            m_deck_encrypted: false,
         };
     }
 }

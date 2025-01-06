@@ -243,6 +243,8 @@ fn test_insufficient_chips_for_bet() {
 
     table_manager.create_table(200, 400, 2000, 4000, 5);
 
+    let table: ComponentTable = world.read_model(1);
+
     starknet::testing::set_contract_address(player);  // Dealer + Big Blind.
     actions.join_table(1, 2000);
     actions.set_ready(1);
@@ -250,6 +252,8 @@ fn test_insufficient_chips_for_bet() {
     starknet::testing::set_contract_address(player_2);  // Small Blind.
     actions.join_table(1, 2000);
     actions.set_ready(1);
+
+    table_manager.post_encrypt_deck(1, table.m_deck);
 
     starknet::testing::set_contract_address(player_2);
     actions.bet(1, 2000);
@@ -274,6 +278,8 @@ fn test_bet_twice() {
 
     table_manager.create_table(200, 400, 2000, 4000, 5);
 
+    let table: ComponentTable = world.read_model(1);
+
     starknet::testing::set_contract_address(player);  // Dealer + Big Blind.
     actions.join_table(1, 2000);
     actions.set_ready(1);
@@ -281,6 +287,8 @@ fn test_bet_twice() {
     starknet::testing::set_contract_address(player_2);  // Small Blind.
     actions.join_table(1, 2000);
     actions.set_ready(1);
+
+    table_manager.post_encrypt_deck(1, table.m_deck);
 
     starknet::testing::set_contract_address(player_2);
     actions.bet(1, 200);

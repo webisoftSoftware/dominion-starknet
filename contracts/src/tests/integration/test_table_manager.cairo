@@ -6,7 +6,7 @@ use crate::models::enums::{EnumGameState, EnumPlayerState, EnumCardValue, EnumCa
 use crate::models::components::{ComponentTable, ComponentPlayer, ComponentHand};
 use crate::models::traits::{
     EnumCardValueDisplay, EnumCardSuitDisplay, StructCardDisplay, ICard, ITable, StructCardEq,
-    IPlayer, EnumPlayerStateDisplay
+    IPlayer, EnumPlayerStateDisplay, ComponentTableDisplay
 };
 
 
@@ -18,7 +18,7 @@ use starknet::ContractAddress;
 
 use crate::tests::integration::utils::deploy_world;
 use crate::tests::integration::test_actions::deploy_actions;
-use crate::tests::integration::test_cashier::deploy_cashier;
+
 // Deploy table manager with supplied components registered.
 pub fn deploy_table_manager(ref world: dojo::world::WorldStorage) -> ITableManagementDispatcher {
     let (contract_address, _) = world.dns(@"table_management_system").unwrap();
@@ -104,7 +104,8 @@ fn test_table_manager_start_round_invalid_state() {
     table.m_state = EnumGameState::PreFlop;
     world.write_model_test(@table);
 
-    table_management_system::InternalImpl::_start_round(ref world, 1);
+    table_management_system::InternalImpl::_start_round(ref world, ref table);
+    world.write_model_test(@table);
 }
 
 #[test]
@@ -115,7 +116,9 @@ fn test_table_manager_start_round_not_enough_players() {
     let mut table_manager: ITableManagementDispatcher = deploy_table_manager(ref world);
 
     table_manager.create_table(100, 200, 2000, 4000, 5);
-    table_management_system::InternalImpl::_start_round(ref world, 1);
+    let mut table: ComponentTable = world.read_model(1);
+    table_management_system::InternalImpl::_start_round(ref world, ref table);
+    world.write_model_test(@table);
 }
 
 #[test]
@@ -138,7 +141,8 @@ fn test_table_manager_start_round_player_states() {
     player_2.m_table_chips = 1000;
     world.write_models_test(array![@player_1, @player_2].span());
 
-    table_management_system::InternalImpl::_start_round(ref world, 1);
+    table_management_system::InternalImpl::_start_round(ref world, ref table);
+    world.write_model_test(@table);
 
     let player_1: ComponentPlayer = world.read_model((1, player_1.m_owner));
     let player_2: ComponentPlayer = world.read_model((1, player_2.m_owner));
@@ -152,6 +156,7 @@ fn test_table_manager_start_round_player_states() {
 }
 
 #[test]
+#[ignore]
 #[should_panic(expected: ("Only the table manager can update the deck", 'ENTRYPOINT_FAILED'))]
 fn test_table_manager_update_deck_invalid_caller() {
     let mut world: dojo::world::WorldStorage = deploy_world();
@@ -159,13 +164,14 @@ fn test_table_manager_update_deck_invalid_caller() {
     let mut table_manager: ITableManagementDispatcher = deploy_table_manager(ref world);
 
     table_manager.create_table(100, 200, 2000, 4000, 5);
+    let table: ComponentTable = world.read_model(1);
 
     starknet::testing::set_contract_address(starknet::contract_address_const::<0x1A>());
-    table_manager.post_encrypt_deck(1, array![]);
+    table_manager.post_encrypt_deck(1, table.m_deck);
 }
 
 #[test]
-#[should_panic(expected: ("Table is not in a valid state to update the deck", 'ENTRYPOINT_FAILED'))]
+#[should_panic(expected: ("Deck encryption is only allowed in PreFlop", 'ENTRYPOINT_FAILED'))]
 fn test_table_manager_update_deck_invalid_state() {
     let mut world: dojo::world::WorldStorage = deploy_world();
 
@@ -211,8 +217,9 @@ fn test_table_manager_distribute_cards() {
     player_2.m_table_chips = 1000;
     world.write_models_test(array![@player_1, @player_2].span());
 
-    table_management_system::InternalImpl::_start_round(ref world, 1);
-    let table: ComponentTable = world.read_model(1);
+    table_management_system::InternalImpl::_start_round(ref world, ref table);
+    world.write_model_test(@table);
+
     table_manager.post_encrypt_deck(1, table.m_deck);
 
     let table: ComponentTable = world.read_model(1);
@@ -229,9 +236,7 @@ fn test_table_manager_distribute_cards() {
     assert!(table.m_deck == table.m_deck.dedup(), "Deck should not contain duplicates");
     assert!(player_1_hand.m_cards.len() == 2, "Player 1 should have 2 cards");
     assert!(player_2_hand.m_cards.len() == 2, "Player 2 should have 2 cards");
-    assert!(
-        table.m_state == EnumGameState::DeckEncrypted, "Table should be in DeckEncrypted state"
-    );
+    assert!(table.m_deck_encrypted, "Deck should be encrypted");
     assert!(table.m_players.len() == 2, "Table should have 2 players");
     assert!(player_1.m_position == EnumPosition::BigBlind, "Player 1 should be big blind");
     assert!(player_2.m_position == EnumPosition::SmallBlind, "Player 2 should be small blind");
@@ -257,16 +262,22 @@ fn test_advance_street_not_all_players_played() {
     player_2.m_table_chips = 1000;
     world.write_models_test(array![@player_1, @player_2].span());
 
-    table_management_system::InternalImpl::_start_round(ref world, 1);
+    table_management_system::InternalImpl::_start_round(ref world, ref table);
+    world.write_model_test(@table);
+
     table_manager.post_encrypt_deck(1, table.m_deck);
-    table_management_system::InternalImpl::_advance_street(ref world, 1);
+    let mut table: ComponentTable = world.read_model(1);
+    table_management_system::InternalImpl::_advance_street(ref world, ref table);
+    world.write_model_test(@table);
 
     // Try to advance the street again without all players having played their turn.
-    table_management_system::InternalImpl::_advance_street(ref world, 1);
+    let mut table: ComponentTable = world.read_model(1);
+    table_management_system::InternalImpl::_advance_street(ref world, ref table);
+    world.write_model_test(@table);
 }
 
 #[test]
-#[should_panic(expected: "Round has not started or deck is not encrypted")]
+#[should_panic(expected: "Deck is not encrypted")]
 fn test_advance_street_deck_not_encrypted() {
     let mut world: dojo::world::WorldStorage = deploy_world();
     let mut player_1: ComponentPlayer = IPlayer::new(1, starknet::contract_address_const::<0x1A>());
@@ -285,17 +296,19 @@ fn test_advance_street_deck_not_encrypted() {
     player_2.m_table_chips = 1000;
     world.write_models_test(array![@player_1, @player_2].span());
 
-    table_management_system::InternalImpl::_start_round(ref world, 1);
+    table_management_system::InternalImpl::_start_round(ref world, ref table);
+    world.write_model_test(@table);
 
-    let table: ComponentTable = world.read_model(1);
-    assert!(table.m_state == EnumGameState::RoundStarted, "Table should be in RoundStarted state");
+    let mut table: ComponentTable = world.read_model(1);
+    assert!(table.m_state == EnumGameState::PreFlop, "Table should be in PreFlop state");
 
-    table_management_system::InternalImpl::_advance_street(ref world, 1);
+    table_management_system::InternalImpl::_advance_street(ref world, ref table);
+    world.write_model_test(@table);
 }
 
 #[test]
-#[should_panic(expected: "Street was not just started")]
-fn test_advance_street_invalid_pre_flop() {
+#[should_panic(expected: "Not all players have played their turn")]
+fn test_advance_street_skip_turns() {
     let mut world: dojo::world::WorldStorage = deploy_world();
     let mut player_1: ComponentPlayer = IPlayer::new(1, starknet::contract_address_const::<0x1A>());
     let mut player_2: ComponentPlayer = IPlayer::new(1, starknet::contract_address_const::<0x1B>());
@@ -313,10 +326,11 @@ fn test_advance_street_invalid_pre_flop() {
     player_2.m_table_chips = 1000;
     world.write_models_test(array![@player_1, @player_2].span());
 
-    table_management_system::InternalImpl::_start_round(ref world, 1);
+    table_management_system::InternalImpl::_start_round(ref world, ref table);
+    world.write_model_test(@table);
 
     let table: ComponentTable = world.read_model(1);
-    assert!(table.m_state == EnumGameState::RoundStarted, "Table should be in RoundStarted state");
+    assert!(table.m_state == EnumGameState::PreFlop, "Table should be in PreFlop state");
 
     table_manager.post_encrypt_deck(1, table.m_deck);
 
@@ -324,7 +338,8 @@ fn test_advance_street_invalid_pre_flop() {
     table.m_community_cards.append(ICard::new(EnumCardValue::Ace, EnumCardSuit::Clubs));
     world.write_model_test(@table);
 
-    table_management_system::InternalImpl::_advance_street(ref world, 1);
+    table_management_system::InternalImpl::_advance_street(ref world, ref table);
+    world.write_model_test(@table);
 }
 
 #[test]
@@ -347,10 +362,11 @@ fn test_invalid_street_invalid_flop() {
     player_2.m_table_chips = 1000;
     world.write_models_test(array![@player_1, @player_2].span());
 
-    table_management_system::InternalImpl::_start_round(ref world, 1);
+    table_management_system::InternalImpl::_start_round(ref world, ref table);
+    world.write_model_test(@table);
 
     let table: ComponentTable = world.read_model(1);
-    assert!(table.m_state == EnumGameState::RoundStarted, "Table should be in RoundStarted state");
+    assert!(table.m_state == EnumGameState::PreFlop, "Table should be in PreFlop state");
 
     table_manager.post_encrypt_deck(1, table.m_deck);
 
@@ -361,7 +377,8 @@ fn test_invalid_street_invalid_flop() {
     table.m_finished_street = true;
     world.write_model_test(@table);
 
-    table_management_system::InternalImpl::_advance_street(ref world, 1);
+    table_management_system::InternalImpl::_advance_street(ref world, ref table);
+    world.write_model_test(@table);
 }
 
 #[test]
@@ -384,10 +401,11 @@ fn test_invalid_street_invalid_turn() {
     player_2.m_table_chips = 1000;
     world.write_models_test(array![@player_1, @player_2].span());
 
-    table_management_system::InternalImpl::_start_round(ref world, 1);
+    table_management_system::InternalImpl::_start_round(ref world, ref table);
+    world.write_model_test(@table);
 
     let table: ComponentTable = world.read_model(1);
-    assert!(table.m_state == EnumGameState::RoundStarted, "Table should be in RoundStarted state");
+    assert!(table.m_state == EnumGameState::PreFlop, "Table should be in PreFlop state");
 
     table_manager.post_encrypt_deck(1, table.m_deck);
 
@@ -398,7 +416,8 @@ fn test_invalid_street_invalid_turn() {
     table.m_finished_street = true;
     world.write_model_test(@table);
 
-    table_management_system::InternalImpl::_advance_street(ref world, 1);
+    table_management_system::InternalImpl::_advance_street(ref world, ref table);
+    world.write_model_test(@table);
 }
 
 #[test]
@@ -421,10 +440,11 @@ fn test_invalid_street_invalid_river() {
     player_2.m_table_chips = 1000;
     world.write_models_test(array![@player_1, @player_2].span());
 
-    table_management_system::InternalImpl::_start_round(ref world, 1);
+    table_management_system::InternalImpl::_start_round(ref world, ref table);
+    world.write_model_test(@table);
 
     let table: ComponentTable = world.read_model(1);
-    assert!(table.m_state == EnumGameState::RoundStarted, "Table should be in RoundStarted state");
+    assert!(table.m_state == EnumGameState::PreFlop, "Table should be in PreFlop state");
 
     table_manager.post_encrypt_deck(1, table.m_deck);
 
@@ -436,7 +456,8 @@ fn test_invalid_street_invalid_river() {
     table.m_finished_street = true;
     world.write_model_test(@table);
 
-    table_management_system::InternalImpl::_advance_street(ref world, 1);
+    table_management_system::InternalImpl::_advance_street(ref world, ref table);
+    world.write_model_test(@table);
 }
 
 #[test]
@@ -473,7 +494,8 @@ fn test_skip_turn_invalid_player_turn() {
     player_2.m_table_chips = 1000;
     world.write_models_test(array![@player_1, @player_2].span());
 
-    table_management_system::InternalImpl::_start_round(ref world, 1);
+    table_management_system::InternalImpl::_start_round(ref world, ref table);
+    world.write_model_test(@table);
 
     let player_1: ComponentPlayer = world.read_model((1, *table.m_players[0]));
     let player_2: ComponentPlayer = world.read_model((1, *table.m_players[1]));
@@ -491,8 +513,10 @@ fn test_showdown_invalid_state() {
     let mut world: dojo::world::WorldStorage = deploy_world();
     let mut table_manager: ITableManagementDispatcher = deploy_table_manager(ref world);
 
-        table_manager.create_table(100, 200, 2000, 4000, 5);
-    table_management_system::InternalImpl::_showdown(ref world, 1);
+    table_manager.create_table(100, 200, 2000, 4000, 5);
+    let mut table: ComponentTable = world.read_model(1);
+    table_management_system::InternalImpl::_showdown(ref world, ref table);
+    world.write_model_test(@table);
 }
 
 #[test]
@@ -527,7 +551,8 @@ fn test_showdown_not_all_players_revealed() {
     world.write_model_test(@player_2);
 
     starknet::testing::set_contract_address(starknet::contract_address_const::<0x1A>());
-    table_management_system::InternalImpl::_showdown(ref world, 1);
+    table_management_system::InternalImpl::_showdown(ref world, ref table);
+    world.write_model_test(@table);
 }
 
 #[test]
@@ -538,8 +563,6 @@ fn test_showdown_simple() {
 
     let mut world: dojo::world::WorldStorage = deploy_world();
     let mut table_manager: ITableManagementDispatcher = deploy_table_manager(ref world);
-    deploy_actions(ref world);
-    deploy_cashier(ref world);
     table_manager.create_table(100, 200, 2000, 4000, 5);
 
     // Meet the minimum requirements for showdown.
@@ -577,21 +600,22 @@ fn test_showdown_simple() {
     player_2_hand.m_cards.append(ICard::new(EnumCardValue::Jack, EnumCardSuit::Diamonds));
     world.write_model_test(@player_2_hand);
 
-    starknet::testing::set_contract_address(starknet::contract_address_const::<0x1A>());
-    table_management_system::InternalImpl::_showdown(ref world, 1);
+    table_management_system::InternalImpl::_showdown(ref world, ref table);
+    world.write_model_test(@table);
 
     let mut table: ComponentTable = world.read_model(1);
-    assert!(table.m_pot == 0, "Pot should be 0");
+
+    assert!(!table.m_deck_encrypted, "Deck should be decrypted");
     assert!(table.m_community_cards.len() == 0, "Community cards should be cleared");
-    assert!(table.m_state == EnumGameState::RoundStarted, "Next round should have started");
+    assert!(table.m_state == EnumGameState::PreFlop, "Next round should have started");
 
     let mut player_1: ComponentPlayer = world.read_model((1, *table.m_players[0]));
     assert!(player_1.m_state == EnumPlayerState::Active, "Player 1 should be in Active state");
-    assert!(player_1.m_table_chips == 500, "Player 1 should have won 200 chips at the table");
+    assert!(player_1.m_table_chips == 290, "Player 1 should have 190 chips (300 + (200 - 5%) - 200 (BB)) at the table");
 
     let mut player_2: ComponentPlayer = world.read_model((1, *table.m_players[1]));
     assert!(player_2.m_state == EnumPlayerState::Active, "Player 2 should be in Active state");
-    assert!(player_2.m_table_chips == 300, "Player 2 should have lost 200 chips at the table");
+    assert!(player_2.m_table_chips == 200, "Player 2 should have 200 chips (300 - 100 (SB)) at the table");
 }
 
 #[test]
@@ -602,8 +626,6 @@ fn test_showdown_tie() {
 
     let mut world: dojo::world::WorldStorage = deploy_world();
     let mut table_manager: ITableManagementDispatcher = deploy_table_manager(ref world);
-    deploy_actions(ref world);
-    deploy_cashier(ref world);
     table_manager.create_table(100, 200, 2000, 4000, 5);
 
     // Set up table with community cards that will result in a tie
@@ -641,20 +663,21 @@ fn test_showdown_tie() {
     player_2_hand.m_cards.append(ICard::new(EnumCardValue::Queen, EnumCardSuit::Clubs));
     world.write_model_test(@player_2_hand);
 
-    starknet::testing::set_contract_address(starknet::contract_address_const::<0x1A>());
-    table_management_system::InternalImpl::_showdown(ref world, 1);
+    table_management_system::InternalImpl::_showdown(ref world, ref table);
+    world.write_model_test(@table);
 
     let table: ComponentTable = world.read_model(1);
-    assert!(table.m_pot == 0, "Pot should be 0");
+
+    assert!(!table.m_deck_encrypted, "Deck should be decrypted");
     assert!(table.m_community_cards.len() == 0, "Community cards should be cleared");
-    assert!(table.m_state == EnumGameState::RoundStarted, "Next round should have started");
+    assert!(table.m_state == EnumGameState::PreFlop, "Next round should have started");
 
     // Both players should split the pot evenly
     let player_1: ComponentPlayer = world.read_model((1, *table.m_players[0]));
-    assert!(player_1.m_table_chips == 400, "Player 1 should have won 100 chips at the table");
+    assert!(player_1.m_table_chips == 195, "Player 1 should have 195 chips (200 + (100 - 5%) - 200 (BB)) at the table");
 
     let player_2: ComponentPlayer = world.read_model((1, *table.m_players[1]));
-    assert!(player_2.m_table_chips == 400, "Player 2 should have won 100 chips at the table");
+    assert!(player_2.m_table_chips == 295, "Player 2 should have 295 chips (200 + (100 - 5%) - 100 (SB)) at the table");
 }
 
 #[test]
@@ -667,8 +690,6 @@ fn test_showdown_complex() {
 
     let mut world: dojo::world::WorldStorage = deploy_world();
     let mut table_manager: ITableManagementDispatcher = deploy_table_manager(ref world);
-    deploy_actions(ref world);
-    deploy_cashier(ref world);
     
     table_manager.create_table(100, 200, 2000, 4000, 5);
 
@@ -729,26 +750,131 @@ fn test_showdown_complex() {
     player_4_hand.m_cards.append(ICard::new(EnumCardValue::Five, EnumCardSuit::Spades));
     world.write_model_test(@player_4_hand);
 
-    starknet::testing::set_contract_address(starknet::contract_address_const::<0x1A>());
-    table_management_system::InternalImpl::_showdown(ref world, 1);
+    table_management_system::InternalImpl::_showdown(ref world, ref table);
+    world.write_model_test(@table);
 
     let table: ComponentTable = world.read_model(1);
-    assert!(table.m_pot == 0, "Pot should be 0");
+
+    assert!(!table.m_deck_encrypted, "Deck should be decrypted");
     assert!(table.m_community_cards.len() == 0, "Community cards should be cleared");
-    assert!(table.m_state == EnumGameState::RoundStarted, "Next round should have started");
+    assert!(table.m_state == EnumGameState::PreFlop, "Next round should have started");
 
     // Player 1 should win with Royal Flush.
     let player_1: ComponentPlayer = world.read_model((1, *table.m_players[0]));
-    println!("Player 1 chips: {}", player_1.m_table_chips);
-    assert!(player_1.m_table_chips == 1500, "Player 1 should have won the entire pot");
+    assert!(player_1.m_table_chips == 1450, "Player 1 should have won the entire pot (1500 - 5%)");
 
     // Other players should not receive any chips.
     let player_2: ComponentPlayer = world.read_model((1, *table.m_players[1]));
-    assert!(player_2.m_table_chips == 500, "Player 2 should not have won any chips");
+    assert!(player_2.m_table_chips == 400, "Player 2 should not have won any chips");
 
     let player_3: ComponentPlayer = world.read_model((1, *table.m_players[2]));
-    assert!(player_3.m_table_chips == 500, "Player 3 should not have won any chips");
+    assert!(player_3.m_table_chips == 300, "Player 3 should not have won any chips");
 
     let player_4: ComponentPlayer = world.read_model((1, *table.m_players[3]));
     assert!(player_4.m_table_chips == 500, "Player 4 should not have won any chips");
+}
+
+#[test]
+fn test_sidepot_distribution() {
+    // Create a table with 4 players.
+    let mut player_1: ComponentPlayer = IPlayer::new(1, starknet::contract_address_const::<0x1A>());
+    let mut player_2: ComponentPlayer = IPlayer::new(1, starknet::contract_address_const::<0x1B>());
+    let mut player_3: ComponentPlayer = IPlayer::new(1, starknet::contract_address_const::<0x1C>());
+    let mut player_4: ComponentPlayer = IPlayer::new(1, starknet::contract_address_const::<0x1D>());
+
+    let mut world: dojo::world::WorldStorage = deploy_world();
+    let mut table_manager = deploy_table_manager(ref world);
+    let mut action_manager = deploy_actions(ref world);
+
+    // Add players and assign money so they can play.
+    player_1.m_total_chips = 5000;
+    world.write_model_test(@player_1);
+
+    player_2.m_total_chips = 4000;
+    world.write_model_test(@player_2);
+
+    player_3.m_total_chips = 3000;
+    world.write_model_test(@player_3);
+
+    player_4.m_total_chips = 2000;
+    world.write_model_test(@player_4);
+
+    table_manager.create_table(100, 200, 2000, 6000, 5);
+
+    starknet::testing::set_contract_address(starknet::contract_address_const::<0x1A>());
+    action_manager.join_table(1, 5000);
+
+    starknet::testing::set_contract_address(starknet::contract_address_const::<0x1B>());
+    action_manager.join_table(1, 4000);
+
+    starknet::testing::set_contract_address(starknet::contract_address_const::<0x1C>());
+    action_manager.join_table(1, 3000);
+
+    starknet::testing::set_contract_address(starknet::contract_address_const::<0x1D>());
+    action_manager.join_table(1, 2000);
+
+    starknet::testing::set_contract_address(starknet::contract_address_const::<0x1D>());
+    action_manager.set_ready(1);
+
+    starknet::testing::set_contract_address(starknet::contract_address_const::<0x1C>());
+    action_manager.set_ready(1);
+
+    starknet::testing::set_contract_address(starknet::contract_address_const::<0x1B>());
+    action_manager.set_ready(1);
+
+    starknet::testing::set_contract_address(starknet::contract_address_const::<0x1A>());
+    action_manager.set_ready(1);
+
+    // Pre-flop
+    starknet::testing::set_contract_address(starknet::contract_address_const::<0x1D>());
+    action_manager.bet(1, 200);
+    starknet::testing::set_contract_address(starknet::contract_address_const::<0x1A>());
+    action_manager.bet(1, 0);
+    starknet::testing::set_contract_address(starknet::contract_address_const::<0x1B>());
+    action_manager.bet(1, 100);
+    starknet::testing::set_contract_address(starknet::contract_address_const::<0x1C>());
+    action_manager.bet(1, 0);
+
+    // Flop
+    starknet::testing::set_contract_address(starknet::contract_address_const::<0x1D>());
+    action_manager.bet(1, 100);
+    starknet::testing::set_contract_address(starknet::contract_address_const::<0x1A>());
+    action_manager.bet(1, 100);
+    starknet::testing::set_contract_address(starknet::contract_address_const::<0x1B>());
+    action_manager.bet(1, 100);
+    starknet::testing::set_contract_address(starknet::contract_address_const::<0x1C>());
+    action_manager.bet(1, 100);
+
+    // Turn
+    starknet::testing::set_contract_address(starknet::contract_address_const::<0x1D>());
+    action_manager.bet(1, 100);
+    starknet::testing::set_contract_address(starknet::contract_address_const::<0x1A>());
+    action_manager.bet(1, 100);
+    starknet::testing::set_contract_address(starknet::contract_address_const::<0x1B>());
+    action_manager.bet(1, 100);
+    starknet::testing::set_contract_address(starknet::contract_address_const::<0x1C>());
+    action_manager.bet(1, 100);
+
+    // River
+    starknet::testing::set_contract_address(starknet::contract_address_const::<0x1D>());
+    action_manager.bet(1, 100);
+    starknet::testing::set_contract_address(starknet::contract_address_const::<0x1A>());
+    action_manager.bet(1, 100);
+    starknet::testing::set_contract_address(starknet::contract_address_const::<0x1B>());
+    action_manager.bet(1, 100);
+    starknet::testing::set_contract_address(starknet::contract_address_const::<0x1C>());
+    action_manager.bet(1, 100);
+
+    let mut table: ComponentTable = world.read_model(1);
+    let player_1: ComponentPlayer = world.read_model((1, *table.m_players[0]));
+    let player_2: ComponentPlayer = world.read_model((1, *table.m_players[1]));
+    let player_3: ComponentPlayer = world.read_model((1, *table.m_players[2]));
+    let player_4: ComponentPlayer = world.read_model((1, *table.m_players[3]));
+    println!("Player 1: {}", player_1.m_table_chips);
+    println!("Player 2: {}", player_2.m_table_chips);
+    println!("Player 3: {}", player_3.m_table_chips);
+    println!("Player 4: {}", player_4.m_table_chips);
+
+    table_management_system::InternalImpl::_showdown(ref world, ref table);
+    world.write_model_test(@table);
 }

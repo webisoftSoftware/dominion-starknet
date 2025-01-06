@@ -3,6 +3,11 @@ use crate::systems::cashier::{ICashierDispatcher, ICashierDispatcherTrait};
 use dojo::world::{IWorldDispatcher, IWorldDispatcherTrait, WorldStorageTrait};
 use dojo_cairo_test::{ContractDefTrait, WorldStorageTestTrait};
 use starknet::ContractAddress;
+use dojo::model::{ModelStorage, ModelValueStorage, ModelStorageTest, ModelValueStorageTest};
+use dojo::world::storage::WorldStorage;
+use crate::models::components::ComponentPlayer;
+
+const ETH_TO_CHIPS_RATIO: u256 = 10000000000000;
 
 #[test]
 fn test_deposit_erc20() {
@@ -28,13 +33,13 @@ fn test_cashout_erc20() {
     let initial_chips = 1000;
     let cashout_amount = 500;
 
-    let mut player: ComponentPlayer = world.read_model(player_address);
+    let mut player: ComponentPlayer = world.read_model((1, player_address));
     player.m_total_chips = initial_chips;
     world.write_model(@player);
 
     cashier.cashout_erc20(cashout_amount);
 
-    let player: ComponentPlayer = world.read_model(player_address);
+    let player: ComponentPlayer = world.read_model((1, player_address));
     assert_eq!(player.m_total_chips, initial_chips - cashout_amount);
 }
 
@@ -49,18 +54,18 @@ fn test_transfer_chips() {
     let initial_chips_recipient = 500;
     let transfer_amount = 300;
 
-    let mut sender: ComponentPlayer = world.read_model(sender_address);
+    let mut sender: ComponentPlayer = world.read_model((1, sender_address));
     sender.m_total_chips = initial_chips_sender;
     world.write_model(@sender);
 
-    let mut recipient: ComponentPlayer = world.read_model(recipient_address);
+    let mut recipient: ComponentPlayer = world.read_model((1, recipient_address));
     recipient.m_total_chips = initial_chips_recipient;
     world.write_model(@recipient);
 
     cashier.transfer_chips(recipient_address, transfer_amount);
 
-    let sender: ComponentPlayer = world.read_model(sender_address);
-    let recipient: ComponentPlayer = world.read_model(recipient_address);
+    let sender: ComponentPlayer = world.read_model((1, sender_address));
+    let recipient: ComponentPlayer = world.read_model((1, recipient_address));
 
     assert_eq!(sender.m_total_chips, initial_chips_sender - transfer_amount);
     assert_eq!(recipient.m_total_chips, initial_chips_recipient + transfer_amount);

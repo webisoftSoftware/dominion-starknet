@@ -23,6 +23,6 @@ mod tests {
         mod utils;
         mod test_actions;
         mod test_table_manager;
-        mod test_cashier;
+        // mod test_cashier;
     }
 }

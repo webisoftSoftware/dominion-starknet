@@ -25,7 +25,7 @@ mod actions_system {
     use dojo::event::{EventStorage};
     use dominion::models::components::{ComponentTable, ComponentPlayer, ComponentHand, ComponentSidepot};
     use dominion::models::enums::{EnumPlayerState, EnumGameState, EnumPosition};
-    use dominion::models::traits::{IPlayer, ITable};
+    use dominion::models::traits::{IPlayer, ITable, ComponentTableDisplay};
     use dominion::models::structs::StructCard;
     use alexandria_data_structures::array_ext::ArrayTraitExt;
     use core::sha256::compute_sha256_byte_array;
@@ -146,7 +146,7 @@ mod actions_system {
         fn set_ready(ref self: ContractState, table_id: u32) {
             let mut world = self.world(@"dominion");
             let caller = get_caller_address();
-            let table: ComponentTable = world.read_model(table_id);
+            let mut table: ComponentTable = world.read_model(table_id);
             assert!(table.m_state == EnumGameState::WaitingForPlayers, "Table is not waiting for players");
 
             let mut player: ComponentPlayer = world.read_model((table_id, caller));
@@ -176,12 +176,13 @@ mod actions_system {
             if (player_statuses.len() == table.m_players.len() && table.m_players.len() > 1) {
                 world.emit_event(
                     @EventAllPlayersReady {
-                        m_table_id: table_id,
-                        m_players: table.m_players,
+                        m_table_id: table.m_table_id,
+                        m_players: table.m_players.clone(),
                         m_timestamp: get_block_timestamp()
                     }
                 );
-                table_management_system::InternalImpl::_start_round(ref world, table_id);
+                table_management_system::InternalImpl::_start_round(ref world, ref table);
+                world.write_model(@table);
             }
         }
 
@@ -248,12 +249,9 @@ mod actions_system {
         fn bet(ref self: ContractState, table_id: u32, amount: u32) {
             let mut world = self.world(@"dominion");
             let mut table: ComponentTable = world.read_model(table_id);
-            match table.m_state {
-                EnumGameState::Shutdown | EnumGameState::WaitingForPlayers | EnumGameState::DeckEncrypted => {
-                    assert!(false, "Game is not in a betting phase");
-                },
-                _ => {}
-            }
+            assert!(table.m_state != EnumGameState::Shutdown &&
+                table.m_state != EnumGameState::WaitingForPlayers, "Game is not in a betting phase");
+            
             let mut player_component: ComponentPlayer = world.read_model((table_id, get_caller_address()));
             assert!(table.check_turn(@player_component.m_owner), "It is not your turn");
 
@@ -266,9 +264,10 @@ mod actions_system {
             }
 
             match amount {
-                0 => InternalImpl::_check(ref world, table_id, player_component.m_owner, amount, true),
-                _ => InternalImpl::_place_bet(ref world, table_id, player_component.m_owner, amount, true),
+                0 => InternalImpl::_check(ref world, ref table, ref player_component, amount, true),
+                _ => InternalImpl::_place_bet(ref world, ref table, ref player_component, amount, true),
             };
+            world.write_model(@player_component);
 
             // Check if the street is finished.
             let mut players: Array<ComponentPlayer> = array![];
@@ -278,21 +277,17 @@ mod actions_system {
 
             if InternalImpl::_is_street_finished(@table, @players) {
                 table.m_finished_street = true;
-                world.write_model(@table);
-                table_management_system::InternalImpl::_advance_street(ref world, table_id);
+                table_management_system::InternalImpl::_advance_street(ref world, ref table);
             }
+            world.write_model(@table);
         }
 
         fn fold(ref self: ContractState, table_id: u32) {
             let mut world = self.world(@"dominion");
 
             let mut table: ComponentTable = world.read_model(table_id);
-            match table.m_state {
-                EnumGameState::Shutdown | EnumGameState::WaitingForPlayers | EnumGameState::DeckEncrypted => {
-                    assert!(false, "Game is not in a betting phase");
-                },
-                _ => {}
-            };
+            assert!(table.m_state != EnumGameState::Shutdown &&
+                table.m_state != EnumGameState::WaitingForPlayers, "Game is not in a betting phase");
 
             let mut player_component: ComponentPlayer = world.read_model((table_id, get_caller_address()));
             assert!(table.check_turn(@get_caller_address()), "It is not your turn");
@@ -308,7 +303,8 @@ mod actions_system {
                 _ => {}
             };
 
-            InternalImpl::_fold(ref world, table_id, player_component.m_owner, true);
+            InternalImpl::_fold(ref world, ref table, ref player_component, true);
+            world.write_model(@player_component);
 
             // Check if the street is finished.
             let mut players: Array<ComponentPlayer> = array![];
@@ -318,9 +314,9 @@ mod actions_system {
 
             if InternalImpl::_is_street_finished(@table, @players) {
                 table.m_finished_street = true;
-                world.write_model(@table);
-                table_management_system::InternalImpl::_advance_street(ref world, table_id);
+                table_management_system::InternalImpl::_advance_street(ref world, ref table);
             }
+            world.write_model(@table);
         }
 
         fn post_commit_hash(ref self: ContractState, table_id: u32, commitment_hash: Array<u32>) {
@@ -401,7 +397,7 @@ mod actions_system {
                 );
 
             if InternalImpl::_all_players_revealed(@world, table_id) {
-                table_management_system::InternalImpl::_showdown(ref world, table_id);
+                table_management_system::InternalImpl::_showdown(ref world, ref table);
             }
         }
     }
@@ -423,25 +419,19 @@ mod actions_system {
             return all_revealed;
         }
 
-        fn _check(ref world: dojo::world::WorldStorage, table_id: u32, player_addr: ContractAddress,
+        fn _check(ref world: dojo::world::WorldStorage, ref table: ComponentTable, ref player: ComponentPlayer,
              current_bet: u32, advance_turn: bool) {
             assert!(current_bet == 0, "Amount must be 0 to check");
-            let mut table: ComponentTable = world.read_model(table_id);
-            let mut player: ComponentPlayer = world.read_model((table_id, player_addr));
             player.m_state = EnumPlayerState::Checked;
 
             if advance_turn {
                 table.advance_turn();
             }
-            world.write_model(@player);
-            world.write_model(@table);
         }
 
-        fn _place_bet(ref world: dojo::world::WorldStorage, table_id: u32, player_addr: ContractAddress,
+        fn _place_bet(ref world: dojo::world::WorldStorage, ref table: ComponentTable, ref player: ComponentPlayer,
              current_bet: u32, advance_turn: bool) {
             assert!(current_bet > 0, "Amount must be greater than 0 to place a bet");
-            let mut table: ComponentTable = world.read_model(table_id);
-            let mut player: ComponentPlayer = world.read_model((table_id, player_addr));
 
             // Determine the player's state based on the current bet.
             if player.m_position == EnumPosition::SmallBlind || player.m_position == EnumPosition::BigBlind {
@@ -457,39 +447,33 @@ mod actions_system {
             }
 
             table.m_pot += player.place_bet(current_bet);
-            // Assign the player's bet to eligible sidepots.
-            table_management_system::InternalImpl::_assign_player_to_sidepot(
-                ref world,
-                table_id,
-                player.m_owner,
-                player.m_current_bet);
-
+            if player.m_state == EnumPlayerState::AllIn {
+                table_management_system::InternalImpl::_assign_player_to_sidepot(
+                    ref world,
+                    ref table,
+                    player.m_owner,
+                    player.m_current_bet);
+            }
+            
             if advance_turn {
                 table.advance_turn();
             }
-            world.write_model(@player);
-            world.write_model(@table);
         }
 
-        fn _fold(ref world: dojo::world::WorldStorage, table_id: u32, player_addr: ContractAddress,
+        fn _fold(ref world: dojo::world::WorldStorage, ref table: ComponentTable, ref player: ComponentPlayer,
              advance_turn: bool) {
-            let mut table: ComponentTable = world.read_model(table_id);
-            let mut player: ComponentPlayer = world.read_model((table_id, player_addr));
-
             table.m_pot += player.fold();
             // If the player was all-in, remove them from all sidepots.
             if player.m_state == EnumPlayerState::AllIn {
                 table_management_system::InternalImpl::_remove_player_from_sidepots(
                     ref world,
-                    table_id,
+                    ref table,
                     player.m_owner);
             }
 
             if advance_turn {
                 table.advance_turn();
             }
-            world.write_model(@player);
-            world.write_model(@table);
         }
 
         /// Checks if the street is finished.
@@ -530,6 +514,8 @@ mod actions_system {
                     EnumPlayerState::Called | 
                     EnumPlayerState::Checked |
                     EnumPlayerState::Raised(_) => {
+                        println!("Player current bet: {:?}", player.m_current_bet);
+                        println!("Highest bet: {:?}", highest_bet);
                         if *player.m_current_bet == highest_bet {
                             matched_highest_bet += 1;
                         }
@@ -537,6 +523,8 @@ mod actions_system {
                     _ => {},
                 }
             };
+            println!("Matched highest bet: {0}", matched_highest_bet);
+            println!("Active players: {0}", active_players);
 
             // Street is finished if all active players have matched the highest bet.
             return matched_highest_bet == active_players;

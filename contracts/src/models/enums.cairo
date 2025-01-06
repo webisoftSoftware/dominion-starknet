@@ -4,8 +4,6 @@ use crate::models::structs::StructCard;
 pub enum EnumGameState {
     Shutdown,
     WaitingForPlayers,
-    RoundStarted,
-    DeckEncrypted,
     PreFlop,
     Flop,
     Turn,

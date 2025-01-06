@@ -3,7 +3,7 @@ use dominion::models::structs::StructCard;
 use dominion::models::enums::{EnumCardValue, EnumHandRank};
 use dominion::models::traits::{
     EnumCardValueInto, EnumCardValueSnapshotInto, EnumCardSuitInto, EnumHandRankSnapshotInto,
-    StructCardDisplay, ICard
+    StructCardDisplay, ICard, EnumCardValueDisplay
 };
 
 /// Utility function to count occurrences of each card value.
@@ -75,14 +75,12 @@ fn _get_highest_card_value(cards: @Array<StructCard>) -> u32 {
 fn _evaluate_value(cards: @Array<StructCard>) -> u32 {
     let mut total_value: u32 = 0;
 
-    for i in 0
-        ..cards
-            .len() {
-                if let Option::Some(card_value) = cards[i].get_value() {
-                    let current_value: u32 = (@card_value).into();
-                    total_value += current_value;
-                }
-            };
+    for i in 0..cards.len() {
+        if let Option::Some(card_value) = cards[i].get_value() {
+            let current_value: u32 = (@card_value).into();
+            total_value += current_value;
+        }
+    };
     return total_value;
 }
 
@@ -128,14 +126,12 @@ fn tie_breaker(first_hand: @EnumHandRank, second_hand: @EnumHandRank) -> i32 {
             EnumHandRank::Flush(cards1), EnumHandRank::Flush(cards2)
         ) => {
             let mut compare_result: i32 = 0;
-            for i in 0
-                ..cards1
-                    .len() {
-                        compare_result = compare_cards(cards1[i], cards2[i]);
-                        if compare_result != 0 {
-                            break;
-                        }
-                    };
+            for i in 0..cards1.len() {
+                compare_result = compare_cards(cards1[i], cards2[i]);
+                if compare_result != 0 {
+                    break;
+                }
+            };
             return compare_result;
         },
         // Compare two cards for full house and two pair
