@@ -7,7 +7,7 @@ use dominion::{
         e_EventRevealShowdownRequested
     },
     systems::actions::actions_system::{
-        e_EventPlayerJoined, e_EventAllPlayersReady, e_EventPlayerLeft
+        e_EventPlayerJoined, e_EventAllPlayersReady, e_EventPlayerLeft, e_EventHandRevealed
     },
 };
 
@@ -52,6 +52,7 @@ pub fn namespace_def() -> NamespaceDef {
             TestResource::Event(e_EventDecryptCCRequested::TEST_CLASS_HASH),
             TestResource::Event(e_EventShowdownRequested::TEST_CLASS_HASH),
             TestResource::Event(e_EventRevealShowdownRequested::TEST_CLASS_HASH),
+            TestResource::Event(e_EventHandRevealed::TEST_CLASS_HASH),
         ].span()
     };
 

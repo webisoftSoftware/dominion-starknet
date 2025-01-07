@@ -237,10 +237,10 @@ mod table_management_system {
         fn post_encrypt_deck(
             ref self: ContractState, table_id: u32, encrypted_deck: Array<StructCard>
         ) {
-            // assert!(
-            //     self.table_manager.read() == get_caller_address(),
-            //     "Only the table manager can update the deck"
-            // );
+            assert!(
+                self.table_manager.read() == get_caller_address(),
+                "Only the table manager can update the deck"
+            );
             assert!(encrypted_deck.len() == 52, "Deck must contain 52 cards");
 
             let mut world = self.world(@"dominion");
@@ -435,7 +435,6 @@ mod table_management_system {
 
             // Advance table state to the next street.
             table.advance_street();
-            println!("Current street: {:?}", table.m_state);
 
             match table.m_state {
                 // Betting round.
@@ -567,18 +566,13 @@ mod table_management_system {
             player: ContractAddress,
             amount: u32
         ) {
-            let sidepot_len: u8 = table.m_num_sidepots;
-            let mut is_player_bet_equal_to_any_sidepots: bool = false;
             let mut remaining_amount: u32 = amount;
 
             // Check all sidepots to see if the player can be added to one.
-            for i in 0..sidepot_len {
+            for i in 0..table.m_num_sidepots {
                 let mut sidepot: ComponentSidepot = world.read_model((table.m_table_id, i));
                 // If the player qualifies for this sidepot, add them to the sidepot.
-                if remaining_amount >= sidepot.m_min_bet {
-                    if remaining_amount == sidepot.m_min_bet {
-                        is_player_bet_equal_to_any_sidepots = true;
-                    }
+                if remaining_amount >= sidepot.m_min_bet && sidepot.m_min_bet >= table.m_small_blind {
                     sidepot.m_eligible_players.append(player);
                     sidepot.m_amount += sidepot.m_min_bet;
                     world.write_model(@sidepot);
@@ -588,8 +582,8 @@ mod table_management_system {
 
             // If the player was not added to any sidepot, create a new sidepot for them.
             if remaining_amount >= table.m_small_blind {
-                let mut sidepot: ComponentSidepot = world.read_model((table.m_table_id, sidepot_len));
-                sidepot = ISidepot::new(table.m_table_id, sidepot_len, remaining_amount,
+                let mut sidepot: ComponentSidepot = world.read_model((table.m_table_id, table.m_num_sidepots));
+                sidepot = ISidepot::new(table.m_table_id, table.m_num_sidepots, remaining_amount,
                     array![player], remaining_amount);
                 world.write_model(@sidepot);
                 table.m_num_sidepots += 1;
@@ -633,23 +627,22 @@ mod table_management_system {
         fn _distribute_sidepots(
             ref world: dojo::world::WorldStorage,
             ref table: ComponentTable,
-            winners: Array<(ContractAddress, u32)> // (player address, hand strength)
+            mut winners: Array<(ContractAddress, u32)> // (player address, hand strength)
         ) {
             if table.m_num_sidepots == 0 {
                 return;
             }
 
-            // Process each sidepot.
+            // Process each sidepot from highest to lowest
             for pot_id in 0..table.m_num_sidepots {
                 let mut pot_winners: Array<ContractAddress> = array![];
                 let mut best_hand_strength: u32 = 0;
                 let sidepot: ComponentSidepot = world.read_model((table.m_table_id, pot_id));
                 
-                // Find winners for this specific sidepot.
+                // Find winners for this specific sidepot
                 for i in 0..winners.len() {
                     let (winner_address, hand_strength) = winners[i];
                     
-                    // Check if player is eligible for this sidepot.
                     if sidepot.m_min_bet > 0 && sidepot.m_eligible_players.contains(winner_address) {
                         if hand_strength > @best_hand_strength {
                             pot_winners = array![*winner_address];
@@ -660,9 +653,8 @@ mod table_management_system {
                     }
                 };
                 
-                // Distribute this sidepot among eligible winners.
+                // Distribute this sidepot among eligible winners
                 if !pot_winners.is_empty() {
-                    // Calculate rake once per pot
                     let house_rake_fee = sidepot.m_amount * table.m_rake_fee / 100;
                     let amount_after_rake = sidepot.m_amount - house_rake_fee;
                     let share_per_winner = amount_after_rake / pot_winners.len().into();
@@ -671,24 +663,23 @@ mod table_management_system {
                     rake.m_chip_amount += house_rake_fee;
                     world.write_model(@rake);
 
+                    // Subtract pot amount once per sidepot
+                    table.m_pot -= sidepot.m_amount;
+
                     for winner in pot_winners.span() {
                         let mut player_component: ComponentPlayer = world.read_model((table.m_table_id, *winner));
-                        // Keep house fee in mind.
-                        let amount_to_distribute: u32 = share_per_winner;
-                        player_component.m_table_chips += amount_to_distribute;
-                        table.m_pot -= amount_to_distribute;
+                        player_component.m_table_chips += share_per_winner;
                         world.write_model(@player_component);
                     };
                 }
             };
 
-            // Clean up sidepot entries.
+            // Clean up sidepot entries
             for i in 0..table.m_num_sidepots {
                 let sidepot: ComponentSidepot = world.read_model((table.m_table_id, i));
                 world.erase_model(@sidepot);
             };
 
-            // Remove all sidepots.
             table.m_num_sidepots = 0;
         }
 

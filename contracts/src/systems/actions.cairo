@@ -275,10 +275,11 @@ mod actions_system {
                 players.append(world.read_model((table_id, *player)));
             };
 
-            if InternalImpl::_is_street_finished(@table, @players) {
+            if InternalImpl::_is_street_finished(@players) {
                 table.m_finished_street = true;
                 table_management_system::InternalImpl::_advance_street(ref world, ref table);
             }
+
             world.write_model(@table);
         }
 
@@ -312,10 +313,11 @@ mod actions_system {
                 players.append(world.read_model((table_id, *player)));
             };
 
-            if InternalImpl::_is_street_finished(@table, @players) {
+            if InternalImpl::_is_street_finished(@players) {
                 table.m_finished_street = true;
                 table_management_system::InternalImpl::_advance_street(ref world, ref table);
             }
+
             world.write_model(@table);
         }
 
@@ -330,8 +332,9 @@ mod actions_system {
                 },
                 _ => {}
             };
+            assert!(commitment_hash.len() == 8, "Commitment hash is not 8 bytes");
 
-            let mut hand: ComponentHand = world.read_model((table_id, get_caller_address()));
+            let mut hand: ComponentHand = world.read_model(get_caller_address());
             hand.m_commitment_hash = commitment_hash;
             world.write_model(@hand);
         }
@@ -362,6 +365,8 @@ mod actions_system {
             };
 
             let mut hand: ComponentHand = world.read_model(caller);
+            assert!(hand.m_commitment_hash.len() == 8, "Commitment hash is not 8 bytes");
+            assert!(request != "", "Request is not valid");
 
             // Recompute the commitment hash of the hand to verify.
             let computed_hash: [u32; 8] = compute_sha256_byte_array(@format!("{}", request));
@@ -383,39 +388,40 @@ mod actions_system {
             hand.m_cards = decrypted_hand.clone();
             player.m_state = EnumPlayerState::Revealed;
 
-            world.write_model(@hand);
+            // world.write_model(@hand);
             world.write_model(@player);
-            world
-                .emit_event(
-                    @EventHandRevealed {
-                        m_table_id: table_id,
-                        m_player: caller,
-                        m_request: request,
-                        m_player_hand: decrypted_hand,
-                        m_timestamp: get_block_timestamp(),
-                    }
-                );
+            world.emit_event(@EventHandRevealed {
+                    m_table_id: table_id,
+                    m_player: caller,
+                    m_request: request,
+                    m_player_hand: decrypted_hand,
+                    m_timestamp: get_block_timestamp(),
+                }
+            );
 
-            if InternalImpl::_all_players_revealed(@world, table_id) {
+            // Check if all players have revealed their hands.
+            let mut players: Array<ComponentPlayer> = array![];
+            for player in table.m_players.span() {
+                players.append(world.read_model((table_id, *player)));
+            };
+
+            if InternalImpl::_all_players_revealed(players.span()) {
                 table_management_system::InternalImpl::_showdown(ref world, ref table);
+                world.write_model(@table);
             }
         }
     }
 
     #[generate_trait]
     impl InternalImpl of InternalTrait {
-        fn _all_players_revealed(world: @dojo::world::WorldStorage, table_id: u32) -> bool {
+        fn _all_players_revealed(players: Span<ComponentPlayer>) -> bool {
             let mut all_revealed: bool = true;
-            let table: ComponentTable = world.read_model(table_id);
-            for player in table
-                .m_players
-                .span() {
-                    let player_component: ComponentPlayer = world.read_model((table_id, *player));
-                    if player_component.m_state != EnumPlayerState::Revealed {
-                        all_revealed = false;
-                        break;
-                    }
-                };
+            for player in players {
+                if player.m_state != @EnumPlayerState::Revealed {
+                    all_revealed = false;
+                    break;
+                }
+            };
             return all_revealed;
         }
 
@@ -445,7 +451,6 @@ mod actions_system {
                     player.m_state = EnumPlayerState::Raised(current_bet);
                 }
             }
-
             table.m_pot += player.place_bet(current_bet);
             if player.m_state == EnumPlayerState::AllIn {
                 table_management_system::InternalImpl::_assign_player_to_sidepot(
@@ -481,7 +486,7 @@ mod actions_system {
         /// @param players The players at the table.
         /// @returns True if the street is finished, false otherwise.
         /// Can Panic? No.
-        fn _is_street_finished(self: @ComponentTable, players: @Array<ComponentPlayer>) -> bool {
+        fn _is_street_finished(players: @Array<ComponentPlayer>) -> bool {
             let mut highest_bet: u32 = 0;
             let mut active_players: u32 = 0;
             let mut matched_highest_bet: u32 = 0;
@@ -492,6 +497,7 @@ mod actions_system {
                     EnumPlayerState::Active | 
                     EnumPlayerState::Called | 
                     EnumPlayerState::Checked |
+                    EnumPlayerState::AllIn |
                     EnumPlayerState::Raised(_) => {
                         active_players += 1;
                         if *player.m_current_bet > highest_bet {
@@ -514,20 +520,18 @@ mod actions_system {
                     EnumPlayerState::Called | 
                     EnumPlayerState::Checked |
                     EnumPlayerState::Raised(_) => {
-                        println!("Player current bet: {:?}", player.m_current_bet);
-                        println!("Highest bet: {:?}", highest_bet);
                         if *player.m_current_bet == highest_bet {
                             matched_highest_bet += 1;
                         }
                     },
+                    EnumPlayerState::AllIn => {
+                        matched_highest_bet += 1;
+                    },
                     _ => {},
                 }
             };
-            println!("Matched highest bet: {0}", matched_highest_bet);
-            println!("Active players: {0}", active_players);
-
             // Street is finished if all active players have matched the highest bet.
-            return matched_highest_bet == active_players;
+            return active_players == matched_highest_bet;
         }
     }
 }

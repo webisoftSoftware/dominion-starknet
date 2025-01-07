@@ -22,17 +22,12 @@ use dominion::models::components::{
 impl ComponentHandDisplay of Display<ComponentHand> {
     fn fmt(self: @ComponentHand, ref f: Formatter) -> Result<(), Error> {
         let str: ByteArray = format!(
-            "Hand {}:\n\tCards:", starknet::contract_address_to_felt252(*self.m_owner)
+            "Player {}: Cards: ", starknet::contract_address_to_felt252(*self.m_owner)
         );
         f.buffer.append(@str);
 
-        for card in self
-            .m_cards
-            .span() {
-                let str: ByteArray = format!("\n\t\t{}", card);
-                f.buffer.append(@str);
-            };
-
+        let str: ByteArray = format!("({},{})", self.m_cards[0], self.m_cards[1]);
+        f.buffer.append(@str);
         Result::Ok(())
     }
 }
@@ -71,14 +66,14 @@ impl ComponentPlayerDisplay of Display<ComponentPlayer> {
 
 impl ComponentTableDisplay of Display<ComponentTable> {
     fn fmt(self: @ComponentTable, ref f: Formatter) -> Result<(), Error> {
-        let str: ByteArray = format!("Table {0}:\n\tPlayers:", *self.m_table_id);
+        let str: ByteArray = format!("Table {0}:\n\tPlayers: ", *self.m_table_id);
         f.buffer.append(@str);
 
         for player in self
             .m_players
             .span() {
                 let str: ByteArray = format!(
-                    "\n\t\t{}", starknet::contract_address_to_felt252(*player)
+                    "{}, ", starknet::contract_address_to_felt252(*player)
                 );
                 f.buffer.append(@str);
             };
@@ -1131,6 +1126,10 @@ impl PlayerImpl of IPlayer {
         assert!(self.m_state != EnumPlayerState::NotCreated, "Player is not created");
         assert!(self.m_table_chips >= added_amount, "Insufficient chips");
 
+        if self.m_table_chips == added_amount {
+            self.m_state = EnumPlayerState::AllIn;
+        }
+        
         self.m_table_chips -= added_amount;
         self.m_current_bet += added_amount;
         return added_amount;

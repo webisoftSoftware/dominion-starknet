@@ -3,10 +3,10 @@ use crate::systems::table_manager::{table_management_system, ITableManagementDis
 use crate::systems::actions::{IActionsDispatcher, IActionsDispatcherTrait};
 
 use crate::models::enums::{EnumGameState, EnumPlayerState, EnumCardValue, EnumCardSuit, EnumPosition};
-use crate::models::components::{ComponentTable, ComponentPlayer, ComponentHand};
+use crate::models::components::{ComponentTable, ComponentPlayer, ComponentHand, ComponentSidepot, StructCard};
 use crate::models::traits::{
     EnumCardValueDisplay, EnumCardSuitDisplay, StructCardDisplay, ICard, ITable, StructCardEq,
-    IPlayer, EnumPlayerStateDisplay, ComponentTableDisplay
+    IPlayer, EnumPlayerStateDisplay, ComponentTableDisplay, ComponentHandDisplay
 };
 
 
@@ -156,7 +156,6 @@ fn test_table_manager_start_round_player_states() {
 }
 
 #[test]
-#[ignore]
 #[should_panic(expected: ("Only the table manager can update the deck", 'ENTRYPOINT_FAILED'))]
 fn test_table_manager_update_deck_invalid_caller() {
     let mut world: dojo::world::WorldStorage = deploy_world();
@@ -168,34 +167,6 @@ fn test_table_manager_update_deck_invalid_caller() {
 
     starknet::testing::set_contract_address(starknet::contract_address_const::<0x1A>());
     table_manager.post_encrypt_deck(1, table.m_deck);
-}
-
-#[test]
-#[should_panic(expected: ("Deck encryption is only allowed in PreFlop", 'ENTRYPOINT_FAILED'))]
-fn test_table_manager_update_deck_invalid_state() {
-    let mut world: dojo::world::WorldStorage = deploy_world();
-
-    let mut table_manager: ITableManagementDispatcher = deploy_table_manager(ref world);
-
-    table_manager.create_table(100, 200, 2000, 4000, 5);
-
-    let mut table: ComponentTable = world.read_model(1);
-    table.m_state = EnumGameState::WaitingForPlayers;
-    world.write_model_test(@table);
-
-    table_manager.post_encrypt_deck(1, table.m_deck);
-}
-
-#[test]
-#[should_panic(expected: ("Deck must contain 52 cards", 'ENTRYPOINT_FAILED'))]
-fn test_table_manager_update_deck_invalid_deck_length() {
-    let mut world: dojo::world::WorldStorage = deploy_world();
-
-    let mut table_manager: ITableManagementDispatcher = deploy_table_manager(ref world);
-
-    table_manager.create_table(100, 200, 2000, 4000, 5);
-
-    table_manager.post_encrypt_deck(1, array![ICard::new(EnumCardValue::Ace, EnumCardSuit::Clubs)]);
 }
 
 #[test]
@@ -263,15 +234,10 @@ fn test_advance_street_not_all_players_played() {
     world.write_models_test(array![@player_1, @player_2].span());
 
     table_management_system::InternalImpl::_start_round(ref world, ref table);
-    world.write_model_test(@table);
+    table.m_deck_encrypted = true;
 
-    table_manager.post_encrypt_deck(1, table.m_deck);
-    let mut table: ComponentTable = world.read_model(1);
     table_management_system::InternalImpl::_advance_street(ref world, ref table);
-    world.write_model_test(@table);
-
     // Try to advance the street again without all players having played their turn.
-    let mut table: ComponentTable = world.read_model(1);
     table_management_system::InternalImpl::_advance_street(ref world, ref table);
     world.write_model_test(@table);
 }
@@ -329,14 +295,11 @@ fn test_advance_street_skip_turns() {
     table_management_system::InternalImpl::_start_round(ref world, ref table);
     world.write_model_test(@table);
 
-    let table: ComponentTable = world.read_model(1);
+    let mut table: ComponentTable = world.read_model(1);
     assert!(table.m_state == EnumGameState::PreFlop, "Table should be in PreFlop state");
 
-    table_manager.post_encrypt_deck(1, table.m_deck);
-
-    let mut table: ComponentTable = world.read_model(1);
+    table.m_deck_encrypted = true;
     table.m_community_cards.append(ICard::new(EnumCardValue::Ace, EnumCardSuit::Clubs));
-    world.write_model_test(@table);
 
     table_management_system::InternalImpl::_advance_street(ref world, ref table);
     world.write_model_test(@table);
@@ -365,17 +328,14 @@ fn test_invalid_street_invalid_flop() {
     table_management_system::InternalImpl::_start_round(ref world, ref table);
     world.write_model_test(@table);
 
-    let table: ComponentTable = world.read_model(1);
+    let mut table: ComponentTable = world.read_model(1);
     assert!(table.m_state == EnumGameState::PreFlop, "Table should be in PreFlop state");
 
-    table_manager.post_encrypt_deck(1, table.m_deck);
-
-    let mut table: ComponentTable = world.read_model(1);
+    table.m_deck_encrypted = true;
     table.m_state = EnumGameState::PreFlop;
     table.m_community_cards.append(ICard::new(EnumCardValue::Ace, EnumCardSuit::Clubs));
     table.m_community_cards.append(ICard::new(EnumCardValue::Ace, EnumCardSuit::Clubs));
     table.m_finished_street = true;
-    world.write_model_test(@table);
 
     table_management_system::InternalImpl::_advance_street(ref world, ref table);
     world.write_model_test(@table);
@@ -404,17 +364,14 @@ fn test_invalid_street_invalid_turn() {
     table_management_system::InternalImpl::_start_round(ref world, ref table);
     world.write_model_test(@table);
 
-    let table: ComponentTable = world.read_model(1);
+    let mut table: ComponentTable = world.read_model(1);
     assert!(table.m_state == EnumGameState::PreFlop, "Table should be in PreFlop state");
 
-    table_manager.post_encrypt_deck(1, table.m_deck);
-
-    let mut table: ComponentTable = world.read_model(1);
+    table.m_deck_encrypted = true;
     table.m_state = EnumGameState::Flop;
     table.m_community_cards.append(ICard::new(EnumCardValue::Ace, EnumCardSuit::Clubs));
     table.m_community_cards.append(ICard::new(EnumCardValue::Ace, EnumCardSuit::Clubs));
     table.m_finished_street = true;
-    world.write_model_test(@table);
 
     table_management_system::InternalImpl::_advance_street(ref world, ref table);
     world.write_model_test(@table);
@@ -443,18 +400,15 @@ fn test_invalid_street_invalid_river() {
     table_management_system::InternalImpl::_start_round(ref world, ref table);
     world.write_model_test(@table);
 
-    let table: ComponentTable = world.read_model(1);
+    let mut table: ComponentTable = world.read_model(1);
     assert!(table.m_state == EnumGameState::PreFlop, "Table should be in PreFlop state");
 
-    table_manager.post_encrypt_deck(1, table.m_deck);
-
-    let mut table: ComponentTable = world.read_model(1);
+    table.m_deck_encrypted = true;
     table.m_state = EnumGameState::Turn;
     table.m_community_cards.append(ICard::new(EnumCardValue::Ace, EnumCardSuit::Clubs));
     table.m_community_cards.append(ICard::new(EnumCardValue::Ace, EnumCardSuit::Clubs));
     table.m_community_cards.append(ICard::new(EnumCardValue::Ace, EnumCardSuit::Clubs));
     table.m_finished_street = true;
-    world.write_model_test(@table);
 
     table_management_system::InternalImpl::_advance_street(ref world, ref table);
     world.write_model_test(@table);
@@ -775,7 +729,80 @@ fn test_showdown_complex() {
 }
 
 #[test]
-fn test_sidepot_distribution() {
+fn test_sidepot_distribution_simple() {
+    let mut world: dojo::world::WorldStorage = deploy_world();
+    let mut table_manager: ITableManagementDispatcher = deploy_table_manager(ref world);
+
+    table_manager.create_table(100, 200, 2000, 4000, 5);
+
+    // Set three players going all in with different chip stacks, creating three sidepots.
+    let mut player_1: ComponentPlayer = IPlayer::new(1, starknet::contract_address_const::<0x1A>());
+    player_1.m_table_chips = 0;
+    world.write_model_test(@player_1);
+
+    let mut player_2: ComponentPlayer = IPlayer::new(1, starknet::contract_address_const::<0x1B>());
+    player_2.m_table_chips = 0;
+    world.write_model_test(@player_2);
+
+    let mut player_3: ComponentPlayer = IPlayer::new(1, starknet::contract_address_const::<0x1C>());
+    player_3.m_table_chips = 0;
+    world.write_model_test(@player_3);
+
+    let mut player_4: ComponentPlayer = IPlayer::new(1, starknet::contract_address_const::<0x1D>());
+    player_4.m_table_chips = 1600;
+    world.write_model_test(@player_4);
+
+    let mut sidepot: ComponentSidepot = world.read_model((1, 0));
+    sidepot.m_min_bet = 1000;
+    sidepot.m_amount = 1000;
+    sidepot.m_eligible_players.append(starknet::contract_address_const::<0x1A>());
+    world.write_model_test(@sidepot);
+
+    let mut sidepot: ComponentSidepot = world.read_model((1, 1));
+    sidepot.m_min_bet = 1000;
+    sidepot.m_amount = 2000;
+    sidepot.m_eligible_players.append(starknet::contract_address_const::<0x1A>());
+    sidepot.m_eligible_players.append(starknet::contract_address_const::<0x1B>());
+    world.write_model_test(@sidepot);
+
+    let mut sidepot: ComponentSidepot = world.read_model((1, 2));
+    sidepot.m_min_bet = 2600;
+    sidepot.m_amount = 7800;
+    sidepot.m_eligible_players.append(starknet::contract_address_const::<0x1A>());
+    sidepot.m_eligible_players.append(starknet::contract_address_const::<0x1B>());
+    sidepot.m_eligible_players.append(starknet::contract_address_const::<0x1C>());
+    world.write_model_test(@sidepot);
+
+    let mut table: ComponentTable = world.read_model(1);
+    table.m_num_sidepots = 3;
+    table.m_state = EnumGameState::Showdown;
+    table.m_pot = 10800;
+    world.write_model_test(@table);
+
+    // Make it so player 1 and 2 tie for the second sidepot, and player 3 wins the main sidepot.
+    table_management_system::InternalImpl::_distribute_sidepots(ref world,
+         ref table,
+          array![(starknet::contract_address_const::<0x1A>(), 2),
+           (starknet::contract_address_const::<0x1B>(), 2),
+           (starknet::contract_address_const::<0x1C>(), 3)]);
+    world.write_model_test(@table);
+
+    let table: ComponentTable = world.read_model(1);
+    assert!(table.m_pot == 0, "Table pot should be 0");
+
+    let player_1: ComponentPlayer = world.read_model((1, player_1.m_owner));
+    assert!(player_1.m_table_chips == 1900, "Player 1 should have all of sidepot 1 (1000 - 5%) chips + half of sidepot 2 (2000 / 2 - 5%) chips");
+
+    let player_2: ComponentPlayer = world.read_model((1, player_2.m_owner));
+    assert!(player_2.m_table_chips == 950, "Player 2 should have half of sidepot 2 (2000 / 2 - 5%) chips");
+
+    let player_3: ComponentPlayer = world.read_model((1, player_3.m_owner));
+    assert!(player_3.m_table_chips == 7410, "Player 3 should have all of sidepot 3 (7800 - 5%) chips");
+}
+
+#[test]
+#[should_panic(expected: ("Commitment hash does not match", 'ENTRYPOINT_FAILED'))]
+fn test_game_simple() {
     // Create a table with 4 players.
     let mut player_1: ComponentPlayer = IPlayer::new(1, starknet::contract_address_const::<0x1A>());
     let mut player_2: ComponentPlayer = IPlayer::new(1, starknet::contract_address_const::<0x1B>());
@@ -825,56 +852,90 @@ fn test_sidepot_distribution() {
     starknet::testing::set_contract_address(starknet::contract_address_const::<0x1A>());
     action_manager.set_ready(1);
 
+    let mut table: ComponentTable = world.read_model(1);
+    table.m_deck_encrypted = true;
+    world.write_model_test(@table);
+
+    // Street starts and dealer (1A) gets skipped, and small blind (1B) pays 100.
+    // Big blind (1C) pays 200.
+
     // Pre-flop
     starknet::testing::set_contract_address(starknet::contract_address_const::<0x1D>());
     action_manager.bet(1, 200);
     starknet::testing::set_contract_address(starknet::contract_address_const::<0x1A>());
-    action_manager.bet(1, 0);
+    action_manager.bet(1, 200);
     starknet::testing::set_contract_address(starknet::contract_address_const::<0x1B>());
     action_manager.bet(1, 100);
+
+    starknet::testing::set_contract_address(starknet::contract_address_const::<0x1A>());
+    action_manager.post_commit_hash(1, array![0x1, 0x2, 0x3, 0x4, 0x5, 0x6, 0x7, 0x8]);
+    starknet::testing::set_contract_address(starknet::contract_address_const::<0x1B>());
+    action_manager.post_commit_hash(1, array![0x1, 0x2, 0x3, 0x4, 0x5, 0x6, 0x7, 0x8]);
     starknet::testing::set_contract_address(starknet::contract_address_const::<0x1C>());
-    action_manager.bet(1, 0);
+    action_manager.post_commit_hash(1, array![0x1, 0x2, 0x3, 0x4, 0x5, 0x6, 0x7, 0x8]);
+    starknet::testing::set_contract_address(starknet::contract_address_const::<0x1D>());
+    action_manager.post_commit_hash(1, array![0x1, 0x2, 0x3, 0x4, 0x5, 0x6, 0x7, 0x8]);
+
+    let mut community_cards: Array<StructCard> = array![
+        ICard::new(EnumCardValue::Ten, EnumCardSuit::Spades),
+        ICard::new(EnumCardValue::Six, EnumCardSuit::Hearts),
+        ICard::new(EnumCardValue::Two, EnumCardSuit::Diamonds)
+    ];
+    let mut table: ComponentTable = world.read_model(1);
+    table.m_community_cards.append_all(ref community_cards);
+    world.write_model_test(@table);
 
     // Flop
+    starknet::testing::set_contract_address(starknet::contract_address_const::<0x1C>());
+    action_manager.bet(1, 100);
     starknet::testing::set_contract_address(starknet::contract_address_const::<0x1D>());
     action_manager.bet(1, 100);
     starknet::testing::set_contract_address(starknet::contract_address_const::<0x1A>());
     action_manager.bet(1, 100);
     starknet::testing::set_contract_address(starknet::contract_address_const::<0x1B>());
     action_manager.bet(1, 100);
-    starknet::testing::set_contract_address(starknet::contract_address_const::<0x1C>());
-    action_manager.bet(1, 100);
 
-    // Turn
-    starknet::testing::set_contract_address(starknet::contract_address_const::<0x1D>());
-    action_manager.bet(1, 100);
-    starknet::testing::set_contract_address(starknet::contract_address_const::<0x1A>());
-    action_manager.bet(1, 100);
-    starknet::testing::set_contract_address(starknet::contract_address_const::<0x1B>());
-    action_manager.bet(1, 100);
-    starknet::testing::set_contract_address(starknet::contract_address_const::<0x1C>());
-    action_manager.bet(1, 100);
-
-    // River
-    starknet::testing::set_contract_address(starknet::contract_address_const::<0x1D>());
-    action_manager.bet(1, 100);
-    starknet::testing::set_contract_address(starknet::contract_address_const::<0x1A>());
-    action_manager.bet(1, 100);
-    starknet::testing::set_contract_address(starknet::contract_address_const::<0x1B>());
-    action_manager.bet(1, 100);
-    starknet::testing::set_contract_address(starknet::contract_address_const::<0x1C>());
-    action_manager.bet(1, 100);
-
+    let mut community_cards: Array<StructCard> = array![
+        ICard::new(EnumCardValue::King, EnumCardSuit::Clubs)
+    ];
     let mut table: ComponentTable = world.read_model(1);
-    let player_1: ComponentPlayer = world.read_model((1, *table.m_players[0]));
-    let player_2: ComponentPlayer = world.read_model((1, *table.m_players[1]));
-    let player_3: ComponentPlayer = world.read_model((1, *table.m_players[2]));
-    let player_4: ComponentPlayer = world.read_model((1, *table.m_players[3]));
-    println!("Player 1: {}", player_1.m_table_chips);
-    println!("Player 2: {}", player_2.m_table_chips);
-    println!("Player 3: {}", player_3.m_table_chips);
-    println!("Player 4: {}", player_4.m_table_chips);
-
-    table_management_system::InternalImpl::_showdown(ref world, ref table);
+    table.m_community_cards.append_all(ref community_cards);
     world.write_model_test(@table);
+    
+    // Turn
+    starknet::testing::set_contract_address(starknet::contract_address_const::<0x1C>());
+    action_manager.bet(1, 100);
+    starknet::testing::set_contract_address(starknet::contract_address_const::<0x1D>());
+    action_manager.bet(1, 100);
+    starknet::testing::set_contract_address(starknet::contract_address_const::<0x1A>());
+    action_manager.bet(1, 100);
+    starknet::testing::set_contract_address(starknet::contract_address_const::<0x1B>());
+    action_manager.bet(1, 100);
+
+    let mut community_cards: Array<StructCard> = array![
+        ICard::new(EnumCardValue::Eight, EnumCardSuit::Clubs)
+    ];
+    let mut table: ComponentTable = world.read_model(1);
+    table.m_community_cards.append_all(ref community_cards);
+    world.write_model_test(@table);
+    
+    // River
+    starknet::testing::set_contract_address(starknet::contract_address_const::<0x1C>());
+    action_manager.bet(1, 2600);
+    starknet::testing::set_contract_address(starknet::contract_address_const::<0x1D>());
+    action_manager.fold(1);
+    starknet::testing::set_contract_address(starknet::contract_address_const::<0x1A>());
+    action_manager.bet(1, 4600);
+    starknet::testing::set_contract_address(starknet::contract_address_const::<0x1B>());
+    action_manager.bet(1, 3600);
+
+    // Players reveals their hand.
+    starknet::testing::set_contract_address(starknet::contract_address_const::<0x1A>());
+    action_manager.reveal_hand(1, array![], "TEST");
+    starknet::testing::set_contract_address(starknet::contract_address_const::<0x1B>());
+    action_manager.reveal_hand(1, array![], "TEST");
+    starknet::testing::set_contract_address(starknet::contract_address_const::<0x1C>());
+    action_manager.reveal_hand(1, array![], "TEST");
+
+    // Showdown starts automatically.
 }

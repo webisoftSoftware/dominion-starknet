@@ -233,6 +233,7 @@ fn test_insufficient_chips_for_bet() {
 
     let player: ContractAddress = starknet::contract_address_const::<0x1A>();
     let player_2: ContractAddress = starknet::contract_address_const::<0x1B>();
+    
     let mut player_component: ComponentPlayer = IPlayer::new(1, player);
     player_component.m_total_chips = 2400;
     world.write_model_test(@player_component);
@@ -243,8 +244,6 @@ fn test_insufficient_chips_for_bet() {
 
     table_manager.create_table(200, 400, 2000, 4000, 5);
 
-    let table: ComponentTable = world.read_model(1);
-
     starknet::testing::set_contract_address(player);  // Dealer + Big Blind.
     actions.join_table(1, 2000);
     actions.set_ready(1);
@@ -253,7 +252,9 @@ fn test_insufficient_chips_for_bet() {
     actions.join_table(1, 2000);
     actions.set_ready(1);
 
-    table_manager.post_encrypt_deck(1, table.m_deck);
+    let mut table: ComponentTable = world.read_model(1);
+    table.m_deck_encrypted = true;
+    world.write_model_test(@table);
 
     starknet::testing::set_contract_address(player_2);
     actions.bet(1, 2000);
@@ -278,8 +279,6 @@ fn test_bet_twice() {
 
     table_manager.create_table(200, 400, 2000, 4000, 5);
 
-    let table: ComponentTable = world.read_model(1);
-
     starknet::testing::set_contract_address(player);  // Dealer + Big Blind.
     actions.join_table(1, 2000);
     actions.set_ready(1);
@@ -288,7 +287,9 @@ fn test_bet_twice() {
     actions.join_table(1, 2000);
     actions.set_ready(1);
 
-    table_manager.post_encrypt_deck(1, table.m_deck);
+    let mut table: ComponentTable = world.read_model(1);
+    table.m_deck_encrypted = true;
+    world.write_model_test(@table);
 
     starknet::testing::set_contract_address(player_2);
     actions.bet(1, 200);
