@@ -34,74 +34,64 @@ impl ComponentHandDisplay of Display<ComponentHand> {
 
 impl ComponentPlayerDisplay of Display<ComponentPlayer> {
     fn fmt(self: @ComponentPlayer, ref f: Formatter) -> Result<(), Error> {
-        let str: ByteArray = format!(
+        let mut str: ByteArray = format!(
             "Player: {0}", starknet::contract_address_to_felt252(*self.m_owner)
         );
-        f.buffer.append(@str);
 
-        let str: ByteArray = format!("\n\tTotal Chips: {0}", *self.m_total_chips);
-        f.buffer.append(@str);
+        str += format!("\n\tTotal Chips: {0}", *self.m_total_chips);
+        str += format!("\n\tTable Chips: {0}", *self.m_table_chips);
+        str += format!("\n\tPosition: {0}", *self.m_position);
+        str += format!("\n\tState: {0}", *self.m_state);
+        str += format!("\n\tCurrent Bet: {0}", *self.m_current_bet);
+        str += format!("\n\tIs Created: {0}", *self.m_is_created);
+        str += format!("\n\tIs Dealer: {0}", *self.m_is_dealer);
 
-        let str: ByteArray = format!("\n\tTable Chips: {0}", *self.m_table_chips);
         f.buffer.append(@str);
-
-        let str: ByteArray = format!("\n\tPosition: {0}", *self.m_position);
-        f.buffer.append(@str);
-
-        let str: ByteArray = format!("\n\tState: {0}", *self.m_state);
-        f.buffer.append(@str);
-
-        let str: ByteArray = format!("\n\tCurrent Bet: {0}", *self.m_current_bet);
-        f.buffer.append(@str);
-
-        let str: ByteArray = format!("\n\tIs Created: {0}", *self.m_is_created);
-        f.buffer.append(@str);
-
-        let str: ByteArray = format!("\n\tIs Dealer: {0}", *self.m_is_dealer);
-        f.buffer.append(@str);
-
         Result::Ok(())
     }
 }
 
 impl ComponentTableDisplay of Display<ComponentTable> {
     fn fmt(self: @ComponentTable, ref f: Formatter) -> Result<(), Error> {
-        let str: ByteArray = format!("Table {0}:\n\tPlayers: ", *self.m_table_id);
+        let mut str: ByteArray = format!("Table {0}:\n\tPlayers: ", *self.m_table_id);
+
+        for player in self.m_players.span() {
+            str += format!(
+                "{}, ", starknet::contract_address_to_felt252(*player)
+            );
+        };
+
+        str += format!("\n\tCommunity Cards: ");
+        for card in self.m_community_cards.span() {
+            str += format!("{}, ", card.clone());
+        };
+
+        str += format!("\n\tNum Sidepots: {}", *self.m_num_sidepots);
+        str += format!("\n\tCurrent Turn Index: {}", *self.m_current_turn);
+        str += format!("\n\tSmall Blind: {}", *self.m_small_blind);
+        str += format!("\n\tBig Blind: {}", *self.m_big_blind);
+        str += format!("\n\tMin Buy In: {}", *self.m_min_buy_in);
+        str += format!("\n\tMax Buy In: {}", *self.m_max_buy_in);
+        str += format!("\n\tPot: {}", *self.m_pot);
+        str += format!("\n\tState: {}", *self.m_state);
+        str += format!("\n\tLast Played: {}", *self.m_last_played_ts);
+        str += format!("\n\tDeck Encrypted: {}", *self.m_deck_encrypted);
+
         f.buffer.append(@str);
+        Result::Ok(())
+    }
+}
 
-        for player in self
-            .m_players
-            .span() {
-                let str: ByteArray = format!(
-                    "{}, ", starknet::contract_address_to_felt252(*player)
-                );
-                f.buffer.append(@str);
-            };
+impl ComponentSidepotDisplay of Display<ComponentSidepot> {
+    fn fmt(self: @ComponentSidepot, ref f: Formatter) -> Result<(), Error> {
+        let mut str: ByteArray = format!("Sidepot: {}, Min Bet: {}, Amount: {}, Eligible Players: ",
+         *self.m_sidepot_id, *self.m_min_bet, *self.m_amount);
 
-        let str: ByteArray = format!("\n\tCurrent Turn Index: {}", *self.m_current_turn);
+        for player in self.m_eligible_players.span() {
+            str += format!("{}, ", starknet::contract_address_to_felt252(*player));
+        };
+
         f.buffer.append(@str);
-
-        let str: ByteArray = format!("\n\tSmall Blind: {}", *self.m_small_blind);
-        f.buffer.append(@str);
-
-        let str: ByteArray = format!("\n\tBig Blind: {}", *self.m_big_blind);
-        f.buffer.append(@str);
-
-        let str: ByteArray = format!("\n\tMin Buy In: {}", *self.m_min_buy_in);
-        f.buffer.append(@str);
-
-        let str: ByteArray = format!("\n\tMax Buy In: {}", *self.m_max_buy_in);
-        f.buffer.append(@str);
-
-        let str: ByteArray = format!("\n\tPot: {}", *self.m_pot);
-        f.buffer.append(@str);
-
-        let str: ByteArray = format!("\n\tState: {}", *self.m_state);
-        f.buffer.append(@str);
-
-        let str: ByteArray = format!("\n\tLast Played: {}", *self.m_last_played_ts);
-        f.buffer.append(@str);
-
         Result::Ok(())
     }
 }
