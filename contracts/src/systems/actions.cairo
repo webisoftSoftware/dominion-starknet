@@ -251,6 +251,8 @@ mod actions_system {
             let mut table: ComponentTable = world.read_model(table_id);
             assert!(table.m_state != EnumGameState::Shutdown &&
                 table.m_state != EnumGameState::WaitingForPlayers, "Game is not in a betting phase");
+            assert!(table.m_deck_encrypted, "Deck is not encrypted");
+            assert!(!table.m_finished_street, "Street is already finished");
             
             let mut player_component: ComponentPlayer = world.read_model((table_id, get_caller_address()));
             assert!(table.check_turn(@player_component.m_owner), "It is not your turn");
@@ -289,6 +291,8 @@ mod actions_system {
             let mut table: ComponentTable = world.read_model(table_id);
             assert!(table.m_state != EnumGameState::Shutdown &&
                 table.m_state != EnumGameState::WaitingForPlayers, "Game is not in a betting phase");
+            assert!(table.m_deck_encrypted, "Deck is not encrypted");
+            assert!(!table.m_finished_street, "Street is already finished");
 
             let mut player_component: ComponentPlayer = world.read_model((table_id, get_caller_address()));
             assert!(table.check_turn(@get_caller_address()), "It is not your turn");
