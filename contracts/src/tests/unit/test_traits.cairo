@@ -51,9 +51,9 @@ fn test_display() {
         ),
         "Player: 0\n\tTotal Chips: 100\n\tTable Chips: 0\n\tPosition: None\n\tState: Active\n\tCurrent Bet: 0\n\tIs Created: false\n\tIs Dealer: false"
     );
-    assert_eq!(
+   assert_eq!(
         format!("{}", TableDefaultImpl::default()),
-        "Table 0:\n\tPlayers: \n\tCurrent Turn Index: 0\n\tSmall Blind: 0\n\tBig Blind: 0\n\tMin Buy In: 0\n\tMax Buy In: 0\n\tPot: 0\n\tState: WaitingForPlayers\n\tLast Played: 0"
+        "Table 0:\n\tPlayers: \n\tCommunity Cards: \n\tNum Sidepots: 0\n\tCurrent Turn Index: 0\n\tSmall Blind: 0\n\tBig Blind: 0\n\tMin Buy In: 0\n\tMax Buy In: 0\n\tPot: 0\n\tState: WaitingForPlayers\n\tLast Played: 0\n\tDeck Encrypted: false"
     );
     assert_eq!(format!("{}", ICard::new(EnumCardValue::Two, EnumCardSuit::Clubs)), "2C");
     assert_eq!(format!("{}", EnumHandRank::HighCard(array![EnumCardValue::Two])), "HighCard");
