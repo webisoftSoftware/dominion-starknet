@@ -34,7 +34,7 @@ mod table_management_system {
     use dominion::models::enums::{EnumGameState, EnumPlayerState, EnumPosition, EnumHandRank, EnumRankMask};
     use dominion::models::traits::{ITable, IPlayer, IHand, EnumHandRankPartialOrd, ISidepot, ComponentPlayerDisplay,
          EnumRankMaskPartialOrd, IEnumRankMask, EnumHandRankSnapshotInto, EnumHandRankSnapshotIntoMask,
-        ComponentHandDisplay};
+        ComponentHandDisplay, StructCardEq};
     use dominion::models::utils;
     use dominion::models::structs::StructCard;
     use dojo::event::{EventStorage};
@@ -247,8 +247,14 @@ mod table_management_system {
             let mut table: ComponentTable = world.read_model(table_id);
             assert!(
                 table.m_state == EnumGameState::PreFlop,
-                "Deck encryption is only allowed in PreFlop"
+                "Deck encryption is only allowed when round starts"
             );
+            assert!(table.m_deck_encrypted == false, "Deck is already encrypted");
+
+            for card in table.m_deck.span() {
+                assert!(encrypted_deck.contains(card), "Deck not encrypted");
+            };
+
             table.m_deck = encrypted_deck;
 
             // Shuffle the deck.
@@ -396,6 +402,13 @@ mod table_management_system {
             // Reset the table (Community cards and pot are cleared out).
             table.reset_table();
 
+            // Reset player's hands.
+            for player in table.m_players.span() {
+                let mut player_hand: ComponentHand = world.read_model(*player);
+                player_hand.m_cards = array![];
+                world.write_model(@player_hand);
+            };
+
             // Update order and dealer chip position (Small Blind, Big Blind, etc.).
             Self::_update_roles(ref world, ref table);
 
@@ -431,7 +444,24 @@ mod table_management_system {
             assert!(table.m_state != EnumGameState::Shutdown &&
                 table.m_state != EnumGameState::WaitingForPlayers, "Round has not started");
             assert!(table.m_deck_encrypted, "Deck is not encrypted");
-            assert!(table.m_finished_street, "Not all players have played their turn");
+
+
+            // Check if all players are All-in, if they are, street is automatically finished.
+            let mut all_players_all_in: bool = true;
+            for player in table.m_players.span() {
+                let mut player_component: ComponentPlayer = world.read_model((table.m_table_id, *player));
+                if player_component.m_state != EnumPlayerState::AllIn {
+                    all_players_all_in = false;
+                    break;
+                }
+            };
+
+            if all_players_all_in {
+                table.m_finished_street = true;
+            }
+
+            assert!(table.m_finished_street, "Street has not finished");
+    
 
             // Advance table state to the next street.
             table.advance_street();
