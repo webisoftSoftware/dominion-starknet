@@ -392,7 +392,7 @@ mod actions_system {
             hand.m_cards = decrypted_hand.clone();
             player.m_state = EnumPlayerState::Revealed;
 
-            // world.write_model(@hand);
+            world.write_model(@hand);
             world.write_model(@player);
             world.emit_event(@EventHandRevealed {
                     m_table_id: table_id,
