@@ -6,7 +6,6 @@ use dominion::models::structs::StructCard;
 #[starknet::interface]
 trait ITableManagement<TContractState> {
     // Table Manager Functions
-    fn post_auth_hash(ref self: TContractState, table_id: u32, auth_hash: ByteArray);
     fn post_encrypt_deck(
         ref self: TContractState, table_id: u32, encrypted_deck: Array<StructCard>
     );
@@ -117,17 +116,6 @@ mod table_management_system {
     struct EventShowdownRequested {
         #[key]
         m_table_id: u32,
-        m_timestamp: u64
-    }
-
-    #[derive(Clone, Serde, Drop)]
-    #[dojo::event]
-    struct EventAuthHashRequested {
-        #[key]
-        m_table_id: u32,
-        #[key]
-        m_player: ContractAddress,
-        m_auth_hash: ByteArray,
         m_timestamp: u64
     }
 
@@ -291,22 +279,6 @@ mod table_management_system {
             world.write_model(@table);
         }
 
-        fn post_auth_hash(ref self: ContractState, table_id: u32, auth_hash: ByteArray) {
-            let mut world = self.world(@"dominion");
-            let mut table: ComponentTable = world.read_model(table_id);
-            assert!(table.m_state != EnumGameState::Shutdown, "Game is shutdown");
-
-            world
-                .emit_event(
-                    @EventAuthHashRequested {
-                        m_table_id: table_id,
-                        m_player: get_caller_address(),
-                        m_auth_hash: auth_hash,
-                        m_timestamp: starknet::get_block_timestamp()
-                    }
-                );
-        }
-
         fn skip_turn(ref self: ContractState, table_id: u32, player: ContractAddress) {
             assert!(
                 self.table_manager.read() == get_caller_address(),
@@ -328,7 +300,7 @@ mod table_management_system {
 
             // Skip turn.
             player_component.fold();
-            table.advance_turn();
+            table.advance_turn(array![]);
             world.write_model(@table);
             world.write_model(@player_component);
         }
@@ -402,10 +374,15 @@ mod table_management_system {
             // Reset the table (Community cards and pot are cleared out).
             table.reset_table();
 
-            // Reset player's hands.
+            // Reset player's hands and states.
             for player in table.m_players.span() {
                 let mut player_hand: ComponentHand = world.read_model(*player);
+                let mut player_component: ComponentPlayer = world.read_model((table.m_table_id, *player));
                 player_hand.m_cards = array![];
+                if player_component.m_state == EnumPlayerState::Folded {
+                    player_component.m_state = EnumPlayerState::Active;
+                    world.write_model(@player_component);
+                }
                 world.write_model(@player_hand);
             };
 

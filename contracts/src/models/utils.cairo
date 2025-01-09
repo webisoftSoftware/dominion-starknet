@@ -121,10 +121,9 @@ fn tie_breaker(first_hand: @EnumHandRank, second_hand: @EnumHandRank) -> i32 {
         // Compare primary cards for hands with one important card
         (EnumHandRank::FourOfAKind(v1), EnumHandRank::FourOfAKind(v2)) |
         (EnumHandRank::ThreeOfAKind(v1), EnumHandRank::ThreeOfAKind(v2)) |
-        (EnumHandRank::Pair(v1), EnumHandRank::Pair(v2)) => compare_cards(v1, v2),
-        (
-            EnumHandRank::Flush(cards1), EnumHandRank::Flush(cards2)
-        ) => {
+        (EnumHandRank::Pair(v1), EnumHandRank::Pair(v2)) |
+        (EnumHandRank::HighCard(v1), EnumHandRank::HighCard(v2)) => compare_cards(v1, v2),
+        (EnumHandRank::Flush(cards1), EnumHandRank::Flush(cards2)) => {
             let mut compare_result: i32 = 0;
             for i in 0..cards1.len() {
                 compare_result = compare_cards(cards1[i], cards2[i]);
@@ -152,21 +151,6 @@ fn tie_breaker(first_hand: @EnumHandRank, second_hand: @EnumHandRank) -> i32 {
                 return main_compare;
             }
             return compare_cards(v2, w2);
-        },
-        // Compare arrays of cards for high card
-        (
-            EnumHandRank::HighCard(cards1), EnumHandRank::HighCard(cards2)
-        ) => {
-            let mut i = 0;
-            let mut compare_result: i32 = 0;
-            while i < cards1.len() {
-                compare_result = compare_cards(cards1[i], cards2[i]);
-                if compare_result != 0 {
-                    break;
-                }
-                i += 1;
-            };
-            compare_result
         },
         // Equal hands that don't need further comparison
         (EnumHandRank::RoyalFlush, EnumHandRank::RoyalFlush) => 0,

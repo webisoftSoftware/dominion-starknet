@@ -981,6 +981,34 @@ impl HandImpl of IHand {
         return Option::None;
     }
 
+    fn _has_high_card(self: @ComponentHand, board: @Array<StructCard>) -> Option<EnumCardValue> {
+        if self.m_cards.len() + board.len() < 5 {
+            return Option::None;
+        }
+
+        let hand_sorted = utils::sort(self.m_cards);
+
+        let mut copy_found: bool = false;
+        let mut highest_unique_card: Option<EnumCardValue> = Option::None;
+
+        for i in 0..hand_sorted.len() {
+            let value = hand_sorted[i].get_value().unwrap();
+            for j in 0..board.len() {
+                if let Option::Some(board_value) = board[j].get_value() {
+                    if board_value == value {
+                        copy_found = true;
+                        break;
+                    }
+                }
+            };
+            if !copy_found {
+                highest_unique_card = Option::Some(value);
+            }
+        };
+
+        return highest_unique_card;
+    }
+
     fn _evaluate_rank(
         self: @ComponentHand, board: @Array<StructCard>, from_depth: EnumRankMask
     ) -> Result<EnumHandRank, EnumError> {
@@ -1084,8 +1112,13 @@ impl HandImpl of IHand {
             }
         }
 
-        // If no other hand is found, return high card.
-        Result::Ok(EnumHandRank::HighCard(utils::sort_values(@values)))
+        // If no other combination is found, check for high card.
+        if let Option::Some(value) = self._has_high_card(board) {
+            return Result::Ok(EnumHandRank::HighCard(value));
+        }
+
+        // We should never reach this point.
+        return Result::Err(EnumError::InvalidHand);
     }
 }
 
@@ -1234,9 +1267,15 @@ impl TableImpl of ITable {
         self.m_finished_street = false;
     }
 
-    fn advance_turn(ref self: ComponentTable) {
-        self.m_current_turn = (self.m_current_turn + 1) % self.m_players.len().try_into()
-            .expect('Cannot downcast turn');
+    fn advance_turn(ref self: ComponentTable, players_folded: Array<EnumPlayerState>) {
+        let players_len: u8 = self.m_players.len().try_into().unwrap();
+        self.m_current_turn = (self.m_current_turn + 1) % players_len;
+
+        for i in 0..players_folded.len() {
+            if *players_folded[i] == EnumPlayerState::Folded {
+                self.m_current_turn = (self.m_current_turn + 1) % players_len;
+            }
+        };
         self.m_last_played_ts = starknet::get_block_timestamp();
     }
 

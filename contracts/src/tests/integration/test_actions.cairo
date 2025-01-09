@@ -206,6 +206,21 @@ fn test_chip_amount_after_leave() {
     assert!(table.m_pot == 0, "Table pot should be 0");
 }
 
+#[test]
+#[should_panic(expected: ("Game is shutdown", 'ENTRYPOINT_FAILED'))]
+fn test_post_auth_hash_invalid_state() {
+    let mut world: dojo::world::WorldStorage = deploy_world();
+    let mut table_manager = deploy_table_manager(ref world);
+    let mut actions = deploy_actions(ref world);
+
+    table_manager.create_table(100, 200, 2000, 4000, 5);
+    let mut table: ComponentTable = world.read_model(1);
+    table.m_state = EnumGameState::Shutdown;
+    world.write_model_test(@table);
+
+    actions.post_auth_hash(1, "test");
+}
+
 // #[test]
 // fn test_roles_after_leave() {
 //     let mut world: dojo::world::WorldStorage = deploy_world();
@@ -373,7 +388,7 @@ fn test_bet_twice() {
 // }
 
 // #[test]
-// fn test_reveal_hand_before_showdown() {
+// fn test_reveal_hand_to_all_before_showdown() {
 //     let mut world: dojo::world::WorldStorage = deploy_world();
 //     let mut table_manager: ITableManagementDispatcher = deploy_table_manager(ref world);
 //     let mut actions: IActionsDispatcher = deploy_actions(ref world);
@@ -381,7 +396,7 @@ fn test_bet_twice() {
 // }
 
 // #[test]
-// fn test_reveal_hand_invalid_commit_hash() {
+// fn test_reveal_hand_to_all_invalid_commit_hash() {
 //     let mut world: dojo::world::WorldStorage = deploy_world();
 //     let mut table_manager: ITableManagementDispatcher = deploy_table_manager(ref world);
 //     let mut actions: IActionsDispatcher = deploy_actions(ref world);

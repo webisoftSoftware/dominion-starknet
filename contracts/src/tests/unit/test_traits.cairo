@@ -56,7 +56,7 @@ fn test_display() {
         "Table 0:\n\tPlayers: \n\tCommunity Cards: \n\tNum Sidepots: 0\n\tCurrent Turn Index: 0\n\tSmall Blind: 0\n\tBig Blind: 0\n\tMin Buy In: 0\n\tMax Buy In: 0\n\tPot: 0\n\tState: WaitingForPlayers\n\tLast Played: 0\n\tDeck Encrypted: false"
     );
     assert_eq!(format!("{}", ICard::new(EnumCardValue::Two, EnumCardSuit::Clubs)), "2C");
-    assert_eq!(format!("{}", EnumHandRank::HighCard(array![EnumCardValue::Two])), "HighCard");
+    assert_eq!(format!("{}", EnumHandRank::HighCard(EnumCardValue::Two)), "HighCard");
     assert_eq!(format!("{}", EnumCardSuit::Clubs), "C");
     assert_eq!(format!("{}", EnumCardValue::Two), "2");
     assert_eq!(format!("{}", EnumPlayerState::Active), "Active");
@@ -64,7 +64,7 @@ fn test_display() {
 
 #[test]
 fn test_into() {
-    let high_card: u32 = (@EnumHandRank::HighCard(array![EnumCardValue::Ace])).into();
+    let high_card: u32 = (@EnumHandRank::HighCard(EnumCardValue::Ace)).into();
     let two: u32 = EnumCardValue::Two.into();
 
     assert_eq!(high_card, 1);

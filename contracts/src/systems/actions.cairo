@@ -5,12 +5,13 @@ use starknet::ContractAddress;
 trait IActions<TContractState> {
     fn bet(ref self: TContractState, table_id: u32, amount: u32);
     fn fold(ref self: TContractState, table_id: u32);
+    fn post_auth_hash(ref self: TContractState, table_id: u32, auth_hash: ByteArray);
     fn post_commit_hash(ref self: TContractState, table_id: u32, commitment_hash: Array<u32>);
     fn top_up_table_chips(ref self: TContractState, table_id: u32, chips_amount: u32);
     fn set_ready(ref self: TContractState, table_id: u32);
     fn join_table(ref self: TContractState, table_id: u32, chips_amount: u32);
     fn leave_table(ref self: TContractState, table_id: u32);
-    fn reveal_hand(
+    fn reveal_hand_to_all(
         ref self: TContractState,
         table_id: u32,
         decrypted_hand: Array<StructCard>,
@@ -65,6 +66,17 @@ mod actions_system {
         m_timestamp: u64,
     }
 
+    #[derive(Clone, Serde, Drop)]
+    #[dojo::event]
+    struct EventAuthHashRequested {
+        #[key]
+        m_table_id: u32,
+        #[key]
+        m_player: ContractAddress,
+        m_auth_hash: ByteArray,
+        m_timestamp: u64
+    }
+
     #[derive(Copy, Clone, Serde, Drop)]
     #[dojo::event]
     struct EventPlayerLeft {
@@ -90,7 +102,9 @@ mod actions_system {
         fn join_table(ref self: ContractState, table_id: u32, chips_amount: u32) {
             let mut world = self.world(@"dominion");
             let caller = get_caller_address();
-            let mut player: ComponentPlayer = world.read_model((table_id, caller));
+
+            // Get total chips from cashier table (0).
+            let mut player: ComponentPlayer = world.read_model((0, caller));
             
             // Create new player if first time joining
             if !player.m_is_created {
@@ -107,7 +121,6 @@ mod actions_system {
             assert!(table.m_max_buy_in >= chips_amount, "Amount is more than max buy in");
 
             // Update player state for joining table.
-            player.m_table_id = table_id;
             player.m_total_chips -= chips_amount;
             player.m_table_chips += chips_amount;
 
@@ -325,8 +338,35 @@ mod actions_system {
             world.write_model(@table);
         }
 
+        fn post_auth_hash(ref self: ContractState, table_id: u32, auth_hash: ByteArray) {
+            let mut world = self.world(@"dominion");
+            let table: ComponentTable = world.read_model(table_id);
+            assert!(table.m_state != EnumGameState::Shutdown, "Game is shutdown");
+
+            let player_component: ComponentPlayer = world.read_model((table_id, get_caller_address()));
+            match player_component.m_state {
+                EnumPlayerState::NotCreated | EnumPlayerState::Waiting | EnumPlayerState::Revealed |
+                EnumPlayerState::Folded | EnumPlayerState::Left => {
+                    panic!("Player is not active");
+                },
+                _ => {}
+            };
+
+            world
+                .emit_event(
+                    @EventAuthHashRequested {
+                        m_table_id: table_id,
+                        m_player: get_caller_address(),
+                        m_auth_hash: auth_hash,
+                        m_timestamp: starknet::get_block_timestamp()
+                    }
+                );
+        }
+
         fn post_commit_hash(ref self: ContractState, table_id: u32, commitment_hash: Array<u32>) {
             let mut world = self.world(@"dominion");
+            let table: ComponentTable = world.read_model(table_id);
+            assert!(table.m_state != EnumGameState::Shutdown, "Game is shutdown");
 
             let player_component: ComponentPlayer = world.read_model((table_id, get_caller_address()));
             match player_component.m_state {
@@ -343,7 +383,7 @@ mod actions_system {
             world.write_model(@hand);
         }
 
-        fn reveal_hand(
+        fn reveal_hand_to_all(
             ref self: ContractState,
             table_id: u32,
             decrypted_hand: Array<StructCard>,
@@ -435,7 +475,14 @@ mod actions_system {
             player.m_state = EnumPlayerState::Checked;
 
             if advance_turn {
-                table.advance_turn();
+                let mut players_folded: Array<EnumPlayerState> = array![];
+                for addr in table.m_players.span() {
+                    if *addr != player.m_owner {
+                        let player_component: ComponentPlayer = world.read_model((table.m_table_id, *addr));
+                        players_folded.append(player_component.m_state);
+                    }
+                };
+                table.advance_turn(players_folded);
             }
         }
 
@@ -465,7 +512,7 @@ mod actions_system {
             }
             
             if advance_turn {
-                table.advance_turn();
+                Self::_skip_folded_players(ref world, ref table);
             }
         }
 
@@ -481,7 +528,7 @@ mod actions_system {
             }
 
             if advance_turn {
-                table.advance_turn();
+                Self::_skip_folded_players(ref world, ref table);
             }
         }
 
@@ -493,49 +540,66 @@ mod actions_system {
         fn _is_street_finished(players: @Array<ComponentPlayer>) -> bool {
             let mut highest_bet: u32 = 0;
             let mut active_players: u32 = 0;
-            let mut matched_highest_bet: u32 = 0;
-
-            // Find highest bet and count active players.
+            let mut last_raiser: Option<ContractAddress> = Option::None;
+        
+            // First pass: find highest bet and count active players.
             for player in players.span() {
-                match player.m_state {
-                    EnumPlayerState::Active | 
-                    EnumPlayerState::Called | 
-                    EnumPlayerState::Checked |
-                    EnumPlayerState::AllIn |
-                    EnumPlayerState::Raised(_) => {
-                        active_players += 1;
-                        if *player.m_current_bet > highest_bet {
-                            highest_bet = *player.m_current_bet;
-                        }
-                    },
-                    _ => {},
+                if *player.m_state != EnumPlayerState::Folded {
+                    active_players += 1;
+                    if *player.m_current_bet > highest_bet {
+                        highest_bet = *player.m_current_bet;
+                        last_raiser = Option::Some(*player.m_owner);
+                    }
                 }
             };
-
+        
             // If only one active player, street is finished.
             if active_players <= 1 {
                 return true;
             }
-
-            // Count how many active players have matched the highest bet.
+        
+            // Second pass: verify all active players have either:
+            // 1. Matched the highest bet.
+            // 2. Are all-in with a lower amount.
+            let mut matched_bet: bool = true;
             for player in players.span() {
+                if *player.m_state == EnumPlayerState::Folded {
+                    continue;
+                }
+                
                 match player.m_state {
-                    EnumPlayerState::Active | 
-                    EnumPlayerState::Called | 
-                    EnumPlayerState::Checked |
-                    EnumPlayerState::Raised(_) => {
-                        if *player.m_current_bet == highest_bet {
-                            matched_highest_bet += 1;
+                    EnumPlayerState::AllIn => {
+                        continue;
+                    },
+                    EnumPlayerState::Raised(_) | EnumPlayerState::Called |
+                    EnumPlayerState::Checked => {
+                        if *player.m_current_bet != highest_bet {
+                            matched_bet = false;
+                            break;
                         }
                     },
-                    EnumPlayerState::AllIn => {
-                        matched_highest_bet += 1;
-                    },
-                    _ => {},
+                    _ => {
+                        matched_bet = false;
+                        break;
+                    }
                 }
             };
-            // Street is finished if all active players have matched the highest bet.
-            return active_players == matched_highest_bet;
+        
+            return matched_bet;
+        }
+
+        fn _skip_folded_players(ref world: dojo::world::WorldStorage, ref table: ComponentTable) {
+            let players_len = table.m_players.len();
+            let mut index: u32 = ((table.m_current_turn + 1) % players_len.try_into().unwrap()).into();
+            let mut players_folded: Array<EnumPlayerState> = array![];
+            let mut player_component: ComponentPlayer = world.read_model((table.m_table_id, *table.m_players[index % players_len.try_into().unwrap()]));
+            
+            while player_component.m_state == EnumPlayerState::Folded {
+                players_folded.append(player_component.m_state);
+                index += 1;
+                player_component = world.read_model((table.m_table_id, *table.m_players[index % players_len.try_into().unwrap()]));
+            };
+            table.advance_turn(players_folded);
         }
     }
 }

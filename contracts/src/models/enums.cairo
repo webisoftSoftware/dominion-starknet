@@ -35,7 +35,7 @@ pub enum EnumPosition {
 
 #[derive(Drop, Serde, Clone, Debug, PartialEq, Introspect)]
 pub enum EnumHandRank {
-    HighCard: Array<EnumCardValue>, // Store all 5 cards for high card comparison.
+    HighCard: EnumCardValue, // Store highest unique card.
     Pair: EnumCardValue, // Just store the pair value.
     TwoPair: (EnumCardValue, EnumCardValue), // Store both pair values.
     ThreeOfAKind: EnumCardValue, // Just store the three of a kind value.

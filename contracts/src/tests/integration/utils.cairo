@@ -3,11 +3,12 @@ use dominion::{
     systems::table_manager::table_management_system::{
         e_EventTableCreated, e_EventTableShutdown, e_EventEncryptDeckRequested,
         e_EventDecryptHandRequested, e_EventRequestBet, e_EventStreetAdvanced,
-        e_EventAuthHashRequested, e_EventDecryptCCRequested, e_EventShowdownRequested,
+        e_EventDecryptCCRequested, e_EventShowdownRequested,
         e_EventRevealShowdownRequested
     },
     systems::actions::actions_system::{
-        e_EventPlayerJoined, e_EventAllPlayersReady, e_EventPlayerLeft, e_EventHandRevealed
+        e_EventPlayerJoined, e_EventAllPlayersReady, e_EventPlayerLeft, e_EventHandRevealed,
+        e_EventAuthHashRequested
     },
 };
 

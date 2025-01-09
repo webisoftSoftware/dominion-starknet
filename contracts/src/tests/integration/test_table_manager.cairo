@@ -410,20 +410,6 @@ fn test_invalid_street_invalid_river() {
 }
 
 #[test]
-#[should_panic(expected: ("Game is shutdown", 'ENTRYPOINT_FAILED'))]
-fn test_post_auth_hash_invalid_state() {
-    let mut world: dojo::world::WorldStorage = deploy_world();
-    let mut table_manager = deploy_table_manager(ref world);
-
-        table_manager.create_table(100, 200, 2000, 4000, 5);
-    let mut table: ComponentTable = world.read_model(1);
-    table.m_state = EnumGameState::Shutdown;
-    world.write_model_test(@table);
-
-    table_manager.post_auth_hash(1, "test");
-}
-
-#[test]
 #[should_panic(expected: ("Cannot skip player's turn: Not player's turn", 'ENTRYPOINT_FAILED'))]
 fn test_skip_turn_invalid_player_turn() {
     let mut world: dojo::world::WorldStorage = deploy_world();
@@ -1048,6 +1034,79 @@ fn test_all_players_all_in_before_showdown() {
 }
 
 #[test]
+#[available_gas(1000000000)]
+fn test_advance_turn_skip_folded_players() {
+    let mut player_1: ComponentPlayer = IPlayer::new(1, starknet::contract_address_const::<0x1A>());
+    let mut player_2: ComponentPlayer = IPlayer::new(1, starknet::contract_address_const::<0x1B>());
+    let mut player_3: ComponentPlayer = IPlayer::new(1, starknet::contract_address_const::<0x1C>());
+    let mut player_4: ComponentPlayer = IPlayer::new(1, starknet::contract_address_const::<0x1D>());
+
+    let mut world: dojo::world::WorldStorage = deploy_world();
+    let mut table_manager = deploy_table_manager(ref world);
+
+    table_manager.create_table(100, 200, 2000, 6000, 5);
+
+    let mut action_manager = deploy_actions(ref world);
+
+    // Add players and assign money so they can play.
+    player_1.m_total_chips = 5000;
+    world.write_model_test(@player_1);
+
+    player_2.m_total_chips = 4000;
+    world.write_model_test(@player_2);
+
+    player_3.m_total_chips = 3000;
+    world.write_model_test(@player_3);
+
+    player_4.m_total_chips = 2000;
+    world.write_model_test(@player_4);
+
+    table_manager.create_table(100, 200, 2000, 6000, 5);
+
+    starknet::testing::set_contract_address(starknet::contract_address_const::<0x1A>());
+    action_manager.join_table(1, 5000);
+
+    starknet::testing::set_contract_address(starknet::contract_address_const::<0x1B>());
+    action_manager.join_table(1, 4000);
+
+    starknet::testing::set_contract_address(starknet::contract_address_const::<0x1C>());
+    action_manager.join_table(1, 3000);
+
+    starknet::testing::set_contract_address(starknet::contract_address_const::<0x1D>());
+    action_manager.join_table(1, 2000);
+
+    starknet::testing::set_contract_address(starknet::contract_address_const::<0x1D>());
+    action_manager.set_ready(1);
+
+    starknet::testing::set_contract_address(starknet::contract_address_const::<0x1C>());
+    action_manager.set_ready(1);
+
+    starknet::testing::set_contract_address(starknet::contract_address_const::<0x1B>());
+    action_manager.set_ready(1);
+
+    starknet::testing::set_contract_address(starknet::contract_address_const::<0x1A>());
+    action_manager.set_ready(1);
+
+    let mut table: ComponentTable = world.read_model(1);
+    table.m_deck_encrypted = true;
+    world.write_model_test(@table);
+
+    // Street starts and dealer (1A) gets skipped, and small blind (1B) pays 100.
+    // Big blind (1C) pays 200.
+
+    // Pre-flop
+    starknet::testing::set_contract_address(starknet::contract_address_const::<0x1D>());
+    action_manager.bet(1, 200);
+    starknet::testing::set_contract_address(starknet::contract_address_const::<0x1A>());
+    action_manager.fold(1);
+    starknet::testing::set_contract_address(starknet::contract_address_const::<0x1B>());
+    action_manager.fold(1);
+
+    let table: ComponentTable = world.read_model(1);
+    assert!(table.m_current_turn == 2, "Current turn should be 2");
+}
+
+#[test]
 #[should_panic(expected: ("Commitment hash does not match", 'ENTRYPOINT_FAILED'))]
 fn test_game_simple() {
     // Create a table with 4 players.
@@ -1171,15 +1230,16 @@ fn test_game_simple() {
     action_manager.bet(1, 3600);
 
     let table: ComponentTable = world.read_model(1);
+    println!("Table: {}", table);
     assert!(table.m_state == EnumGameState::Showdown, "Showdown should start automatically");
 
     // Players reveals their hand.
     starknet::testing::set_contract_address(starknet::contract_address_const::<0x1A>());
-    action_manager.reveal_hand(1, array![], "TEST");
+    action_manager.reveal_hand_to_all(1, array![], "TEST");
     starknet::testing::set_contract_address(starknet::contract_address_const::<0x1B>());
-    action_manager.reveal_hand(1, array![], "TEST");
+    action_manager.reveal_hand_to_all(1, array![], "TEST");
     starknet::testing::set_contract_address(starknet::contract_address_const::<0x1C>());
-    action_manager.reveal_hand(1, array![], "TEST");
+    action_manager.reveal_hand_to_all(1, array![], "TEST");
 
     // Showdown starts automatically.
     let table: ComponentTable = world.read_model(1);
