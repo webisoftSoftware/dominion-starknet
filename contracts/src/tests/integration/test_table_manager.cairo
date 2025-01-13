@@ -7,8 +7,10 @@ use crate::models::components::{ComponentTable, ComponentPlayer, ComponentHand, 
 use crate::models::traits::{
     EnumCardValueDisplay, EnumCardSuitDisplay, StructCardDisplay, ICard, ITable, StructCardEq,
     IPlayer, EnumPlayerStateDisplay, ComponentTableDisplay, ComponentHandDisplay, ComponentPlayerDisplay,
-    ComponentSidepotDisplay
+    ComponentSidepotDisplay, EnumGameStateDisplay
 };
+
+
 
 
 use alexandria_data_structures::array_ext::ArrayTraitExt;
@@ -302,6 +304,7 @@ fn test_advance_street_skip_turns() {
 
 #[test]
 #[should_panic(expected: "Street was not at pre-flop")]
+#[should_panic(expected: "Street was not at pre-flop")]
 fn test_invalid_street_invalid_flop() {
     let mut world: dojo::world::WorldStorage = deploy_world();
     let mut player_1: ComponentPlayer = IPlayer::new(1, starknet::contract_address_const::<0x1A>());
@@ -328,7 +331,6 @@ fn test_invalid_street_invalid_flop() {
 
     table.m_deck_encrypted = true;
     table.m_state = EnumGameState::PreFlop;
-    table.m_community_cards.append(ICard::new(EnumCardValue::Ace, EnumCardSuit::Clubs));
     table.m_community_cards.append(ICard::new(EnumCardValue::Ace, EnumCardSuit::Clubs));
     table.m_finished_street = true;
 
@@ -365,7 +367,6 @@ fn test_invalid_street_invalid_turn() {
     table.m_deck_encrypted = true;
     table.m_state = EnumGameState::Flop;
     table.m_community_cards.append(ICard::new(EnumCardValue::Ace, EnumCardSuit::Clubs));
-    table.m_community_cards.append(ICard::new(EnumCardValue::Ace, EnumCardSuit::Clubs));
     table.m_finished_street = true;
 
     table_management_system::InternalImpl::_advance_street(ref world, ref table);
@@ -400,7 +401,6 @@ fn test_invalid_street_invalid_river() {
 
     table.m_deck_encrypted = true;
     table.m_state = EnumGameState::Turn;
-    table.m_community_cards.append(ICard::new(EnumCardValue::Ace, EnumCardSuit::Clubs));
     table.m_community_cards.append(ICard::new(EnumCardValue::Ace, EnumCardSuit::Clubs));
     table.m_community_cards.append(ICard::new(EnumCardValue::Ace, EnumCardSuit::Clubs));
     table.m_finished_street = true;
@@ -1119,6 +1119,8 @@ fn test_game_simple() {
     let mut table_manager = deploy_table_manager(ref world);
     let mut action_manager = deploy_actions(ref world);
 
+    let table_manager_address: starknet::ContractAddress = table_manager.get_table_manager();
+
     // Add players and assign money so they can play.
     player_1.m_total_chips = 5000;
     world.write_model_test(@player_1);
@@ -1158,12 +1160,13 @@ fn test_game_simple() {
     starknet::testing::set_contract_address(starknet::contract_address_const::<0x1A>());
     action_manager.set_ready(1);
 
-    let mut table: ComponentTable = world.read_model(1);
-    table.m_deck_encrypted = true;
-    world.write_model_test(@table);
+    let table: ComponentTable = world.read_model(1);
+    starknet::testing::set_contract_address(table_manager_address);
+    table_manager.post_encrypt_deck(1, table.m_deck.clone());
 
     // Street starts and dealer (1A) gets skipped, and small blind (1B) pays 100.
     // Big blind (1C) pays 200.
+    // Goes back around to 1A.
 
     // Pre-flop
     starknet::testing::set_contract_address(starknet::contract_address_const::<0x1D>());
@@ -1172,6 +1175,12 @@ fn test_game_simple() {
     action_manager.bet(1, 200);
     starknet::testing::set_contract_address(starknet::contract_address_const::<0x1B>());
     action_manager.bet(1, 100);
+    starknet::testing::set_contract_address(starknet::contract_address_const::<0x1C>());
+    action_manager.bet(1, 0);  // check.
+
+    // Check if we have changed the to Flop.
+    let table: ComponentTable = world.read_model(1);
+    assert!(table.m_state == EnumGameState::Flop, "Table should be in Flop");
 
     starknet::testing::set_contract_address(starknet::contract_address_const::<0x1A>());
     action_manager.post_commit_hash(1, array![0x1, 0x2, 0x3, 0x4, 0x5, 0x6, 0x7, 0x8]);
@@ -1182,7 +1191,7 @@ fn test_game_simple() {
     starknet::testing::set_contract_address(starknet::contract_address_const::<0x1D>());
     action_manager.post_commit_hash(1, array![0x1, 0x2, 0x3, 0x4, 0x5, 0x6, 0x7, 0x8]);
 
-    starknet::testing::set_contract_address(starknet::contract_address_const::<0x0>());
+    starknet::testing::set_contract_address(table_manager_address);
     table_manager.post_decrypted_community_cards(1, array![
         ICard::new(EnumCardValue::Ten, EnumCardSuit::Spades),
         ICard::new(EnumCardValue::Six, EnumCardSuit::Hearts),
@@ -1190,48 +1199,56 @@ fn test_game_simple() {
     ]);
 
     // Flop
-    starknet::testing::set_contract_address(starknet::contract_address_const::<0x1C>());
-    action_manager.bet(1, 100);
     starknet::testing::set_contract_address(starknet::contract_address_const::<0x1D>());
     action_manager.bet(1, 100);
     starknet::testing::set_contract_address(starknet::contract_address_const::<0x1A>());
     action_manager.bet(1, 100);
     starknet::testing::set_contract_address(starknet::contract_address_const::<0x1B>());
     action_manager.bet(1, 100);
+    starknet::testing::set_contract_address(starknet::contract_address_const::<0x1C>());
+    action_manager.bet(1, 100);
 
-    starknet::testing::set_contract_address(starknet::contract_address_const::<0x0>());
+    // Check if we have changed the to Turn.
+    let table: ComponentTable = world.read_model(1);
+    assert!(table.m_state == EnumGameState::Turn, "Table should be in Turn");
+
+    starknet::testing::set_contract_address(table_manager_address);
     table_manager.post_decrypted_community_cards(1, array![
         ICard::new(EnumCardValue::King, EnumCardSuit::Clubs)
     ]);
     
     // Turn
-    starknet::testing::set_contract_address(starknet::contract_address_const::<0x1C>());
-    action_manager.bet(1, 100);
     starknet::testing::set_contract_address(starknet::contract_address_const::<0x1D>());
     action_manager.bet(1, 100);
     starknet::testing::set_contract_address(starknet::contract_address_const::<0x1A>());
     action_manager.bet(1, 100);
     starknet::testing::set_contract_address(starknet::contract_address_const::<0x1B>());
     action_manager.bet(1, 100);
+    starknet::testing::set_contract_address(starknet::contract_address_const::<0x1C>());
+    action_manager.bet(1, 100);
 
-    starknet::testing::set_contract_address(starknet::contract_address_const::<0x0>());
+    // Check if we have changed the to River.
+    let table: ComponentTable = world.read_model(1);
+    assert!(table.m_state == EnumGameState::River, "Table should be in River");
+
+    starknet::testing::set_contract_address(table_manager_address);
     table_manager.post_decrypted_community_cards(1, array![
         ICard::new(EnumCardValue::Eight, EnumCardSuit::Clubs)
     ]);
     
     // River
-    starknet::testing::set_contract_address(starknet::contract_address_const::<0x1C>());
-    action_manager.bet(1, 2600);
     starknet::testing::set_contract_address(starknet::contract_address_const::<0x1D>());
     action_manager.fold(1);
     starknet::testing::set_contract_address(starknet::contract_address_const::<0x1A>());
     action_manager.bet(1, 4600);
     starknet::testing::set_contract_address(starknet::contract_address_const::<0x1B>());
     action_manager.bet(1, 3600);
+    starknet::testing::set_contract_address(starknet::contract_address_const::<0x1C>());
+    action_manager.bet(1, 2600);
 
+    // Check if we have changed the to Showdown.
     let table: ComponentTable = world.read_model(1);
-    println!("Table: {}", table);
-    assert!(table.m_state == EnumGameState::Showdown, "Showdown should start automatically");
+    assert!(table.m_state == EnumGameState::Showdown, "Table should be in Showdown");
 
     // Players reveals their hand.
     starknet::testing::set_contract_address(starknet::contract_address_const::<0x1A>());

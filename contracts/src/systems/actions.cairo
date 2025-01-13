@@ -1,5 +1,6 @@
 use dominion::models::structs::StructCard;
 use starknet::ContractAddress;
+use dominion::models::enums::{EnumPlayerState, EnumPosition};
 
 #[starknet::interface]
 trait IActions<TContractState> {
@@ -17,6 +18,14 @@ trait IActions<TContractState> {
         decrypted_hand: Array<StructCard>,
         request: ByteArray
     );
+
+    // Getters.
+    fn get_player_state(self: @TContractState, table_id: u32, player: ContractAddress) -> EnumPlayerState;
+    fn get_player_bet(self: @TContractState, table_id: u32, player: ContractAddress) -> u32;
+    fn get_player_position(self: @TContractState, table_id: u32, player: ContractAddress) -> EnumPosition;
+    fn get_player_total_chips(self: @TContractState, table_id: u32, player: ContractAddress) -> u32;
+    fn get_player_table_chips(self: @TContractState, table_id: u32, player: ContractAddress) -> u32;
+    fn has_player_revealed(self: @TContractState, table_id: u32, player: ContractAddress) -> bool;
 }
 
 #[dojo::contract]
@@ -26,7 +35,8 @@ mod actions_system {
     use dojo::event::{EventStorage};
     use dominion::models::components::{ComponentTable, ComponentPlayer, ComponentHand, ComponentSidepot};
     use dominion::models::enums::{EnumPlayerState, EnumGameState, EnumPosition};
-    use dominion::models::traits::{IPlayer, ITable, ComponentTableDisplay};
+    use dominion::models::traits::{IPlayer, ITable, ComponentTableDisplay, EnumGameStateDisplay, ComponentPlayerDisplay,
+        EnumPlayerStateDisplay};
     use dominion::models::structs::StructCard;
     use alexandria_data_structures::array_ext::ArrayTraitExt;
     use core::sha256::compute_sha256_byte_array;
@@ -99,12 +109,22 @@ mod actions_system {
         /// @param chips_amount The amount of chips to join the table with.
         /// @returns Nothing.
         /// Can Panic? Yes, if the table is not created or shutdown, or if the player is already active.
+        /// Allows a player to join a table with specified chips amount.
+        ///
+        /// If the player is not at the table, a new player is created.
+        /// If the player is already at the table, their chips are updated.
+        /// If the player is already at the table and has not joined yet, their chips are updated.
+        ///
+        /// @param table_id The ID of the table to join.
+        /// @param chips_amount The amount of chips to join the table with.
+        /// @returns Nothing.
+        /// Can Panic? Yes, if the table is not created or shutdown, or if the player is already active.
         fn join_table(ref self: ContractState, table_id: u32, chips_amount: u32) {
             let mut world = self.world(@"dominion");
             let caller = get_caller_address();
 
             // Get total chips from cashier table (0).
-            let mut player: ComponentPlayer = world.read_model((0, caller));
+            let mut player: ComponentPlayer = world.read_model((table_id, caller));
             
             // Create new player if first time joining
             if !player.m_is_created {
@@ -278,19 +298,20 @@ mod actions_system {
                 _ => {}
             }
 
+            let last_raiser: ComponentPlayer = world.read_model((table_id, *table.m_players[table.m_last_raiser.into()]));
+
             match amount {
                 0 => InternalImpl::_check(ref world, ref table, ref player_component, amount, true),
                 _ => InternalImpl::_place_bet(ref world, ref table, ref player_component, amount, true),
             };
             world.write_model(@player_component);
 
-            // Check if the street is finished.
             let mut players: Array<ComponentPlayer> = array![];
             for player in table.m_players.span() {
                 players.append(world.read_model((table_id, *player)));
             };
 
-            if InternalImpl::_is_street_finished(@players) {
+            if last_raiser.m_owner == get_caller_address() && InternalImpl::_is_street_finished(table.m_last_raiser, @players) {
                 table.m_finished_street = true;
                 table_management_system::InternalImpl::_advance_street(ref world, ref table);
             }
@@ -321,6 +342,8 @@ mod actions_system {
                 _ => {}
             };
 
+            let last_raiser: ComponentPlayer = world.read_model((table_id, *table.m_players[table.m_last_raiser.into()]));
+
             InternalImpl::_fold(ref world, ref table, ref player_component, true);
             world.write_model(@player_component);
 
@@ -330,7 +353,7 @@ mod actions_system {
                 players.append(world.read_model((table_id, *player)));
             };
 
-            if InternalImpl::_is_street_finished(@players) {
+            if last_raiser.m_owner == get_caller_address() && InternalImpl::_is_street_finished(table.m_last_raiser, @players) {
                 table.m_finished_street = true;
                 table_management_system::InternalImpl::_advance_street(ref world, ref table);
             }
@@ -454,6 +477,48 @@ mod actions_system {
                 world.write_model(@table);
             }
         }
+
+        /////////////////////////////////////////////////////////////////////////
+        /////////////////////////////////////////////////////////////////////////
+        //////////////////////////////// GETTERS ////////////////////////////////
+        /////////////////////////////////////////////////////////////////////////
+        /////////////////////////////////////////////////////////////////////////
+        
+        fn get_player_bet(self: @ContractState, table_id: u32, player: ContractAddress) -> u32 {
+            let world = self.world(@"dominion");
+            let player_component: ComponentPlayer = world.read_model((table_id, player));
+            player_component.m_current_bet
+        }
+
+        fn get_player_position(self: @ContractState, table_id: u32, player: ContractAddress) -> EnumPosition {
+            let world = self.world(@"dominion");
+            let player_component: ComponentPlayer = world.read_model((table_id, player));
+            player_component.m_position
+        }
+
+        fn get_player_state(self: @ContractState, table_id: u32, player: ContractAddress) -> EnumPlayerState {
+            let world = self.world(@"dominion");
+            let player_component: ComponentPlayer = world.read_model((table_id, player));
+            player_component.m_state
+        }
+
+        fn get_player_total_chips(self: @ContractState, table_id: u32, player: ContractAddress) -> u32 {
+            let world = self.world(@"dominion");
+            let player_component: ComponentPlayer = world.read_model((table_id, player));
+            player_component.m_total_chips
+        }
+
+        fn get_player_table_chips(self: @ContractState, table_id: u32, player: ContractAddress) -> u32 {
+            let world = self.world(@"dominion");
+            let player_component: ComponentPlayer = world.read_model((table_id, player));
+            player_component.m_table_chips
+        }
+
+        fn has_player_revealed(self: @ContractState, table_id: u32, player: ContractAddress) -> bool {
+            let world = self.world(@"dominion");
+            let player_component: ComponentPlayer = world.read_model((table_id, player));
+            player_component.m_state == EnumPlayerState::Revealed
+        }
     }
 
     #[generate_trait]
@@ -470,38 +535,32 @@ mod actions_system {
         }
 
         fn _check(ref world: dojo::world::WorldStorage, ref table: ComponentTable, ref player: ComponentPlayer,
-             current_bet: u32, advance_turn: bool) {
+                current_bet: u32, advance_turn: bool) {
             assert!(current_bet == 0, "Amount must be 0 to check");
             player.m_state = EnumPlayerState::Checked;
 
             if advance_turn {
-                let mut players_folded: Array<EnumPlayerState> = array![];
-                for addr in table.m_players.span() {
-                    if *addr != player.m_owner {
-                        let player_component: ComponentPlayer = world.read_model((table.m_table_id, *addr));
-                        players_folded.append(player_component.m_state);
-                    }
-                };
-                table.advance_turn(players_folded);
+                Self::_skip_folded_players(ref world, ref table);
             }
         }
 
         fn _place_bet(ref world: dojo::world::WorldStorage, ref table: ComponentTable, ref player: ComponentPlayer,
-             current_bet: u32, advance_turn: bool) {
+                current_bet: u32, advance_turn: bool) {
             assert!(current_bet > 0, "Amount must be greater than 0 to place a bet");
 
             // Determine the player's state based on the current bet.
-            if player.m_position == EnumPosition::SmallBlind || player.m_position == EnumPosition::BigBlind {
-                player.m_state = EnumPlayerState::Active;
-            } else if current_bet == player.m_current_bet {
-                player.m_state = EnumPlayerState::Called;
-            } else if player.m_current_bet >= current_bet {
-                if player.m_table_chips == current_bet {
-                    player.m_state = EnumPlayerState::AllIn;
+            let last_raiser: ComponentPlayer = world.read_model((table.m_table_id, *table.m_players[table.m_last_raiser.into()]));
+
+            if player.m_current_bet + current_bet >= last_raiser.m_current_bet {
+                if player.m_current_bet + current_bet == last_raiser.m_current_bet {
+                    // If our last bet combined with the current one matches the last raiser's bet, we call.
+                    player.m_state = EnumPlayerState::Called;
                 } else {
+                    // If we are not at the beginning of the round and not small or big blind, we raise.
                     player.m_state = EnumPlayerState::Raised(current_bet);
                 }
             }
+
             table.m_pot += player.place_bet(current_bet);
             if player.m_state == EnumPlayerState::AllIn {
                 table_management_system::InternalImpl::_assign_player_to_sidepot(
@@ -517,7 +576,7 @@ mod actions_system {
         }
 
         fn _fold(ref world: dojo::world::WorldStorage, ref table: ComponentTable, ref player: ComponentPlayer,
-             advance_turn: bool) {
+                advance_turn: bool) {
             table.m_pot += player.fold();
             // If the player was all-in, remove them from all sidepots.
             if player.m_state == EnumPlayerState::AllIn {
@@ -537,18 +596,18 @@ mod actions_system {
         /// @param players The players at the table.
         /// @returns True if the street is finished, false otherwise.
         /// Can Panic? No.
-        fn _is_street_finished(players: @Array<ComponentPlayer>) -> bool {
-            let mut highest_bet: u32 = 0;
+        fn _is_street_finished(mut last_raiser: u8, players: @Array<ComponentPlayer>) -> bool {
+            let mut highest_bet: u32 = *players[last_raiser.into()].m_current_bet;
             let mut active_players: u32 = 0;
-            let mut last_raiser: Option<ContractAddress> = Option::None;
         
             // First pass: find highest bet and count active players.
-            for player in players.span() {
+            for index in 0..players.len() {
+                let player: @ComponentPlayer = players[index];
                 if *player.m_state != EnumPlayerState::Folded {
                     active_players += 1;
                     if *player.m_current_bet > highest_bet {
+                        last_raiser = index.try_into().unwrap();
                         highest_bet = *player.m_current_bet;
-                        last_raiser = Option::Some(*player.m_owner);
                     }
                 }
             };
@@ -562,7 +621,9 @@ mod actions_system {
             // 1. Matched the highest bet.
             // 2. Are all-in with a lower amount.
             let mut matched_bet: bool = true;
-            for player in players.span() {
+            for index in 0..active_players {
+                let current_turn: u32 = (last_raiser.into() + index) % players.len();
+                let player: @ComponentPlayer = players[current_turn];
                 if *player.m_state == EnumPlayerState::Folded {
                     continue;
                 }

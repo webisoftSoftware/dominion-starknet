@@ -2,17 +2,20 @@ use starknet::ContractAddress;
 use core::traits::Into;
 use core::dict::Felt252Dict;
 use dominion::models::structs::StructCard;
+use dominion::models::enums::EnumGameState;
+use dominion::models::components::{ComponentSidepot, ComponentPlayer};
 
 #[starknet::interface]
 trait ITableManagement<TContractState> {
-    // Table Manager Functions
+    // Backend entrypoints.
     fn post_encrypt_deck(
         ref self: TContractState, table_id: u32, encrypted_deck: Array<StructCard>
     );
     fn post_decrypted_community_cards(
         ref self: TContractState, table_id: u32, cards: Array<StructCard>
     );
-    // Timeout Functions
+    
+    // Admin Functions.
     fn skip_turn(ref self: TContractState, table_id: u32, player: ContractAddress);
     fn kick_player(ref self: TContractState, table_id: u32, player: ContractAddress);
     fn create_table(
@@ -20,9 +23,22 @@ trait ITableManagement<TContractState> {
          max_buy_in: u32, rake_fee: u32
     );
     fn shutdown_table(ref self: TContractState, table_id: u32);
-    // Admin Functions
     fn change_table_manager(ref self: TContractState, new_table_manager: ContractAddress);
+
+    // Getters.
     fn get_table_manager(self: @TContractState) -> ContractAddress;
+    fn get_table_length(self: @TContractState) -> u32;
+    fn get_game_state(self: @TContractState, table_id: u32) -> EnumGameState;
+    fn get_table_players(self: @TContractState, table_id: u32) -> Array<ContractAddress>;
+    fn get_current_turn(self: @TContractState, table_id: u32) -> Option<ContractAddress>;
+    fn get_current_sidepots(self: @TContractState, table_id: u32) -> Array<ComponentSidepot>;
+    fn get_table_community_cards(self: @TContractState, table_id: u32) -> Array<StructCard>;
+    fn is_deck_encrypted(self: @TContractState, table_id: u32) -> bool;
+    fn get_table_last_played_ts(self: @TContractState, table_id: u32) -> u64;
+    fn get_table_min_buy_in(self: @TContractState, table_id: u32) -> u32;
+    fn get_table_max_buy_in(self: @TContractState, table_id: u32) -> u32;
+    fn get_table_rake_fee(self: @TContractState, table_id: u32) -> u32;
+    fn get_table_last_raiser(self: @TContractState, table_id: u32) -> Option<ContractAddress>;
 }
 
 #[dojo::contract]
@@ -356,8 +372,98 @@ mod table_management_system {
             self.table_manager.write(new_table_manager);
         }
 
+        /////////////////////////////////////////////////////////////////////////
+        /////////////////////////////////////////////////////////////////////////
+        //////////////////////////////// GETTERS ////////////////////////////////
+        /////////////////////////////////////////////////////////////////////////
+        /////////////////////////////////////////////////////////////////////////
+        
         fn get_table_manager(self: @ContractState) -> ContractAddress {
             self.table_manager.read()
+        }
+
+        
+        fn get_table_length(self: @ContractState) -> u32 {
+            self.counter.read()
+        }
+        
+        fn get_game_state(self: @ContractState, table_id: u32) -> EnumGameState {
+            let world = self.world(@"dominion");
+            let table: ComponentTable = world.read_model(table_id);
+            table.m_state
+        }
+        
+        fn get_table_players(self: @ContractState, table_id: u32) -> Array<ContractAddress> {
+            let world = self.world(@"dominion");
+            let table: ComponentTable = world.read_model(table_id);
+            table.m_players
+        }
+        
+        fn get_table_last_raiser(self: @ContractState, table_id: u32) -> Option<ContractAddress> {
+            let world = self.world(@"dominion");
+            let table: ComponentTable = world.read_model(table_id);
+            if let Option::Some(player) = table.m_players.get(table.m_last_raiser.into()) {
+                Option::Some(*(player.unbox()))
+            } else {
+                Option::None
+            }
+        }
+        
+        fn get_current_turn(self: @ContractState, table_id: u32) -> Option<ContractAddress> {
+            let world = self.world(@"dominion");
+            let table: ComponentTable = world.read_model(table_id);
+            if let Option::Some(player) = table.m_players.get(table.m_current_turn.into()) {
+                Option::Some(*(player.unbox()))
+            } else {
+                Option::None
+            }
+        }
+
+        fn get_current_sidepots(self: @ContractState, table_id: u32) -> Array<ComponentSidepot> {
+            let world = self.world(@"dominion");
+            let table: ComponentTable = world.read_model(table_id);
+            let mut sidepots: Array<ComponentSidepot> = array![];
+            for i in 0..table.m_num_sidepots {
+                let sidepot: ComponentSidepot = world.read_model((table_id, i));
+                sidepots.append(sidepot);
+            };
+            sidepots
+        }
+        
+        fn get_table_community_cards(self: @ContractState, table_id: u32) -> Array<StructCard> {
+            let world = self.world(@"dominion");
+            let table: ComponentTable = world.read_model(table_id);
+            table.m_community_cards
+        }
+        
+        fn is_deck_encrypted(self: @ContractState, table_id: u32) -> bool {
+            let world = self.world(@"dominion");
+            let table: ComponentTable = world.read_model(table_id);
+            table.m_deck_encrypted
+        }
+        
+        fn get_table_last_played_ts(self: @ContractState, table_id: u32) -> u64 {
+            let world = self.world(@"dominion");
+            let table: ComponentTable = world.read_model(table_id);
+            table.m_last_played_ts
+        }
+
+        fn get_table_min_buy_in(self: @ContractState, table_id: u32) -> u32 {
+            let world = self.world(@"dominion");
+            let table: ComponentTable = world.read_model(table_id);
+            table.m_min_buy_in
+        }
+
+        fn get_table_max_buy_in(self: @ContractState, table_id: u32) -> u32 {
+            let world = self.world(@"dominion");
+            let table: ComponentTable = world.read_model(table_id);
+            table.m_max_buy_in
+        }
+
+        fn get_table_rake_fee(self: @ContractState, table_id: u32) -> u32 {
+            let world = self.world(@"dominion");
+            let table: ComponentTable = world.read_model(table_id);
+            table.m_rake_fee
         }
     }
 
@@ -374,15 +480,10 @@ mod table_management_system {
             // Reset the table (Community cards and pot are cleared out).
             table.reset_table();
 
-            // Reset player's hands and states.
+            // Reset player's hands.
             for player in table.m_players.span() {
                 let mut player_hand: ComponentHand = world.read_model(*player);
-                let mut player_component: ComponentPlayer = world.read_model((table.m_table_id, *player));
                 player_hand.m_cards = array![];
-                if player_component.m_state == EnumPlayerState::Folded {
-                    player_component.m_state = EnumPlayerState::Active;
-                    world.write_model(@player_component);
-                }
                 world.write_model(@player_hand);
             };
 
@@ -399,15 +500,18 @@ mod table_management_system {
             if let Option::Some(small_blind_player) = table.m_players.get(small_blind_position.into()) {
                 let mut small_blind_player: ComponentPlayer = world.read_model((table.m_table_id, *small_blind_player.unbox()));
                 actions_system::InternalImpl::_place_bet(ref world, ref table, ref small_blind_player, table.m_small_blind, true);
+                small_blind_player.m_state = EnumPlayerState::Active;
                 world.write_model(@small_blind_player);
             }
             if let Option::Some(big_blind_player) = table.m_players.get(big_blind_position.into()) {
                 let mut big_blind_player: ComponentPlayer = world.read_model((table.m_table_id, *big_blind_player.unbox()));
                 actions_system::InternalImpl::_place_bet(ref world, ref table, ref big_blind_player, table.m_big_blind, true);
+                big_blind_player.m_state = EnumPlayerState::Active;
                 world.write_model(@big_blind_player);
             }
 
             table.m_state = EnumGameState::PreFlop;
+            world.write_model(@table);
             world.emit_event(
                 @EventEncryptDeckRequested {
                     m_table_id: table.m_table_id,
@@ -435,10 +539,16 @@ mod table_management_system {
 
             if all_players_all_in {
                 table.m_finished_street = true;
+            } else {
+                // Reset players' states if they are not all in.
+                for player in table.m_players.span() {
+                    let mut player_component: ComponentPlayer = world.read_model((table.m_table_id, *player));
+                    player_component.m_state = EnumPlayerState::Active;
+                    world.write_model(@player_component);
+                };
             }
 
             assert!(table.m_finished_street, "Street has not finished");
-    
 
             // Advance table state to the next street.
             table.advance_street();
@@ -662,6 +772,7 @@ mod table_management_system {
                 
                 // Distribute this sidepot among eligible winners
                 if !pot_winners.is_empty() {
+                    // Calculate rake once per pot
                     let house_rake_fee = sidepot.m_amount * table.m_rake_fee / 100;
                     let amount_after_rake = sidepot.m_amount - house_rake_fee;
                     let share_per_winner = amount_after_rake / pot_winners.len().into();
@@ -734,7 +845,6 @@ mod table_management_system {
             // Update dealer/small blind/big blind.
             if dealer_found.is_none() {
                 // If there's no dealer, set the new dealer to this player.
-                dealer_position = 0;
                 small_blind_position = 1 % table.m_players.len();
                 big_blind_position = 2 % table.m_players.len();
 
@@ -750,6 +860,7 @@ mod table_management_system {
                 table.m_current_turn = small_blind_position.try_into().unwrap();
             }
 
+            table.m_last_raiser = big_blind_position.try_into().unwrap();
 
             // Update Roles.
             let mut dealer: ComponentPlayer = world.read_model((table.m_table_id, *table.m_players[dealer_position]));

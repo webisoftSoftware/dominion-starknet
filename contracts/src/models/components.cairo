@@ -48,6 +48,7 @@ struct ComponentTable {
     m_players: Array<ContractAddress>, /// Used to keep track of players at the table.
     m_current_turn: u8, /// Index of the current player turn
     m_current_dealer: u8, /// Index of the current dealer
+    m_last_raiser: u8, /// Index of the last raiser
     m_pot: u32, /// Total amount of chips in the pot.
     m_small_blind: u32, /// Small blind amount.
     m_big_blind: u32, /// Big blind amount.

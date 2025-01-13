@@ -12,7 +12,6 @@ trait ICashier<TContractState> {
     fn get_treasury_address(self: @TContractState) -> ContractAddress;
     fn get_vault_address(self: @TContractState) -> ContractAddress;
     fn get_paymaster_address(self: @TContractState) -> ContractAddress;
-    get_
 }
 
 #[starknet::interface]
@@ -131,8 +130,8 @@ mod cashier_system {
             let caller = get_caller_address();
 
             // Get sender and recipient components
-            let mut sender: ComponentPlayer = world.read_model(caller);
-            let mut recipient: ComponentPlayer = world.read_model(to);
+            let mut sender: ComponentPlayer = world.read_model((0, caller));
+            let mut recipient: ComponentPlayer = world.read_model((0, to));
 
             assert!(sender.m_total_chips >= amount, "Insufficient chips");
 
