@@ -9,6 +9,7 @@ trait ICashier<TContractState> {
     fn set_treasury_address(ref self: TContractState, treasury_address: ContractAddress);
     fn set_vault_address(ref self: TContractState, vault_address: ContractAddress);
     fn set_paymaster_address(ref self: TContractState, paymaster_address: ContractAddress);
+    fn get_player_balance(self: @TContractState, player: ContractAddress) -> u32;
     fn get_treasury_address(self: @TContractState) -> ContractAddress;
     fn get_vault_address(self: @TContractState) -> ContractAddress;
     fn get_paymaster_address(self: @TContractState) -> ContractAddress;
@@ -187,6 +188,12 @@ mod cashier_system {
 
         fn get_paymaster_address(self: @ContractState) -> ContractAddress {
             self.paymaster_address.read()
+        }
+
+        fn get_player_balance(self: @ContractState, player: ContractAddress) -> u32 {
+            let mut world = self.world(@"dominion");
+            let player_component: ComponentPlayer = world.read_model((0, player));
+            player_component.m_total_chips
         }
     }
 

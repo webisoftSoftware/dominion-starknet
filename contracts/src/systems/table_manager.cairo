@@ -384,7 +384,7 @@ mod table_management_system {
 
         
         fn get_table_length(self: @ContractState) -> u32 {
-            self.counter.read()
+            self.counter.read() - 1
         }
         
         fn get_game_state(self: @ContractState, table_id: u32) -> EnumGameState {

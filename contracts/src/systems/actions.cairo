@@ -23,7 +23,6 @@ trait IActions<TContractState> {
     fn get_player_state(self: @TContractState, table_id: u32, player: ContractAddress) -> EnumPlayerState;
     fn get_player_bet(self: @TContractState, table_id: u32, player: ContractAddress) -> u32;
     fn get_player_position(self: @TContractState, table_id: u32, player: ContractAddress) -> EnumPosition;
-    fn get_player_total_chips(self: @TContractState, table_id: u32, player: ContractAddress) -> u32;
     fn get_player_table_chips(self: @TContractState, table_id: u32, player: ContractAddress) -> u32;
     fn has_player_revealed(self: @TContractState, table_id: u32, player: ContractAddress) -> bool;
 }
@@ -124,11 +123,13 @@ mod actions_system {
             let caller = get_caller_address();
 
             // Get total chips from cashier table (0).
-            let mut player: ComponentPlayer = world.read_model((table_id, caller));
+            let mut player: ComponentPlayer = world.read_model((0, caller));
             
             // Create new player if first time joining
             if !player.m_is_created {
                 player = IPlayer::new(table_id, caller);
+            } else {
+                player.m_table_id = table_id;
             }
             
             // Validate table capacity and chip amounts.
@@ -243,6 +244,15 @@ mod actions_system {
             player.m_state = EnumPlayerState::Left;
 
             world.write_model(@player);
+
+            // Remove player from table.
+            let mut new_table_players: Array<ContractAddress> = array![];
+            for player in table.m_players.span() {
+                if *player != caller {
+                    new_table_players.append(*player);
+                }
+            };
+            table.m_players = new_table_players;
 
             // Update table roles if player was dealer/big blind/small blind.
             if player.m_is_dealer || player.m_position == EnumPosition::BigBlind ||
@@ -500,12 +510,6 @@ mod actions_system {
             let world = self.world(@"dominion");
             let player_component: ComponentPlayer = world.read_model((table_id, player));
             player_component.m_state
-        }
-
-        fn get_player_total_chips(self: @ContractState, table_id: u32, player: ContractAddress) -> u32 {
-            let world = self.world(@"dominion");
-            let player_component: ComponentPlayer = world.read_model((table_id, player));
-            player_component.m_total_chips
         }
 
         fn get_player_table_chips(self: @ContractState, table_id: u32, player: ContractAddress) -> u32 {
