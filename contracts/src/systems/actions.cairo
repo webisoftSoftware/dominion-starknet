@@ -120,6 +120,8 @@ mod actions_system {
         /// Can Panic? Yes, if the table is not created or shutdown, or if the player is already active.
         fn join_table(ref self: ContractState, table_id: u32, chips_amount: u32) {
             let mut world = self.world(@"dominion");
+
+
             let caller = get_caller_address();
 
             // Get total chips from cashier table (0).
@@ -144,6 +146,7 @@ mod actions_system {
             // Update player state for joining table.
             player.m_total_chips -= chips_amount;
             player.m_table_chips += chips_amount;
+            player.m_state = EnumPlayerState::Waiting;
 
             // Set player state based on game state.
             if table.m_state == EnumGameState::WaitingForPlayers {
@@ -159,6 +162,7 @@ mod actions_system {
             world.write_model(@player);
             table.m_players.append(caller);
 
+            world.write_model(@table);
             world
                 .emit_event(
                     @EventPlayerJoined {
@@ -167,7 +171,6 @@ mod actions_system {
                         m_timestamp: starknet::get_block_timestamp()
                     }
                 );
-            world.write_model(@table);
         }
 
         /// Sets a player's state to ready.
