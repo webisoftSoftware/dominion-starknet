@@ -148,13 +148,6 @@ mod actions_system {
             player.m_table_chips += chips_amount;
             player.m_state = EnumPlayerState::Waiting;
 
-            // Set player state based on game state.
-            if table.m_state == EnumGameState::WaitingForPlayers {
-                player.m_state = EnumPlayerState::Active;
-            } else {
-                player.m_state = EnumPlayerState::Waiting;
-            }
-
             // Reset player's current bet if they previously joined the table.
             player.m_current_bet = 0;
 
