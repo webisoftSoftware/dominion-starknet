@@ -1,6 +1,6 @@
 import { createDojoConfig } from '@dojoengine/core';
 
-import manifest from "./manifest_sepolia.json" with {type: "json"};
+import manifest from "../../contracts/manifest_sepolia.json" with {type: "json"};
 
 export const dojoConfig = createDojoConfig({
   rpcUrl: 'https://api.cartridge.gg/x/starknet/sepolia',
