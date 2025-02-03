@@ -1,0 +1,41 @@
+{
+  "compilerOptions": {
+    "jsx": "react-jsx",
+    "allowJs": true,
+    "types": ["vite/client"],
+    "resolveJsonModule": true,
+    "rootDir": ".",
+    "sourceMap": true,
+    "declaration": false,
+    "emitDecoratorMetadata": true,
+    "experimentalDecorators": true,
+    "importHelpers": true,
+    "target": "es2023",
+    "module": "NodeNext",
+    "lib": ["es2023", "dom", "DOM.Iterable"],
+    "moduleDetection": "force",
+    "isolatedModules": true,
+    "skipLibCheck": true,
+    "skipDefaultLibCheck": true,
+    "baseUrl": ".",
+    "paths": {
+      "@frontend/*": ["./src/*"]
+    },
+    "esModuleInterop": true,
+    "strict": true,
+    "noUncheckedIndexedAccess": true,
+    "noImplicitOverride": true
+  },
+  "exclude": ["node_modules", "tmp"],
+  "files": [],
+  "include": [],
+  "references": [
+    {
+      "path": "./tsconfig.app.json"
+    },
+    {
+      "path": "./tsconfig.spec.json"
+    }
+  ],
+  "compileOnSave": false,
+}

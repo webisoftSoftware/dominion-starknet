@@ -1,0 +1,17 @@
+{
+  "extends": "./tsconfig.json",
+  "compilerOptions": {
+    "module": "ESNext",
+    "moduleResolution": "bundler",
+    "outDir": "../../dist/out-tsc",
+    "types": [
+      "node",
+      "@nx/react/typings/cssmodule.d.ts",
+      "@nx/react/typings/image.d.ts",
+      "vite/client",
+      "./vite-env.d.ts"
+    ]
+  },
+  "exclude": ["tests/", "jest.config.ts"],
+  "include": ["src/"]
+}

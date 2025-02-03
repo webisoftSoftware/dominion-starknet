@@ -1,0 +1,30 @@
+@import '@fontsource-variable/inter';
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+/* You can add global styles to this file, and also import other style files */
+
+body {
+  margin: 0;
+  padding: 0;
+  background-color: theme('colors.primary');
+  min-height: 100vh;
+  width: 100%;
+  display: flex;
+  justify-content: center;
+}
+
+#root {
+  width: min(100%, 640px);
+  min-height: 100vh;
+  position: relative;
+  overflow-x: hidden; /* Prevent horizontal scroll */
+}
+
+/* Force all direct children of root to respect container width */
+#root > * {
+  max-width: 100%;
+  overflow-x: hidden;
+}
+

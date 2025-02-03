@@ -67,3 +67,4 @@ lerna-debug.log*
 # .vscode Debugging
 */.vscode/*-debug-profile
 */.vscode
+*.nx/

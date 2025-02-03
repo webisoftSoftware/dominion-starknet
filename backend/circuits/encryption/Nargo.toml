@@ -1,0 +1,9 @@
+[package]
+name = "encryption"
+type = "bin"
+authors = [""]
+compiler_version = ">=0.36.0"
+
+[dependencies]
+hydra = { tag = "v0.4.0", git = "https://github.com/TaceoLabs/noir-hydra" }
+
