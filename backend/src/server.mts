@@ -1,6 +1,6 @@
 import express from 'express';
 import cors from 'cors';
-import { dojoConfig } from '../dojo/dojoConfig.mjs';
+import { dojoConfig } from './dojoConfig.mjs';
 import { WebSocket } from 'ws';
 import { createClient } from 'graphql-transport-ws';
 import { spawn } from 'child_process';
