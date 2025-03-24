@@ -5,7 +5,7 @@ edition = "2024_07"
 
 [dependencies]
 starknet = "2.9.2"
-dojo = { git = "https://github.com/dojoengine/dojo", tag = "v1.2.0" }
+dojo = { git = "https://github.com/dojoengine/dojo" }
 origami_random = { git = "https://github.com/dojoengine/origami.git" }
 
 [[target.starknet-contract]]
@@ -14,6 +14,6 @@ sierra = true
 
 [dev-dependencies]
 cairo_test = "2.9.2"
-dojo_cairo_test = { git = "https://github.com/dojoengine/dojo", tag = "v1.2.0" }
+dojo_cairo_test = { git = "https://github.com/dojoengine/dojo" }
 
 [profile.sepolia]

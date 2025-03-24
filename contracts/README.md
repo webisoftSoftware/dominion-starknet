@@ -1,24 +1,18 @@
 # Dojo Contracts for Dominion
 
-# Dominion on Starknet (Dojo Smart Contracts)
+## Setup
 
-## 🚀 Getting Started
+### Install
 
-### Prerequisites
-Make sure the following tools are installed:
-- **Node.js**: Version 16 or higher
-- **Scarb**: Version 2.9.2 or higher
-- **Dojo**: Latest version
+```bash
+curl -L https://install.dojoengine.org | bash
+dojoup --version v1.0.12
+sudo cp ~/.dojo/bin/sozo /usr/local/bin
+```
 
-### Setup
+*Note, you may need to restart your shell or source `.bashrc` to have access to the `dojoup` command.*
 
-1. **Clone the Repository**:
-   ```bash  
-   git clone https://github.com/webisoftSoftware/dominion-starknet.git 
-   cd dominion-starknet  
-   ```  
-
-#### Build \[sepolia\]
+### Build \[sepolia\]
 
 Release:
 ```bash
@@ -30,7 +24,8 @@ Debug:
 sozo build --profile sepolia --stats.by-tag
 ```
 
-#### Migrate \[sepolia\]
+### Migrate \[sepolia\]
+
 
 Release:
 ```bash
@@ -42,7 +37,7 @@ Debug:
 sozo migrate -vvv --profile sepolia --fee ETH
 ```
 
-#### Inspect Deployment \[sepolia\]
+### Inspect Deployment \[sepolia\]
 ```bash
 sozo inspect --profile sepolia
 ```
