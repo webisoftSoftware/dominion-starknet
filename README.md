@@ -6,8 +6,8 @@
 Make sure the following tools are installed:  
 - **Node.js**: Version 16 or higher  
 - **Yarn**: Version 1.22.10 or higher  
-- **Scarb**: Version 2.8.4 or higher
-- **Dojo**: Latest version
+- **Scarb**: Version 2.9.2 or higher
+- **Dojo**: 1.0.0 or higher
 
 ### Setup Instructions  
 

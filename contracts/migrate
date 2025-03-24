@@ -1,0 +1,3 @@
+#!/bin/bash
+
+sozo migrate -vvv --profile sepolia --fee ETH && sozo inspect --profile sepolia && sozo inspect --profile sepolia > deployed_contracts_info.txt

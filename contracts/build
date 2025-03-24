@@ -1,0 +1,3 @@
+#!/bin/bash
+
+sozo clean && sozo build --typescript --profile sepolia
