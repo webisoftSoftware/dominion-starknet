@@ -1,6 +1,6 @@
 import { DojoProvider, DojoCall } from "@dojoengine/core";
 import { Account, AccountInterface, BigNumberish, CairoOption, CairoCustomEnum, ByteArray } from "starknet";
-import {StructCard} from "./models.gen";
+import * as models from "./models.gen";
 
 export function setupWorld(provider: DojoProvider) {
 
@@ -185,23 +185,6 @@ export function setupWorld(provider: DojoProvider) {
 		}
 	};
 
-	const build_table_management_system_getGameState_calldata = (tableId: BigNumberish): DojoCall => {
-		return {
-			contractName: "table_management_system",
-			entrypoint: "get_game_state",
-			calldata: [tableId],
-		};
-	};
-
-	const table_management_system_getGameState = async (tableId: BigNumberish) => {
-		try {
-			return await provider.call("dominion", build_table_management_system_getGameState_calldata(tableId));
-		} catch (error) {
-			console.error(error);
-			throw error;
-		}
-	};
-
 	const build_cashier_system_getPaymasterAddress_calldata = (): DojoCall => {
 		return {
 			contractName: "cashier_system",
@@ -247,6 +230,40 @@ export function setupWorld(provider: DojoProvider) {
 	const actions_system_getPlayerBet = async (tableId: BigNumberish, player: string) => {
 		try {
 			return await provider.call("dominion", build_actions_system_getPlayerBet_calldata(tableId, player));
+		} catch (error) {
+			console.error(error);
+			throw error;
+		}
+	};
+
+	const build_actions_system_getPlayerCommitmentHash_calldata = (tableId: BigNumberish, player: string): DojoCall => {
+		return {
+			contractName: "actions_system",
+			entrypoint: "get_player_commitment_hash",
+			calldata: [tableId, player],
+		};
+	};
+
+	const actions_system_getPlayerCommitmentHash = async (tableId: BigNumberish, player: string) => {
+		try {
+			return await provider.call("dominion", build_actions_system_getPlayerCommitmentHash_calldata(tableId, player));
+		} catch (error) {
+			console.error(error);
+			throw error;
+		}
+	};
+
+	const build_actions_system_getPlayerHand_calldata = (tableId: BigNumberish, player: string): DojoCall => {
+		return {
+			contractName: "actions_system",
+			entrypoint: "get_player_hand",
+			calldata: [tableId, player],
+		};
+	};
+
+	const actions_system_getPlayerHand = async (tableId: BigNumberish, player: string) => {
+		try {
+			return await provider.call("dominion", build_actions_system_getPlayerHand_calldata(tableId, player));
 		} catch (error) {
 			console.error(error);
 			throw error;
@@ -304,6 +321,23 @@ export function setupWorld(provider: DojoProvider) {
 		}
 	};
 
+	const build_table_management_system_getTableBigBlind_calldata = (tableId: BigNumberish): DojoCall => {
+		return {
+			contractName: "table_management_system",
+			entrypoint: "get_table_big_blind",
+			calldata: [tableId],
+		};
+	};
+
+	const table_management_system_getTableBigBlind = async (tableId: BigNumberish) => {
+		try {
+			return await provider.call("dominion", build_table_management_system_getTableBigBlind_calldata(tableId));
+		} catch (error) {
+			console.error(error);
+			throw error;
+		}
+	};
+
 	const build_table_management_system_getTableCommunityCards_calldata = (tableId: BigNumberish): DojoCall => {
 		return {
 			contractName: "table_management_system",
@@ -315,6 +349,23 @@ export function setupWorld(provider: DojoProvider) {
 	const table_management_system_getTableCommunityCards = async (tableId: BigNumberish) => {
 		try {
 			return await provider.call("dominion", build_table_management_system_getTableCommunityCards_calldata(tableId));
+		} catch (error) {
+			console.error(error);
+			throw error;
+		}
+	};
+
+	const build_table_management_system_getTableDeck_calldata = (tableId: BigNumberish): DojoCall => {
+		return {
+			contractName: "table_management_system",
+			entrypoint: "get_table_deck",
+			calldata: [tableId],
+		};
+	};
+
+	const table_management_system_getTableDeck = async (tableId: BigNumberish) => {
+		try {
+			return await provider.call("dominion", build_table_management_system_getTableDeck_calldata(tableId));
 		} catch (error) {
 			console.error(error);
 			throw error;
@@ -457,6 +508,40 @@ export function setupWorld(provider: DojoProvider) {
 		}
 	};
 
+	const build_table_management_system_getTableSmallBlind_calldata = (tableId: BigNumberish): DojoCall => {
+		return {
+			contractName: "table_management_system",
+			entrypoint: "get_table_small_blind",
+			calldata: [tableId],
+		};
+	};
+
+	const table_management_system_getTableSmallBlind = async (tableId: BigNumberish) => {
+		try {
+			return await provider.call("dominion", build_table_management_system_getTableSmallBlind_calldata(tableId));
+		} catch (error) {
+			console.error(error);
+			throw error;
+		}
+	};
+
+	const build_table_management_system_getTableState_calldata = (tableId: BigNumberish): DojoCall => {
+		return {
+			contractName: "table_management_system",
+			entrypoint: "get_table_state",
+			calldata: [tableId],
+		};
+	};
+
+	const table_management_system_getTableState = async (tableId: BigNumberish) => {
+		try {
+			return await provider.call("dominion", build_table_management_system_getTableState_calldata(tableId));
+		} catch (error) {
+			console.error(error);
+			throw error;
+		}
+	};
+
 	const build_cashier_system_getTreasuryAddress_calldata = (): DojoCall => {
 		return {
 			contractName: "cashier_system",
@@ -491,6 +576,23 @@ export function setupWorld(provider: DojoProvider) {
 		}
 	};
 
+	const build_actions_system_getWinners_calldata = (tableId: BigNumberish, round: BigNumberish): DojoCall => {
+		return {
+			contractName: "actions_system",
+			entrypoint: "get_winners",
+			calldata: [tableId, round],
+		};
+	};
+
+	const actions_system_getWinners = async (tableId: BigNumberish, round: BigNumberish) => {
+		try {
+			return await provider.call("dominion", build_actions_system_getWinners_calldata(tableId, round));
+		} catch (error) {
+			console.error(error);
+			throw error;
+		}
+	};
+
 	const build_actions_system_hasPlayerRevealed_calldata = (tableId: BigNumberish, player: string): DojoCall => {
 		return {
 			contractName: "actions_system",
@@ -519,6 +621,23 @@ export function setupWorld(provider: DojoProvider) {
 	const table_management_system_isDeckEncrypted = async (tableId: BigNumberish) => {
 		try {
 			return await provider.call("dominion", build_table_management_system_isDeckEncrypted_calldata(tableId));
+		} catch (error) {
+			console.error(error);
+			throw error;
+		}
+	};
+
+	const build_actions_system_isPlayerDealer_calldata = (tableId: BigNumberish, player: string): DojoCall => {
+		return {
+			contractName: "actions_system",
+			entrypoint: "is_player_dealer",
+			calldata: [tableId, player],
+		};
+	};
+
+	const actions_system_isPlayerDealer = async (tableId: BigNumberish, player: string) => {
+		try {
+			return await provider.call("dominion", build_actions_system_isPlayerDealer_calldata(tableId, player));
 		} catch (error) {
 			console.error(error);
 			throw error;
@@ -672,6 +791,27 @@ export function setupWorld(provider: DojoProvider) {
 		}
 	};
 
+	const build_table_management_system_postProofs_calldata = (tableId: BigNumberish, shuffleProof: ByteArray, deckProof: ByteArray): DojoCall => {
+		return {
+			contractName: "table_management_system",
+			entrypoint: "post_proofs",
+			calldata: [tableId, shuffleProof, deckProof],
+		};
+	};
+
+	const table_management_system_postProofs = async (snAccount: Account | AccountInterface, tableId: BigNumberish, shuffleProof: ByteArray, deckProof: ByteArray) => {
+		try {
+			return await provider.execute(
+				snAccount,
+				build_table_management_system_postProofs_calldata(tableId, shuffleProof, deckProof),
+				"dominion",
+			);
+		} catch (error) {
+			console.error(error);
+			throw error;
+		}
+	};
+
 	const build_actions_system_revealHandToAll_calldata = (tableId: BigNumberish, decryptedHand: Array<StructCard>, request: ByteArray): DojoCall => {
 		return {
 			contractName: "actions_system",
@@ -798,19 +938,19 @@ export function setupWorld(provider: DojoProvider) {
 		}
 	};
 
-	const build_table_management_system_skipTurn_calldata = (tableId: BigNumberish, player: string): DojoCall => {
+	const build_actions_system_skipTurn_calldata = (tableId: BigNumberish, player: string): DojoCall => {
 		return {
-			contractName: "table_management_system",
+			contractName: "actions_system",
 			entrypoint: "skip_turn",
 			calldata: [tableId, player],
 		};
 	};
 
-	const table_management_system_skipTurn = async (snAccount: Account | AccountInterface, tableId: BigNumberish, player: string) => {
+	const actions_system_skipTurn = async (snAccount: Account | AccountInterface, tableId: BigNumberish, player: string) => {
 		try {
 			return await provider.execute(
 				snAccount,
-				build_table_management_system_skipTurn_calldata(tableId, player),
+				build_actions_system_skipTurn_calldata(tableId, player),
 				"dominion",
 			);
 		} catch (error) {
@@ -871,14 +1011,22 @@ export function setupWorld(provider: DojoProvider) {
 			buildFoldCalldata: build_actions_system_fold_calldata,
 			getPlayerBet: actions_system_getPlayerBet,
 			buildGetPlayerBetCalldata: build_actions_system_getPlayerBet_calldata,
+			getPlayerCommitmentHash: actions_system_getPlayerCommitmentHash,
+			buildGetPlayerCommitmentHashCalldata: build_actions_system_getPlayerCommitmentHash_calldata,
+			getPlayerHand: actions_system_getPlayerHand,
+			buildGetPlayerHandCalldata: build_actions_system_getPlayerHand_calldata,
 			getPlayerPosition: actions_system_getPlayerPosition,
 			buildGetPlayerPositionCalldata: build_actions_system_getPlayerPosition_calldata,
 			getPlayerState: actions_system_getPlayerState,
 			buildGetPlayerStateCalldata: build_actions_system_getPlayerState_calldata,
 			getPlayerTableChips: actions_system_getPlayerTableChips,
 			buildGetPlayerTableChipsCalldata: build_actions_system_getPlayerTableChips_calldata,
+			getWinners: actions_system_getWinners,
+			buildGetWinnersCalldata: build_actions_system_getWinners_calldata,
 			hasPlayerRevealed: actions_system_hasPlayerRevealed,
 			buildHasPlayerRevealedCalldata: build_actions_system_hasPlayerRevealed_calldata,
+			isPlayerDealer: actions_system_isPlayerDealer,
+			buildIsPlayerDealerCalldata: build_actions_system_isPlayerDealer_calldata,
 			joinTable: actions_system_joinTable,
 			buildJoinTableCalldata: build_actions_system_joinTable_calldata,
 			leaveTable: actions_system_leaveTable,
@@ -891,6 +1039,8 @@ export function setupWorld(provider: DojoProvider) {
 			buildRevealHandToAllCalldata: build_actions_system_revealHandToAll_calldata,
 			setReady: actions_system_setReady,
 			buildSetReadyCalldata: build_actions_system_setReady_calldata,
+			skipTurn: actions_system_skipTurn,
+			buildSkipTurnCalldata: build_actions_system_skipTurn_calldata,
 			topUpTableChips: actions_system_topUpTableChips,
 			buildTopUpTableChipsCalldata: build_actions_system_topUpTableChips_calldata,
 		},
@@ -927,10 +1077,12 @@ export function setupWorld(provider: DojoProvider) {
 			buildGetCurrentSidepotsCalldata: build_table_management_system_getCurrentSidepots_calldata,
 			getCurrentTurn: table_management_system_getCurrentTurn,
 			buildGetCurrentTurnCalldata: build_table_management_system_getCurrentTurn_calldata,
-			getGameState: table_management_system_getGameState,
-			buildGetGameStateCalldata: build_table_management_system_getGameState_calldata,
+			getTableBigBlind: table_management_system_getTableBigBlind,
+			buildGetTableBigBlindCalldata: build_table_management_system_getTableBigBlind_calldata,
 			getTableCommunityCards: table_management_system_getTableCommunityCards,
 			buildGetTableCommunityCardsCalldata: build_table_management_system_getTableCommunityCards_calldata,
+			getTableDeck: table_management_system_getTableDeck,
+			buildGetTableDeckCalldata: build_table_management_system_getTableDeck_calldata,
 			getTableLastPlayedTs: table_management_system_getTableLastPlayedTs,
 			buildGetTableLastPlayedTsCalldata: build_table_management_system_getTableLastPlayedTs_calldata,
 			getTableLastRaiser: table_management_system_getTableLastRaiser,
@@ -947,6 +1099,10 @@ export function setupWorld(provider: DojoProvider) {
 			buildGetTablePlayersCalldata: build_table_management_system_getTablePlayers_calldata,
 			getTableRakeFee: table_management_system_getTableRakeFee,
 			buildGetTableRakeFeeCalldata: build_table_management_system_getTableRakeFee_calldata,
+			getTableSmallBlind: table_management_system_getTableSmallBlind,
+			buildGetTableSmallBlindCalldata: build_table_management_system_getTableSmallBlind_calldata,
+			getTableState: table_management_system_getTableState,
+			buildGetTableStateCalldata: build_table_management_system_getTableState_calldata,
 			isDeckEncrypted: table_management_system_isDeckEncrypted,
 			buildIsDeckEncryptedCalldata: build_table_management_system_isDeckEncrypted_calldata,
 			kickPlayer: table_management_system_kickPlayer,
@@ -955,10 +1111,10 @@ export function setupWorld(provider: DojoProvider) {
 			buildPostDecryptedCommunityCardsCalldata: build_table_management_system_postDecryptedCommunityCards_calldata,
 			postEncryptDeck: table_management_system_postEncryptDeck,
 			buildPostEncryptDeckCalldata: build_table_management_system_postEncryptDeck_calldata,
+			postProofs: table_management_system_postProofs,
+			buildPostProofsCalldata: build_table_management_system_postProofs_calldata,
 			shutdownTable: table_management_system_shutdownTable,
 			buildShutdownTableCalldata: build_table_management_system_shutdownTable_calldata,
-			skipTurn: table_management_system_skipTurn,
-			buildSkipTurnCalldata: build_table_management_system_skipTurn_calldata,
 		},
 	};
 }

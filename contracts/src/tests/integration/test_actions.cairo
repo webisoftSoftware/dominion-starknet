@@ -1,12 +1,15 @@
-use crate::systems::actions::{actions_system, IActionsDispatcher, IActionsDispatcherTrait};
-use crate::systems::table_manager::{table_management_system, ITableManagementDispatcher, ITableManagementDispatcherTrait};
+use crate::systems::actions::{IActionsDispatcher, IActionsDispatcherTrait};
+use crate::systems::table_manager::{ITableManagementDispatcher, ITableManagementDispatcherTrait};
 
-use crate::models::enums::{EnumGameState, EnumPlayerState, EnumCardValue, EnumCardSuit, EnumPosition};
-use crate::models::components::{ComponentTable, ComponentPlayer, ComponentHand};
-use crate::models::traits::{IPlayer, ITable};
+use crate::models::enums::{EnumTableState};
+use crate::models::components::{
+    ComponentTable, ComponentPlayer, ComponentBank,
+    ComponentProof, ComponentTableInfo
+};
+use crate::models::traits::{IPlayer, IBank};
 
-use dojo::model::{ModelStorage, ModelValueStorage, ModelStorageTest, ModelValueStorageTest};
-use dojo::world::{IWorldDispatcher, IWorldDispatcherTrait, WorldStorageTrait};
+use dojo::model::{ModelStorage, ModelStorageTest};
+use dojo::world::{WorldStorageTrait};
 use dojo_cairo_test::{ContractDefTrait, WorldStorageTestTrait};
 use starknet::ContractAddress;
 
@@ -44,19 +47,26 @@ fn test_join_table_full() {
 
     // Create the players in advance to give them total chips.
     let mut player_1_component: ComponentPlayer = IPlayer::new(1, player_1);
-    player_1_component.m_total_chips = 10000;
+    let mut player_1_bank: ComponentBank = IBank::new(player_1);
+    player_1_bank.m_balance = 10000;
     let mut player_2_component: ComponentPlayer = IPlayer::new(1, player_2);
-    player_2_component.m_total_chips = 10000;
+    let mut player_2_bank: ComponentBank = IBank::new(player_2);
+    player_2_bank.m_balance = 10000;
     let mut player_3_component: ComponentPlayer = IPlayer::new(1, player_3);
-    player_3_component.m_total_chips = 10000;
+    let mut player_3_bank: ComponentBank = IBank::new(player_3);
+    player_3_bank.m_balance = 10000;
     let mut player_4_component: ComponentPlayer = IPlayer::new(1, player_4);
-    player_4_component.m_total_chips = 10000;
+    let mut player_4_bank: ComponentBank = IBank::new(player_4);
+    player_4_bank.m_balance = 10000;
     let mut player_5_component: ComponentPlayer = IPlayer::new(1, player_5);
-    player_5_component.m_total_chips = 10000;
+    let mut player_5_bank: ComponentBank = IBank::new(player_5);
+    player_5_bank.m_balance = 10000;
     let mut player_6_component: ComponentPlayer = IPlayer::new(1, player_6);
-    player_6_component.m_total_chips = 10000;
+    let mut player_6_bank: ComponentBank = IBank::new(player_6);
+    player_6_bank.m_balance = 10000;
     let mut player_7_component: ComponentPlayer = IPlayer::new(1, player_7);
-    player_7_component.m_total_chips = 10000;
+    let mut player_7_bank: ComponentBank = IBank::new(player_7);
+    player_7_bank.m_balance = 10000;
 
     world.write_models_test(array![
         @player_1_component,
@@ -66,6 +76,15 @@ fn test_join_table_full() {
         @player_5_component,
         @player_6_component,
         @player_7_component,
+    ].span());
+    world.write_models_test(array![
+        @player_1_bank,
+        @player_2_bank,
+        @player_3_bank,
+        @player_4_bank,
+        @player_5_bank,
+        @player_6_bank,
+        @player_7_bank,
     ].span());
 
     table_manager.create_table(100, 200, 2000, 4000, 5);
@@ -116,8 +135,11 @@ fn test_join_table_chips_less_than_min_buy_in() {
 
     let player: ContractAddress = starknet::contract_address_const::<0x1A>();
     let mut player_component: ComponentPlayer = IPlayer::new(1, player);
-    player_component.m_total_chips = 10000;
     world.write_model_test(@player_component);
+
+    let mut player_bank: ComponentBank = IBank::new(player);
+    player_bank.m_balance = 10000;
+    world.write_model_test(@player_bank);
 
     table_manager.create_table(100, 200, 2000, 4000, 5);
 
@@ -134,8 +156,11 @@ fn test_join_table_chips_more_than_max_buy_in() {
 
     let player: ContractAddress = starknet::contract_address_const::<0x1A>();
     let mut player_component: ComponentPlayer = IPlayer::new(1, player);
-    player_component.m_total_chips = 10000;
     world.write_model_test(@player_component);
+
+    let mut player_bank: ComponentBank = IBank::new(player);
+    player_bank.m_balance = 10000;
+    world.write_model_test(@player_bank);
 
     table_manager.create_table(100, 200, 2000, 4000, 5);
 
@@ -150,12 +175,23 @@ fn test_join_table_twice() {
     let mut table_manager: ITableManagementDispatcher = deploy_table_manager(ref world);
     let mut actions: IActionsDispatcher = deploy_actions(ref world);
 
+    let player: ContractAddress = starknet::contract_address_const::<0x1A>();
+    let mut player_component: ComponentPlayer = IPlayer::new(1, player);
+    world.write_model_test(@player_component);
+
+    let mut player_bank: ComponentBank = IBank::new(player);
+    player_bank.m_balance = 10000;
+    world.write_model_test(@player_bank);
+
     table_manager.create_table(100, 200, 2000, 4000, 5);
 
     let player: ContractAddress = starknet::contract_address_const::<0x1A>();
     let mut player_component: ComponentPlayer = IPlayer::new(1, player);
-    player_component.m_total_chips = 10000;
     world.write_model_test(@player_component);
+
+    let mut player_bank: ComponentBank = IBank::new(player);
+    player_bank.m_balance = 10000;
+    world.write_model_test(@player_bank);
 
     starknet::testing::set_contract_address(player);
     actions.join_table(1, 2000);
@@ -174,6 +210,13 @@ fn test_leave_table_not_joined() {
     table_manager.create_table(100, 200, 2000, 4000, 5);
 
     let player: ContractAddress = starknet::contract_address_const::<0x1A>();
+    let mut player_component: ComponentPlayer = IPlayer::new(1, player);
+    world.write_model_test(@player_component);
+
+    let mut player_bank: ComponentBank = IBank::new(player);
+    player_bank.m_balance = 10000;
+    world.write_model_test(@player_bank);
+
     starknet::testing::set_contract_address(player);
     actions.leave_table(1);
 }
@@ -189,8 +232,11 @@ fn test_chip_amount_after_leave() {
     table_manager.create_table(100, 200, 2000, 4000, 5);
 
     let mut player_component: ComponentPlayer = IPlayer::new(1, player);
-    player_component.m_total_chips = 10000;
     world.write_model_test(@player_component);
+
+    let mut player_bank: ComponentBank = IBank::new(player);
+    player_bank.m_balance = 10000;
+    world.write_model_test(@player_bank);
 
     starknet::testing::set_contract_address(player);
     actions.join_table(1, 2000);
@@ -200,23 +246,24 @@ fn test_chip_amount_after_leave() {
 
     let table: ComponentTable = world.read_model(1);
     let player_component: ComponentPlayer = world.read_model((1, player));
-    
-    assert!(player_component.m_total_chips == 10000, "Player's total chips should be 10000");
+    let player_bank: ComponentBank = world.read_model(player);
+
+    assert!(player_bank.m_balance == 10000, "Player's total chips should be 10000");
     assert!(player_component.m_table_chips == 0, "Player's table chips should be 0");
     assert!(table.m_pot == 0, "Table pot should be 0");
 }
 
 #[test]
-#[should_panic(expected: ("Game is shutdown", 'ENTRYPOINT_FAILED'))]
+#[should_panic(expected: ("Game has not started", 'ENTRYPOINT_FAILED'))]
 fn test_post_auth_hash_invalid_state() {
     let mut world: dojo::world::WorldStorage = deploy_world();
     let mut table_manager = deploy_table_manager(ref world);
     let mut actions = deploy_actions(ref world);
 
     table_manager.create_table(100, 200, 2000, 4000, 5);
-    let mut table: ComponentTable = world.read_model(1);
-    table.m_state = EnumGameState::Shutdown;
-    world.write_model_test(@table);
+    let mut table_info: ComponentTableInfo = world.read_model(1);
+    table_info.m_state = EnumTableState::Shutdown;
+    world.write_model_test(@table_info);
 
     actions.post_auth_hash(1, "test");
 }
@@ -249,30 +296,36 @@ fn test_insufficient_chips_for_bet() {
     let player: ContractAddress = starknet::contract_address_const::<0x1A>();
     let player_2: ContractAddress = starknet::contract_address_const::<0x1B>();
     
-    let mut player_component: ComponentPlayer = IPlayer::new(1, player);
-    player_component.m_total_chips = 2400;
+    let player_component: ComponentPlayer = IPlayer::new(1, player);
     world.write_model_test(@player_component);
 
-    let mut player_2_component: ComponentPlayer = IPlayer::new(1, player_2);
-    player_2_component.m_total_chips = 2200;
+    let mut player_bank: ComponentBank = IBank::new(player);
+    player_bank.m_balance = 4400;
+    world.write_model_test(@player_bank);
+
+    let player_2_component: ComponentPlayer = IPlayer::new(1, player_2);
     world.write_model_test(@player_2_component);
 
-    table_manager.create_table(200, 400, 2000, 4000, 5);
+    let mut player_2_bank: ComponentBank = IBank::new(player_2);
+    player_2_bank.m_balance = 4200;
+    world.write_model_test(@player_2_bank);
+
+    table_manager.create_table(200, 400, 4000, 6000, 5);
 
     starknet::testing::set_contract_address(player);  // Dealer + Big Blind.
-    actions.join_table(1, 2000);
+    actions.join_table(1, 4000);
     actions.set_ready(1);
 
     starknet::testing::set_contract_address(player_2);  // Small Blind.
-    actions.join_table(1, 2000);
+    actions.join_table(1, 4000);
     actions.set_ready(1);
 
-    let mut table: ComponentTable = world.read_model(1);
-    table.m_deck_encrypted = true;
-    world.write_model_test(@table);
+    let mut proof: ComponentProof = world.read_model(1);
+    proof.m_deck_proof = "TEST";
+    world.write_model_test(@proof);
 
     starknet::testing::set_contract_address(player_2);
-    actions.bet(1, 2000);
+    actions.bet(1, 4000);
 }
 
 #[test]
@@ -285,31 +338,37 @@ fn test_bet_twice() {
     let player: ContractAddress = starknet::contract_address_const::<0x1A>();
     let player_2: ContractAddress = starknet::contract_address_const::<0x1B>();
     let mut player_component: ComponentPlayer = IPlayer::new(1, player);
-    player_component.m_total_chips = 2400;
     world.write_model_test(@player_component);
 
+    let mut player_bank: ComponentBank = IBank::new(player);
+    player_bank.m_balance = 4400;
+    world.write_model_test(@player_bank);
+
     let mut player_2_component: ComponentPlayer = IPlayer::new(1, player_2);
-    player_2_component.m_total_chips = 2200;
     world.write_model_test(@player_2_component);
 
-    table_manager.create_table(200, 400, 2000, 4000, 5);
+    let mut player_2_bank: ComponentBank = IBank::new(player_2);
+    player_2_bank.m_balance = 4200;
+    world.write_model_test(@player_2_bank);
+
+    table_manager.create_table(200, 400, 4000, 6000, 5);
 
     starknet::testing::set_contract_address(player);  // Dealer + Big Blind.
-    actions.join_table(1, 2000);
+    actions.join_table(1, 4000);
     actions.set_ready(1);
 
     starknet::testing::set_contract_address(player_2);  // Small Blind.
-    actions.join_table(1, 2000);
+    actions.join_table(1, 4000);
     actions.set_ready(1);
 
-    let mut table: ComponentTable = world.read_model(1);
-    table.m_deck_encrypted = true;
-    world.write_model_test(@table);
+    let mut proof: ComponentProof = world.read_model(1);
+    proof.m_deck_proof = "TEST";
+    world.write_model_test(@proof);
 
-    starknet::testing::set_contract_address(player_2);
+    starknet::testing::set_caller_address(player_2);
     actions.bet(1, 200);
 
-    starknet::testing::set_contract_address(player_2);
+    starknet::testing::set_caller_address(player_2);
     actions.bet(1, 200);
 }
 

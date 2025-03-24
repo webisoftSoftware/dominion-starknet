@@ -1,22 +1,19 @@
 [package]
 name = "dominion"
-version = "1.0.1"
-edition = "2023_01"
-
-[cairo]
-sierra-replace-ids = true
+version = "1.2.1"
+edition = "2024_07"
 
 [dependencies]
-dojo = { git = "https://github.com/dojoengine/dojo"}
-origami_random = { git = "https://github.com/dojoengine/origami.git"}
-alexandria_data_structures = { git = "https://github.com/keep-starknet-strange/alexandria.git"}
+starknet = "2.9.2"
+dojo = { git = "https://github.com/dojoengine/dojo", tag = "v1.2.0" }
+origami_random = { git = "https://github.com/dojoengine/origami.git" }
 
 [[target.starknet-contract]]
 build-external-contracts = ["dojo::world::world_contract::world"]
 sierra = true
-casm = true
 
 [dev-dependencies]
-dojo_cairo_test = { git = "https://github.com/dojoengine/dojo"}
+cairo_test = "2.9.2"
+dojo_cairo_test = { git = "https://github.com/dojoengine/dojo", tag = "v1.2.0" }
 
 [profile.sepolia]

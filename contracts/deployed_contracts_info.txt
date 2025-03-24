@@ -1,33 +1,32 @@
-The world address computed from the seed is different from the address provided in config:
 
-deterministic address: 0x3799db1a112296f50245901d1a3e3e6162dccbb77d2ef03dfdccb3320f1679a
-config address: 0x3f73735a76cf44a357fb55f03dfaa84e0e4be53a70e73cb324aab9c3649bbf8
-
-The address in the config file is preferred, consider commenting it out from the config file if you attempt to migrate the world with a new seed.
-
-If you are upgrading the world, you can ignore this message.
-
- [90mWorld[39m   | Contract Address                                                   | Class Hash                                                         
----------+--------------------------------------------------------------------+--------------------------------------------------------------------
- Updated | 0x03f73735a76cf44a357fb55f03dfaa84e0e4be53a70e73cb324aab9c3649bbf8 | 0x045575a88cc5cef1e444c77ce60b7b4c9e73a01cbbe20926d5a4c72a94011410 
+ [90mWorld[39m  | Contract Address                                                   | Class Hash                                                         
+--------+--------------------------------------------------------------------+--------------------------------------------------------------------
+ Synced | 0x05386d840b14c94c37cb6f03aa9908c18bc1f2a7ba2826bc3a6f52da5121117f | 0x07c9469d45a9cdbab775035afb48e1fa73fb35ab059fcb9dfb0a301aa973e783 
 
  [90mNamespaces[39m | Status | Dojo Selector                                                      
 ------------+--------+--------------------------------------------------------------------
  dominion   | Synced | 0x01a50f4b3e702e363d41c74ba4437e1125c001f0d67e0dfd0b9d31880bff2c24 
 
- [90mContracts[39m                        | Status  | Is Initialized | Dojo Selector                                                      | Contract Address                                                   
-----------------------------------+---------+----------------+--------------------------------------------------------------------+--------------------------------------------------------------------
- dominion-actions_system          | Updated | true           | 0x05fdf8e627677acf0623e578748e3068e45b056e1860750dfc2365d05201fae4 | 0x07eed572e63c1b9bde3bc281dfccfe34cefd2418a21088a3b48c3bbd2dd19265 
- dominion-cashier_system          | Updated | true           | 0x036e521f8dca7fc9828879272d7fdabfee7d0fd7d81e7d6a8303bc713373df09 | 0x04aded7826879353faf7940fb95598c548ada8cd1e89d215e27bf4a68fb9abca 
- dominion-table_management_system | Updated | true           | 0x0078cd3f96d3573400a198e2e01ec57d618e6275bc696cc0de56b39155ee4c93 | 0x07d8cbf3785bf7ff0ce4a76b1b3845012866c4262a81de79cbe7cea38c598dd3 
+ [90mContracts[39m                        | Status | Is Initialized | Dojo Selector                                                      | Contract Address                                                   
+----------------------------------+--------+----------------+--------------------------------------------------------------------+--------------------------------------------------------------------
+ dominion-actions_system          | Synced | true           | 0x05fdf8e627677acf0623e578748e3068e45b056e1860750dfc2365d05201fae4 | 0x04a2d59b915d66d4e0261aa4c4b9f5b1a0de7cdd7ff65a86ab7b6ad3eac4aec9 
+ dominion-cashier_system          | Synced | true           | 0x036e521f8dca7fc9828879272d7fdabfee7d0fd7d81e7d6a8303bc713373df09 | 0x04999d8264c179208aa855a72ee6b74dd5b1b5098d25bc4a4f6970026186b9e3 
+ dominion-table_management_system | Synced | true           | 0x0078cd3f96d3573400a198e2e01ec57d618e6275bc696cc0de56b39155ee4c93 | 0x0339ef756b924458aa0e99b0779837962907c57243ef9dfcdc17cc6dc6ab0b49 
 
- [90mModels[39m                    | Status | Dojo Selector                                                      
----------------------------+--------+--------------------------------------------------------------------
- dominion-ComponentHand    | Synced | 0x04bd62816580f9be0bc3df0172a78fb4a94f33a0fee5a4669d9d43217ad01e85 
- dominion-ComponentPlayer  | Synced | 0x01ad4df630f65e2174274b501fa84cc61f27e0f99ca50f958bfe7d72bd88434a 
- dominion-ComponentRake    | Synced | 0x0020ea8c79af680865f8aa97eb935b2bb11ba0a79c1f44abaa607103a8e58f4a 
- dominion-ComponentSidepot | Synced | 0x057083362aec796140a679898f64c8be972c8dd2760a4ae175734990c668c74c 
- dominion-ComponentTable   | Synced | 0x03624a5fdc31bf9404a3420b8c7bb6560c7844c6d640951ff30de78b3f55feb3 
+ [90mModels[39m                         | Status | Dojo Selector                                                      
+--------------------------------+--------+--------------------------------------------------------------------
+ dominion-ComponentBank         | Synced | 0x055f85d0b3b1f52ce8a9e763ae8302404d871c420b3872aee1fa495108f299be 
+ dominion-ComponentHand         | Synced | 0x04bd62816580f9be0bc3df0172a78fb4a94f33a0fee5a4669d9d43217ad01e85 
+ dominion-ComponentOriginalDeck | Synced | 0x050fdfa7e0e6ae8f516b9325902eb6892e7f16817c2d7b05f156d8f2f4f0bb43 
+ dominion-ComponentPlayer       | Synced | 0x01ad4df630f65e2174274b501fa84cc61f27e0f99ca50f958bfe7d72bd88434a 
+ dominion-ComponentProof        | Synced | 0x0173233548e7c1e9f1c00a8e5731325d6bac4ee49ad5b60ee7e71a074a25d8ab 
+ dominion-ComponentRake         | Synced | 0x0020ea8c79af680865f8aa97eb935b2bb11ba0a79c1f44abaa607103a8e58f4a 
+ dominion-ComponentRound        | Synced | 0x028ef463bdb763295e19cb1bc06c7555ced07aa8ed885092818bfda9d81326b8 
+ dominion-ComponentSidepot      | Synced | 0x057083362aec796140a679898f64c8be972c8dd2760a4ae175734990c668c74c 
+ dominion-ComponentStreet       | Synced | 0x0677ab53bfe21d0639960f643bb8c19b2daa6af16ac3db6f2a66715ea9a0f237 
+ dominion-ComponentTable        | Synced | 0x03624a5fdc31bf9404a3420b8c7bb6560c7844c6d640951ff30de78b3f55feb3 
+ dominion-ComponentTableInfo    | Synced | 0x03cbb2daa50bf55759aaa7530f06162834907c61ac62298a9e69c424fd2e984a 
+ dominion-ComponentWinners      | Synced | 0x0318ea31fec78e435dde7db1e04fcf3098d612edf618ea3f75427e88f4a86190 
 
  [90mEvents[39m                                | Status | Dojo Selector                                                      
 ---------------------------------------+--------+--------------------------------------------------------------------

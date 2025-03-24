@@ -1,9 +1,12 @@
-use crate::models::structs::StructCard;
-
 #[derive(Drop, Serde, Copy, Debug, PartialEq, Introspect)]
-pub enum EnumGameState {
+pub enum EnumTableState {
     Shutdown,
     WaitingForPlayers,
+    InProgress
+}
+
+#[derive(Drop, Serde, Copy, Debug, PartialEq, Introspect)]
+pub enum EnumStreetState {
     PreFlop,
     Flop,
     Turn,
@@ -35,6 +38,7 @@ pub enum EnumPosition {
 
 #[derive(Drop, Serde, Clone, Debug, PartialEq, Introspect)]
 pub enum EnumHandRank {
+    None: (),  // When we win by default and don't want to show our hand.
     HighCard: EnumCardValue, // Store highest unique card.
     Pair: EnumCardValue, // Just store the pair value.
     TwoPair: (EnumCardValue, EnumCardValue), // Store both pair values.

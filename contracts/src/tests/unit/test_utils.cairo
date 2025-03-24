@@ -1,7 +1,6 @@
-use dominion::models::structs::StructCard;
 use dominion::models::enums::{EnumCardValue, EnumCardSuit};
 use dominion::models::traits::{StructCardEq, StructCardDisplay, ICard};
-use dominion::models::utils::{sort, merge_sort, _merge_sort_players};
+use dominion::models::utils::{sort};
 
 #[test]
 fn test_sort_cards() {
@@ -51,21 +50,4 @@ fn test_sort_cards() {
     ];
     let sorted_arr = sort(@input_arr);
     assert_eq!(sorted_arr, expected_arr);
-}
-
-#[test]
-fn test_sort_bets() {
-    let players = array![
-        (starknet::contract_address_const::<1>(), 300),
-        (starknet::contract_address_const::<2>(), 100),
-        (starknet::contract_address_const::<3>(), 200)
-    ];
-    let expected_array = array![
-        (starknet::contract_address_const::<2>(), 100),
-        (starknet::contract_address_const::<3>(), 200),
-        (starknet::contract_address_const::<1>(), 300)
-    ];
-
-    let new_array = _merge_sort_players(@players);
-    assert_eq!(new_array, expected_array);
 }

@@ -1,28 +1,28 @@
-mod models {
-    mod utils;
-    mod components;
-    mod enums;
-    mod structs;
-    mod traits;
+pub mod models {
+    pub mod utils;
+    pub mod components;
+    pub mod enums;
+    pub mod structs;
+    pub mod traits;
 }
 
-mod systems {
-    mod actions;
-    mod table_manager;
-    mod cashier;
+pub mod systems {
+    pub mod actions;
+    pub mod table_manager;
+    pub mod cashier;
 }
 
 #[cfg(test)]
-mod tests {
-    mod unit {
-        mod test_card;
-        mod test_utils;
-        mod test_traits;
+pub mod tests {
+    pub mod unit {
+        pub mod test_card;
+        pub mod test_utils;
+        pub mod test_traits;
     }
-    mod integration {
-        mod utils;
-        mod test_actions;
-        mod test_table_manager;
-        // mod test_cashier;
+    pub mod integration {
+        pub mod utils;
+        pub mod test_actions;
+        pub mod test_table_manager;
+        pub mod test_cashier;
     }
 }
