@@ -1,21 +1,23 @@
 use starknet::ContractAddress;
 
 #[starknet::interface]
-trait ICashier<TContractState> {
+pub trait ICashier<TContractState> {
     fn deposit_erc20(ref self: TContractState, amount: u256);
-    fn cashout_erc20(ref self: TContractState, chips_amount: u32);
+    fn cashout_erc20(ref self: TContractState, chips_amount: u256);
     fn claim_fees(ref self: TContractState);
     fn transfer_chips(ref self: TContractState, to: ContractAddress, amount: u32);
     fn set_treasury_address(ref self: TContractState, treasury_address: ContractAddress);
     fn set_vault_address(ref self: TContractState, vault_address: ContractAddress);
     fn set_paymaster_address(ref self: TContractState, paymaster_address: ContractAddress);
+    fn get_player_balance(self: @TContractState, player: ContractAddress) -> u32;
     fn get_treasury_address(self: @TContractState) -> ContractAddress;
     fn get_vault_address(self: @TContractState) -> ContractAddress;
     fn get_paymaster_address(self: @TContractState) -> ContractAddress;
 }
 
 #[starknet::interface]
-trait IERC20<TContractState> {
+pub trait IERC20<TContractState> {
+    fn transfer(ref self: TContractState, recipient: ContractAddress, amount: u256) -> bool;
     fn transfer_from(
         ref self: TContractState, sender: ContractAddress, recipient: ContractAddress, amount: u256
     ) -> bool;
@@ -23,16 +25,16 @@ trait IERC20<TContractState> {
 }
 
 #[dojo::contract]
-mod cashier_system {
-    use starknet::{ContractAddress, get_caller_address, get_contract_address, get_tx_info, TxInfo};
-    use dominion::models::traits::IPlayer;
-    use dojo::{model::ModelStorage, world::IWorldDispatcher};
-    use dominion::models::components::{ComponentPlayer, ComponentRake};
+pub(crate) mod cashier_system {
+    use starknet::{ContractAddress, get_caller_address, get_tx_info, TxInfo};
+    use dojo::{model::ModelStorage};
+    use starknet::storage::{StoragePointerReadAccess, StoragePointerWriteAccess};
+    use dominion::models::components::{ComponentBank, ComponentRake};
     use super::{IERC20Dispatcher, IERC20DispatcherTrait};
 
     // Constants
     const ETH_TO_CHIPS_RATIO: u256 =
-        10000000000000; // 100,000 chips per ETH // TODO: Change this to 1,000,000 chips per ETH
+        1_000_000_000_000; // 1,000,000 chips per ETH
     const PAYMASTER_FEE_PERCENTAGE: u32 = 0; // Turned off for now
     const WITHDRAWAL_FEE_PERCENTAGE: u32 = 0; // 2% withdrawal fee
 
@@ -71,7 +73,7 @@ mod cashier_system {
             let net_amount: u256 = amount - paymaster_amount;
 
             // Calculate chips to mint based on net amount
-            let chips_amount: u32 = (net_amount / ETH_TO_CHIPS_RATIO).try_into().unwrap();
+            let chips_amount: u32 = (net_amount / ETH_TO_CHIPS_RATIO).try_into().expect('Cannot convert eth to chips');
 
             // Transfer ETH to paymaster
             if PAYMASTER_FEE_PERCENTAGE > 0 {
@@ -86,43 +88,41 @@ mod cashier_system {
             );
 
             // Update player's chips
-            let mut player: ComponentPlayer = world.read_model((0, caller));
-            if !player.m_is_created {
-                player = IPlayer::new(0, caller);
-            }
-            player.m_total_chips += chips_amount;
-            world.write_model(@player);
+            let mut player_bank: ComponentBank = world.read_model(caller);
+            player_bank.m_balance += chips_amount;
+            world.write_model(@player_bank);
         }
 
-        fn cashout_erc20(ref self: ContractState, chips_amount: u32) {
+        fn cashout_erc20(ref self: ContractState, chips_amount: u256) {
             let mut world = self.world(@"dominion");
             let caller = get_caller_address();
 
             // Get player component
-            let mut player: ComponentPlayer = world.read_model(caller);
-            assert!(player.m_total_chips >= chips_amount, "Insufficient chips");
-
-            // Calculate ETH amount based on chips
-            let eth_amount: u256 = chips_amount.into() * ETH_TO_CHIPS_RATIO;
+            let mut player_bank: ComponentBank = world.read_model(caller);
+            let chips_amount_u32: u32 = (chips_amount / ETH_TO_CHIPS_RATIO).try_into().expect('Cannot convert eth to chips');
+            assert!(player_bank.m_balance >= chips_amount_u32, "Insufficient chips");
 
             // Calculate withdrawal fee (2%)
-            let fee_amount: u256 = (eth_amount * WITHDRAWAL_FEE_PERCENTAGE.into()) / 100;
-            let net_eth_amount: u256 = eth_amount - fee_amount;
+            let fee_amount: u256 = (chips_amount * WITHDRAWAL_FEE_PERCENTAGE.into()) / 100;
+            let net_eth_amount: u256 = chips_amount - fee_amount;
+
+            // Transfer net ETH to caller
+            // Create ERC20 dispatcher
+            let erc20 = IERC20Dispatcher {
+                contract_address: starknet::contract_address_const::<ETH_CONTRACT_ADDRESS>()
+            };
 
             // Transfer fee to treasury
             if WITHDRAWAL_FEE_PERCENTAGE > 0 {
-                InternalImpl::_transfer_eth_to(
-                    fee_amount, self.treasury_address.read()
-                );
+                erc20.transfer(self.treasury_address.read(), fee_amount);
             }
 
-            // Transfer net ETH to caller
-            // TODO: Approve ETH contract to transfer ETH to caller from Vault's wallet
-            InternalImpl::_transfer_eth_to(net_eth_amount, caller);
+            // Call transfer
+            erc20.transfer(caller, net_eth_amount);
 
             // Update player's chips
-            player.m_total_chips -= chips_amount;
-            world.write_model(@player);
+            player_bank.m_balance -= chips_amount_u32;
+            world.write_model(@player_bank);
         }
 
         fn transfer_chips(ref self: ContractState, to: ContractAddress, amount: u32) {
@@ -130,17 +130,17 @@ mod cashier_system {
             let caller = get_caller_address();
 
             // Get sender and recipient components
-            let mut sender: ComponentPlayer = world.read_model(caller);
-            let mut recipient: ComponentPlayer = world.read_model(to);
+            let mut sender_bank: ComponentBank = world.read_model(caller);
+            let mut recipient_bank: ComponentBank = world.read_model(to);
 
-            assert!(sender.m_total_chips >= amount, "Insufficient chips");
+            assert!(sender_bank.m_balance >= amount, "Insufficient chips");
 
             // Update balances
-            sender.m_total_chips -= amount;
-            recipient.m_total_chips += amount;
+            sender_bank.m_balance -= amount;
+            recipient_bank.m_balance += amount;
 
-            world.write_model(@sender);
-            world.write_model(@recipient);
+            world.write_model(@sender_bank);
+            world.write_model(@recipient_bank);
         }
 
         fn claim_fees(ref self: ContractState) {
@@ -154,7 +154,6 @@ mod cashier_system {
             let eth_amount: u256 = rake.m_chip_amount.into() * ETH_TO_CHIPS_RATIO;
 
             // Transfer net ETH to caller
-            // TODO: Approve ETH contract to transfer ETH to caller from Vault's wallet
             InternalImpl::_transfer_eth_to(eth_amount, caller);
 
             // Update rake's chips
@@ -188,6 +187,12 @@ mod cashier_system {
         fn get_paymaster_address(self: @ContractState) -> ContractAddress {
             self.paymaster_address.read()
         }
+
+        fn get_player_balance(self: @ContractState, player: ContractAddress) -> u32 {
+            let mut world = self.world(@"dominion");
+            let mut player_bank: ComponentBank = world.read_model(player);
+            player_bank.m_balance
+        }
     }
 
     // Helper functions
@@ -200,14 +205,11 @@ mod cashier_system {
             };
 
             // Call transferFrom
-            // TODO: Approve contract to transfer ETH first.
-            let transfer_result = erc20
+            erc20
                 .transfer_from(get_caller_address(), // from
                  to, // to
                  amount // amount
                 );
-
-            assert!(transfer_result, "ERC20 transfer failed");
         }
     }
 }
